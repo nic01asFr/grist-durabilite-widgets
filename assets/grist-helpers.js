@@ -172,74 +172,55 @@ const GristHelpers = {
 
   // =========================================================================
   // ENSURE SCHEMA — Crée tables + colonnes manquantes à l'initialisation
+  // Utilise l'API postMessage (pas de CORS, pas de REST API)
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
     log('Vérification du schéma Grist (13 tables)…');
 
     try {
-      const tokenInfo = await grist.docApi.getAccessToken({ readOnly: false });
-      const baseUrl = tokenInfo.baseUrl;
-      const headers = {
-        'Authorization': `Bearer ${tokenInfo.token}`,
-        'Content-Type': 'application/json'
-      };
+      // Lire les métadonnées Grist via postMessage (pas de CORS)
+      const metaTables = await grist.docApi.fetchTable('_grist_Tables');
+      const existingTables = new Set(metaTables.tableId);
 
-      // 1. Lister les tables existantes
-      const tablesResp = await fetch(`${baseUrl}/tables`, { headers });
-      if (!tablesResp.ok) throw new Error('Impossible de lister les tables : ' + tablesResp.status);
-      const tablesData = await tablesResp.json();
-      const existingTables = new Set(tablesData.tables.map(t => t.id));
+      // Index rowId → nom de table pour les colonnes
+      const tableRowIdToName = {};
+      metaTables.id.forEach((rowId, i) => {
+        tableRowIdToName[rowId] = metaTables.tableId[i];
+      });
+
+      // Lire les colonnes existantes
+      const metaCols = await grist.docApi.fetchTable('_grist_Tables_column');
+      const existingColumns = {};
+      metaCols.parentId.forEach((parentRowId, i) => {
+        const tableName = tableRowIdToName[parentRowId];
+        if (tableName) {
+          if (!existingColumns[tableName]) existingColumns[tableName] = new Set();
+          existingColumns[tableName].add(metaCols.colId[i]);
+        }
+      });
 
       let created = 0, updated = 0;
 
       for (const [tableName, tableDef] of Object.entries(GristHelpers.SCHEMA)) {
 
         if (!existingTables.has(tableName)) {
-          // Créer la table avec toutes ses colonnes
+          // Créer la table avec toutes ses colonnes via applyUserActions
           log(`Création de la table ${tableName}…`);
-          const createResp = await fetch(`${baseUrl}/tables`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              tables: [{
-                id: tableName,
-                columns: tableDef.columns
-              }]
-            })
-          });
-          if (!createResp.ok) {
-            const err = await createResp.text();
-            log(`Erreur création table ${tableName} : ${err}`, 'err');
-            continue;
-          }
-          log(`Table ${tableName} créée ✓ (${tableDef.columns.length} colonnes)`, 'ok');
+          const cols = tableDef.columns.map(c => ({ id: c.id, ...c.fields }));
+          await grist.docApi.applyUserActions([['AddTable', tableName, cols]]);
+          log(`Table ${tableName} créée ✓ (${cols.length} colonnes)`, 'ok');
           created++;
 
         } else {
           // Table existe — vérifier les colonnes manquantes
-          const colsResp = await fetch(`${baseUrl}/tables/${tableName}/columns`, { headers });
-          if (!colsResp.ok) {
-            log(`Impossible de lire les colonnes de ${tableName}`, 'warn');
-            continue;
-          }
-          const colsData = await colsResp.json();
-          const existingCols = new Set(colsData.columns.map(c => c.id));
-
-          const missingCols = tableDef.columns.filter(c => !existingCols.has(c.id));
+          const existingColSet = existingColumns[tableName] || new Set();
+          const missingCols = tableDef.columns.filter(c => !existingColSet.has(c.id));
 
           if (missingCols.length > 0) {
             log(`Ajout de ${missingCols.length} colonne(s) à ${tableName}…`);
-            const addResp = await fetch(`${baseUrl}/tables/${tableName}/columns`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ columns: missingCols })
-            });
-            if (!addResp.ok) {
-              const err = await addResp.text();
-              log(`Erreur ajout colonnes ${tableName} : ${err}`, 'err');
-              continue;
-            }
+            const actions = missingCols.map(c => ['AddColumn', tableName, c.id, c.fields]);
+            await grist.docApi.applyUserActions(actions);
             log(`${tableName} : +${missingCols.length} colonne(s) ✓`, 'ok');
             updated++;
           }
@@ -277,42 +258,28 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // GRIST REST API — Lecture
+  // GRIST API — Lecture (postMessage, pas de CORS)
   // =========================================================================
   async fetchAllRecords(tableName) {
-    const tokenInfo = await grist.docApi.getAccessToken({ readOnly: true });
-    const resp = await fetch(
-      `${tokenInfo.baseUrl}/tables/${tableName}/records`,
-      { headers: { 'Authorization': `Bearer ${tokenInfo.token}` } }
+    const tableData = await grist.docApi.fetchTable(tableName);
+    const ids = tableData.id;
+    const colNames = Object.keys(tableData).filter(
+      k => k !== 'id' && k !== 'manualSort' && !k.startsWith('gristHelper_')
     );
-    if (!resp.ok) {
-      throw new Error(`API Grist ${tableName} : ${resp.status}`);
-    }
-    const data = await resp.json();
-    return data.records;
+    return ids.map((id, idx) => ({
+      id,
+      fields: Object.fromEntries(colNames.map(col => [col, tableData[col][idx]]))
+    }));
   },
 
   // =========================================================================
-  // GRIST REST API — Écriture
+  // GRIST API — Écriture (postMessage, pas de CORS)
   // =========================================================================
   async createRecord(tableName, fields) {
-    const tokenInfo = await grist.docApi.getAccessToken({ readOnly: false });
-    const resp = await fetch(
-      `${tokenInfo.baseUrl}/tables/${tableName}/records`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tokenInfo.token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ records: [{ fields }] })
-      }
-    );
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`Sauvegarde ${tableName} : ${resp.status} — ${errText}`);
-    }
-    return (await resp.json()).records[0];
+    const result = await grist.docApi.applyUserActions([
+      ['AddRecord', tableName, null, fields]
+    ]);
+    return { id: result.retValues[0] };
   },
 
   // =========================================================================
