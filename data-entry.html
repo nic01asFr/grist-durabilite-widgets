@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saisie de données — Durabilité</title>
+
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    .tabs { flex-wrap: wrap; }
+    .tab { font-size: 12px; padding: 6px 12px; white-space: nowrap; }
+    .tab.disabled { opacity: 0.4; pointer-events: none; }
+    .tab .badge {
+      display: inline-block; background: var(--accent); color: #fff;
+      font-size: 9px; padding: 1px 5px; border-radius: 8px; margin-left: 4px;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .breadcrumb {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+      font-size: 11px; color: var(--text-dim); margin-bottom: 12px;
+    }
+    .breadcrumb .crumb {
+      background: var(--surface2); padding: 3px 8px; border-radius: 6px;
+      color: var(--text-muted); max-width: 200px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .breadcrumb .crumb.active { color: var(--accent-light); border: 1px solid var(--accent); }
+    .breadcrumb .sep { color: var(--text-dim); }
+
+    .selector-row {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+    }
+    .selector-row select {
+      flex: 1; padding: 8px 10px; background: var(--bg); border: 1px solid var(--surface2);
+      border-radius: 6px; color: var(--text); font-size: 13px;
+    }
+    .selector-row select:focus { outline: none; border-color: var(--accent); }
+
+    .form-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px; margin-bottom: 12px;
+    }
+    .form-field label {
+      display: block; font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px;
+    }
+    .form-field label .req { color: var(--error); }
+    .form-field input, .form-field select, .form-field textarea {
+      width: 100%; padding: 7px 10px; background: var(--bg);
+      border: 1px solid var(--surface2); border-radius: 6px;
+      color: var(--text); font-size: 13px; font-family: inherit;
+    }
+    .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .form-field textarea { resize: vertical; min-height: 60px; }
+
+    .form-actions {
+      display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;
+    }
+
+    .detail-section {
+      border: 1px solid var(--surface2); border-radius: 8px;
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .detail-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: var(--bg); cursor: pointer;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+    }
+    .detail-header:hover { color: var(--text); }
+    .detail-header .count {
+      font-size: 10px; background: var(--surface2); padding: 2px 7px;
+      border-radius: 10px; font-weight: 400;
+    }
+    .detail-body { padding: 8px 12px; display: none; }
+    .detail-body.open { display: block; }
+
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .mini-table th {
+      text-align: left; padding: 4px 6px; font-size: 10px;
+      text-transform: uppercase; color: var(--text-dim);
+      border-bottom: 1px solid var(--surface2); font-weight: 600;
+    }
+    .mini-table td { padding: 4px 6px; border-bottom: 1px solid var(--surface2); }
+    .mini-table input {
+      width: 100%; padding: 4px 6px; background: var(--bg);
+      border: 1px solid var(--surface2); border-radius: 4px;
+      color: var(--text); font-size: 12px;
+    }
+    .mini-table input:focus { outline: none; border-color: var(--accent); }
+    .mini-table .row-actions { width: 30px; text-align: center; }
+    .btn-icon {
+      background: none; border: none; color: var(--text-dim); cursor: pointer;
+      font-size: 14px; padding: 2px 4px; border-radius: 4px;
+    }
+    .btn-icon:hover { color: var(--error); background: rgba(239,68,68,0.1); }
+
+    .protocol-type-selector {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .protocol-type-btn {
+      flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--surface2);
+      background: var(--bg); color: var(--text-muted); font-size: 13px;
+      cursor: pointer; text-align: center; transition: all 0.15s;
+    }
+    .protocol-type-btn:hover { border-color: var(--border); color: var(--text); }
+    .protocol-type-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .selected-summary {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .selected-summary .tag {
+      font-size: 11px; padding: 3px 8px; border-radius: 6px;
+      background: var(--bg); color: var(--text-muted); border: 1px solid var(--surface2);
+    }
+    .selected-summary .tag.set { color: var(--success); border-color: var(--success); }
+
+    .log { max-height: 100px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1><span class="icon">📝</span> Saisie de données</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-secondary" onclick="refreshAll()">🔄 Rafraîchir</button>
+      <div class="status" id="status">
+        <span class="dot"></span>
+        <span id="status-text">Chargement…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breadcrumb -->
+  <div class="card" style="padding:10px 16px;">
+    <div class="breadcrumb" id="breadcrumb"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="card" style="padding:8px 12px 0;">
+    <div class="tabs" id="main-tabs">
+      <div class="tab active" data-tab="source" onclick="showTab('source')">Source</div>
+      <div class="tab" data-tab="mix" onclick="showTab('mix')">Béton</div>
+      <div class="tab" data-tab="details" onclick="showTab('details')">Détails</div>
+      <div class="tab" data-tab="site" onclick="showTab('site')">Site</div>
+      <div class="tab" data-tab="protocol" onclick="showTab('protocol')">Protocole</div>
+      <div class="tab" data-tab="results" onclick="showTab('results')">Mesures</div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: SOURCE -->
+  <!-- ============================================================ -->
+  <div class="tab-panel active" id="panel-source">
+    <div class="card">
+      <div class="card-title">Source bibliographique</div>
+      <div class="selector-row">
+        <select id="sel-source" onchange="onSelectSource()">
+          <option value="">— Sélectionner une source —</option>
+        </select>
+        <button class="btn btn-secondary" onclick="toggleForm('source')">+ Nouveau</button>
+      </div>
+      <div id="form-source" style="display:none;">
+        <div class="form-grid">
+          <div class="form-field"><label>Auteurs <span class="req">*</span></label><input type="text" id="f-source-authors" placeholder="Dupont, Martin et al."></div>
+          <div class="form-field"><label>Titre <span class="req">*</span></label><input type="text" id="f-source-title" placeholder="Titre de l'article"></div>
+          <div class="form-field"><label>Revue</label><input type="text" id="f-source-journal" placeholder="Cement and Concrete Research"></div>
+          <div class="form-field"><label>Année</label><input type="number" id="f-source-year" placeholder="2023" min="1950" max="2030"></div>
+          <div class="form-field"><label>DOI</label><input type="text" id="f-source-doi" placeholder="10.1016/..."></div>
+          <div class="form-field"><label>URL</label><input type="text" id="f-source-url" placeholder="https://..."></div>
+          <div class="form-field" style="grid-column: 1/-1;"><label>Notes</label><textarea id="f-source-notes" placeholder="Notes complémentaires"></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="toggleForm('source')">Annuler</button>
+          <button class="btn btn-primary" onclick="saveSource()">Enregistrer la source</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: CONCRETE_MIX -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="panel-mix">
+    <div class="card">
+      <div class="card-title">Formulation béton</div>
+      <div class="selector-row">
+        <select id="sel-mix" onchange="onSelectMix()">
+          <option value="">— Sélectionner un béton —</option>
+        </select>
+        <button class="btn btn-secondary" onclick="toggleForm('mix')">+ Nouveau</button>
+      </div>
+      <div id="form-mix" style="display:none;">
+        <div class="form-grid">
+          <div class="form-field"><label>Nom du mélange <span class="req">*</span></label><input type="text" id="f-mix-name" placeholder="OPC-0.45"></div>
+          <div class="form-field"><label>Type de ciment</label><input type="text" id="f-mix-cement" placeholder="CEM I 52.5"></div>
+          <div class="form-field"><label>E/L (ratio)</label><input type="number" id="f-mix-wbr" step="0.01" min="0" max="1" placeholder="0.45"></div>
+          <div class="form-field"><label>Liant total (kg/m³)</label><input type="number" id="f-mix-binder" step="1" min="0" placeholder="350"></div>
+          <div class="form-field"><label>Eau (kg/m³)</label><input type="number" id="f-mix-water" step="1" min="0" placeholder="175"></div>
+          <div class="form-field"><label>Type adjuvant</label><input type="text" id="f-mix-admix-type" placeholder="Superplastifiant"></div>
+          <div class="form-field"><label>Dosage adjuvant (%)</label><input type="number" id="f-mix-admix-dose" step="0.1" min="0" placeholder="1.0"></div>
+          <div class="form-field"><label>Air entraîné (%)</label><input type="number" id="f-mix-air" step="0.1" min="0" placeholder="2.5"></div>
+          <div class="form-field"><label>Affaissement (mm)</label><input type="number" id="f-mix-slump" step="5" min="0" placeholder="180"></div>
+          <div class="form-field"><label>Condition de cure</label><input type="text" id="f-mix-curing" placeholder="Eau 20°C"></div>
+          <div class="form-field"><label>Durée cure (jours)</label><input type="number" id="f-mix-curing-days" step="1" min="0" placeholder="28"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="toggleForm('mix')">Annuler</button>
+          <button class="btn btn-primary" onclick="saveMix()">Enregistrer le béton</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: DETAILS (4 sous-tables) -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="panel-details">
+    <div class="card">
+      <div class="card-title">Détails du béton</div>
+      <div id="details-empty" class="empty-state" style="padding:24px;">
+        <h3>Sélectionnez d'abord un béton</h3>
+        <p>Retournez à l'onglet Béton pour en choisir ou créer un.</p>
+      </div>
+      <div id="details-content" style="display:none;">
+
+        <!-- AGGREGATES -->
+        <div class="detail-section">
+          <div class="detail-header" onclick="toggleDetail('agg')">
+            Granulats <span class="count" id="agg-count">0</span>
+          </div>
+          <div class="detail-body" id="detail-agg">
+            <table class="mini-table">
+              <thead><tr>
+                <th>Type</th><th>Min (mm)</th><th>Max (mm)</th><th>Dosage (kg/m³)</th><th class="row-actions"></th>
+              </tr></thead>
+              <tbody id="agg-rows"></tbody>
+            </table>
+            <button class="btn btn-secondary" style="margin-top:6px; font-size:11px; padding:4px 10px;" onclick="addDetailRow('agg')">+ Ajouter</button>
+          </div>
+        </div>
+
+        <!-- BINDER_COMPOSITION -->
+        <div class="detail-section">
+          <div class="detail-header" onclick="toggleDetail('binder')">
+            Composition du liant <span class="count" id="binder-count">0</span>
+          </div>
+          <div class="detail-body" id="detail-binder">
+            <table class="mini-table">
+              <thead><tr>
+                <th>Composant</th><th>Teneur (%)</th><th>Base</th><th class="row-actions"></th>
+              </tr></thead>
+              <tbody id="binder-rows"></tbody>
+            </table>
+            <button class="btn btn-secondary" style="margin-top:6px; font-size:11px; padding:4px 10px;" onclick="addDetailRow('binder')">+ Ajouter</button>
+          </div>
+        </div>
+
+        <!-- CEMENT_CHARACTERIZATION -->
+        <div class="detail-section">
+          <div class="detail-header" onclick="toggleDetail('cement')">
+            Caractérisation ciment <span class="count" id="cement-count">0</span>
+          </div>
+          <div class="detail-body" id="detail-cement">
+            <table class="mini-table">
+              <thead><tr>
+                <th>Phase</th><th>Valeur (%)</th><th>Méthode</th><th class="row-actions"></th>
+              </tr></thead>
+              <tbody id="cement-rows"></tbody>
+            </table>
+            <button class="btn btn-secondary" style="margin-top:6px; font-size:11px; padding:4px 10px;" onclick="addDetailRow('cement')">+ Ajouter</button>
+          </div>
+        </div>
+
+        <!-- MATERIAL_PROPERTIES -->
+        <div class="detail-section">
+          <div class="detail-header" onclick="toggleDetail('matprop')">
+            Propriétés matériau <span class="count" id="matprop-count">0</span>
+          </div>
+          <div class="detail-body" id="detail-matprop">
+            <table class="mini-table">
+              <thead><tr>
+                <th>Propriété</th><th>Valeur</th><th>Unité</th><th>Âge (j)</th><th class="row-actions"></th>
+              </tr></thead>
+              <tbody id="matprop-rows"></tbody>
+            </table>
+            <button class="btn btn-secondary" style="margin-top:6px; font-size:11px; padding:4px 10px;" onclick="addDetailRow('matprop')">+ Ajouter</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: SITE -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="panel-site">
+    <div class="card">
+      <div class="card-title">Site d'exposition</div>
+      <div class="selector-row">
+        <select id="sel-site" onchange="onSelectSite()">
+          <option value="">— Sélectionner un site —</option>
+        </select>
+        <button class="btn btn-secondary" onclick="toggleForm('site')">+ Nouveau</button>
+      </div>
+      <div id="form-site" style="display:none;">
+        <div class="form-grid">
+          <div class="form-field"><label>Nom du site <span class="req">*</span></label><input type="text" id="f-site-name" placeholder="Port de Marseille"></div>
+          <div class="form-field"><label>Pays</label><input type="text" id="f-site-country" placeholder="France"></div>
+          <div class="form-field"><label>Latitude</label><input type="number" id="f-site-lat" step="0.0001" placeholder="43.2965"></div>
+          <div class="form-field"><label>Longitude</label><input type="number" id="f-site-lng" step="0.0001" placeholder="5.3698"></div>
+          <div class="form-field"><label>Zone climatique</label><input type="text" id="f-site-climate" placeholder="Méditerranéen"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="toggleForm('site')">Annuler</button>
+          <button class="btn btn-primary" onclick="saveSite()">Enregistrer le site</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: PROTOCOL -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="panel-protocol">
+    <div class="card">
+      <div class="card-title">Protocole d'exposition</div>
+
+      <div class="protocol-type-selector">
+        <button class="protocol-type-btn active" id="proto-type-chl" onclick="setProtoType('chloride')">
+          Chlorures
+        </button>
+        <button class="protocol-type-btn" id="proto-type-carb" onclick="setProtoType('carbonation')">
+          Carbonatation
+        </button>
+      </div>
+
+      <div class="selector-row">
+        <select id="sel-protocol" onchange="onSelectProtocol()">
+          <option value="">— Sélectionner un protocole —</option>
+        </select>
+        <button class="btn btn-secondary" onclick="toggleForm('protocol')">+ Nouveau</button>
+      </div>
+
+      <!-- Chloride protocol form -->
+      <div id="form-protocol" style="display:none;">
+        <div id="form-chl-fields">
+          <div class="form-grid">
+            <div class="form-field"><label>Régime exposition <span class="req">*</span></label>
+              <select id="f-proto-regime">
+                <option value="">Choisir…</option>
+                <option>Immersion</option><option>Marnage</option>
+                <option>Aspersion</option><option>Atmosphérique</option>
+                <option>Accéléré laboratoire</option>
+              </select>
+            </div>
+            <div class="form-field"><label>Concentration</label><input type="number" id="f-proto-conc" step="0.1" min="0" placeholder="35"></div>
+            <div class="form-field"><label>Unité</label>
+              <select id="f-proto-conc-unit">
+                <option value="g/L">g/L</option><option value="mol/L">mol/L</option><option value="%">%</option>
+              </select>
+            </div>
+            <div class="form-field"><label>Température (°C)</label><input type="number" id="f-proto-temp" step="0.5" placeholder="20"></div>
+          </div>
+        </div>
+        <div id="form-carb-fields" style="display:none;">
+          <div class="form-grid">
+            <div class="form-field"><label>Type exposition <span class="req">*</span></label>
+              <select id="f-proto-carb-type">
+                <option value="">Choisir…</option>
+                <option>Naturelle</option><option>Accélérée</option>
+                <option>Laboratoire</option><option>In situ</option>
+              </select>
+            </div>
+            <div class="form-field"><label>CO2 (%)</label><input type="number" id="f-proto-co2" step="0.1" min="0" placeholder="0.04"></div>
+            <div class="form-field"><label>HR (%)</label><input type="number" id="f-proto-rh" step="1" min="0" max="100" placeholder="65"></div>
+            <div class="form-field"><label>Température (°C)</label><input type="number" id="f-proto-carb-temp" step="0.5" placeholder="20"></div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="toggleForm('protocol')">Annuler</button>
+          <button class="btn btn-primary" onclick="saveProtocol()">Enregistrer le protocole</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB: RESULTS -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="panel-results">
+    <div class="card">
+      <div class="card-title">Mesures</div>
+      <div id="results-empty" class="empty-state" style="padding:24px;">
+        <h3>Sélectionnez d'abord un protocole</h3>
+        <p>Créez ou choisissez un protocole dans l'onglet précédent.</p>
+      </div>
+      <div id="results-content" style="display:none;">
+        <div id="results-chl-table">
+          <table class="mini-table">
+            <thead><tr>
+              <th>Temps (jours)</th><th>Profondeur (mm)</th><th>Cl⁻ (% liant)</th><th class="row-actions"></th>
+            </tr></thead>
+            <tbody id="results-chl-rows"></tbody>
+          </table>
+        </div>
+        <div id="results-carb-table" style="display:none;">
+          <table class="mini-table">
+            <thead><tr>
+              <th>Temps (jours)</th><th>Profondeur (mm)</th><th class="row-actions"></th>
+            </tr></thead>
+            <tbody id="results-carb-rows"></tbody>
+          </table>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="addResultRow()">+ Ajouter mesure</button>
+          <button class="btn btn-primary" style="font-size:11px; padding:4px 10px;" onclick="saveResults()">Enregistrer les mesures</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card">
+    <div class="card-title">Journal</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let activeTab = 'source';
+    let protoType = 'chloride'; // 'chloride' | 'carbonation'
+
+    // Données chargées
+    let allSources = [], allMixes = [], allSites = [];
+    let allChlProtocols = [], allCarbProtocols = [];
+    let allAggregates = [], allBinders = [], allCements = [], allMatProps = [];
+
+    // Sélections actives
+    const sel = { source: null, mix: null, site: null, protocol: null };
+
+    // =========================================================================
+    // TABS
+    // =========================================================================
+    function showTab(tabName) {
+      activeTab = tabName;
+      document.querySelectorAll('#main-tabs .tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === tabName)
+      );
+      document.querySelectorAll('.tab-panel').forEach(p =>
+        p.classList.toggle('active', p.id === 'panel-' + tabName)
+      );
+      updateBreadcrumb();
+    }
+
+    // =========================================================================
+    // BREADCRUMB
+    // =========================================================================
+    function updateBreadcrumb() {
+      const items = [
+        { key: 'source', label: sel.source ? (allSources.find(s => s.id === sel.source)?.fields.authors || `Source #${sel.source}`) : null },
+        { key: 'mix', label: sel.mix ? (allMixes.find(m => m.id === sel.mix)?.fields.mix_name || `Béton #${sel.mix}`) : null },
+        { key: 'site', label: sel.site ? (allSites.find(s => s.id === sel.site)?.fields.site_name || `Site #${sel.site}`) : null },
+        { key: 'protocol', label: sel.protocol ? `Protocole #${sel.protocol}` : null },
+      ];
+      const bc = document.getElementById('breadcrumb');
+      bc.innerHTML = items.map((item, i) => {
+        const cls = item.label ? 'crumb set' : 'crumb';
+        const active = item.key === activeTab ? ' active' : '';
+        const text = item.label || ('— ' + item.key + ' —');
+        return (i > 0 ? '<span class="sep">→</span>' : '') +
+          `<span class="${cls}${active}" onclick="showTab('${item.key}')" style="cursor:pointer">${text}</span>`;
+      }).join('');
+    }
+
+    // =========================================================================
+    // FORM TOGGLE
+    // =========================================================================
+    function toggleForm(section) {
+      const form = document.getElementById('form-' + section);
+      form.style.display = form.style.display === 'none' ? '' : 'none';
+    }
+
+    function toggleDetail(section) {
+      const body = document.getElementById('detail-' + section);
+      body.classList.toggle('open');
+    }
+
+    // =========================================================================
+    // DATA LOADING
+    // =========================================================================
+    async function refreshAll() {
+      GristHelpers.log('Chargement des données de référence…');
+      GristHelpers.setStatus('Chargement…', '');
+      try {
+        [allSources, allMixes, allSites, allChlProtocols, allCarbProtocols,
+         allAggregates, allBinders, allCements, allMatProps] = await Promise.all([
+          GristHelpers.fetchAllRecords('SOURCE'),
+          GristHelpers.fetchAllRecords('CONCRETE_MIX'),
+          GristHelpers.fetchAllRecords('SITE'),
+          GristHelpers.fetchAllRecords('CHLORIDE_PROTOCOL'),
+          GristHelpers.fetchAllRecords('CARBONATION_PROTOCOL'),
+          GristHelpers.fetchAllRecords('AGGREGATES'),
+          GristHelpers.fetchAllRecords('BINDER_COMPOSITION'),
+          GristHelpers.fetchAllRecords('CEMENT_CHARACTERIZATION'),
+          GristHelpers.fetchAllRecords('MATERIAL_PROPERTIES'),
+        ]);
+
+        GristHelpers.log(`${allSources.length} sources, ${allMixes.length} bétons, ${allSites.length} sites`, 'ok');
+        populateDropdowns();
+        updateDetails();
+        GristHelpers.setStatus('Prêt', 'ready');
+      } catch (err) {
+        GristHelpers.log('Erreur chargement : ' + err.message, 'err');
+        GristHelpers.setStatus('Erreur', 'error');
+      }
+    }
+
+    // =========================================================================
+    // DROPDOWNS
+    // =========================================================================
+    function populateDropdowns() {
+      // Sources
+      fillDropdown('sel-source', allSources, s => `${s.fields.authors || '?'} (${s.fields.year || '?'}) — ${(s.fields.title || '').substring(0, 50)}`);
+
+      // Mixes — filtered by selected source
+      const mixes = sel.source
+        ? allMixes.filter(m => m.fields.source_id === sel.source)
+        : allMixes;
+      fillDropdown('sel-mix', mixes, m => `${m.fields.mix_name || '?'} — ${m.fields.cement_type || '?'} — E/L=${m.fields.w_b_ratio || '?'}`);
+
+      // Sites
+      fillDropdown('sel-site', allSites, s => `${s.fields.site_name || '?'} (${s.fields.country || '?'})`);
+
+      // Protocols — filtered by selected mix and type
+      const protocols = protoType === 'chloride'
+        ? allChlProtocols.filter(p => !sel.mix || p.fields.concrete_id === sel.mix)
+        : allCarbProtocols.filter(p => !sel.mix || p.fields.concrete_id === sel.mix);
+      fillDropdown('sel-protocol', protocols, p => {
+        if (protoType === 'chloride') {
+          return `#${p.id} — ${p.fields.exposure_regime || '?'} — ${p.fields.concentration_value || '?'} ${p.fields.concentration_unit || ''}`;
+        } else {
+          return `#${p.id} — ${p.fields.exposure_type || '?'} — CO₂ ${p.fields.co2_pct || '?'}%`;
+        }
+      });
+
+      // Restore selections
+      if (sel.source) document.getElementById('sel-source').value = sel.source;
+      if (sel.mix) document.getElementById('sel-mix').value = sel.mix;
+      if (sel.site) document.getElementById('sel-site').value = sel.site;
+      if (sel.protocol) document.getElementById('sel-protocol').value = sel.protocol;
+    }
+
+    function fillDropdown(elId, records, labelFn) {
+      const select = document.getElementById(elId);
+      const defaultText = select.options[0].text;
+      const prev = select.value;
+      select.innerHTML = `<option value="">${defaultText}</option>`;
+      records.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = labelFn(r);
+        select.appendChild(opt);
+      });
+      // Try to restore previous selection
+      if (prev && [...select.options].some(o => o.value == prev)) {
+        select.value = prev;
+      }
+    }
+
+    // =========================================================================
+    // SELECTION HANDLERS
+    // =========================================================================
+    function onSelectSource() {
+      const v = document.getElementById('sel-source').value;
+      sel.source = v ? parseInt(v) : null;
+      // Reset downstream
+      sel.mix = null; sel.protocol = null;
+      populateDropdowns();
+      updateBreadcrumb();
+      updateDetails();
+    }
+
+    function onSelectMix() {
+      const v = document.getElementById('sel-mix').value;
+      sel.mix = v ? parseInt(v) : null;
+      sel.protocol = null;
+      populateDropdowns();
+      updateBreadcrumb();
+      updateDetails();
+    }
+
+    function onSelectSite() {
+      const v = document.getElementById('sel-site').value;
+      sel.site = v ? parseInt(v) : null;
+      updateBreadcrumb();
+    }
+
+    function onSelectProtocol() {
+      const v = document.getElementById('sel-protocol').value;
+      sel.protocol = v ? parseInt(v) : null;
+      updateBreadcrumb();
+      updateResultsPanel();
+    }
+
+    // =========================================================================
+    // PROTOCOL TYPE
+    // =========================================================================
+    function setProtoType(type) {
+      protoType = type;
+      document.getElementById('proto-type-chl').classList.toggle('active', type === 'chloride');
+      document.getElementById('proto-type-carb').classList.toggle('active', type === 'carbonation');
+      document.getElementById('form-chl-fields').style.display = type === 'chloride' ? '' : 'none';
+      document.getElementById('form-carb-fields').style.display = type === 'carbonation' ? '' : 'none';
+      sel.protocol = null;
+      populateDropdowns();
+      updateResultsPanel();
+    }
+
+    // =========================================================================
+    // SAVE: SOURCE
+    // =========================================================================
+    async function saveSource() {
+      const authors = document.getElementById('f-source-authors').value.trim();
+      const title = document.getElementById('f-source-title').value.trim();
+      if (!authors || !title) { GristHelpers.log('Auteurs et titre requis', 'warn'); return; }
+
+      try {
+        const fields = {
+          authors,
+          title,
+          journal: document.getElementById('f-source-journal').value.trim() || '',
+          year: parseInt(document.getElementById('f-source-year').value) || 0,
+          doi: document.getElementById('f-source-doi').value.trim() || '',
+          url: document.getElementById('f-source-url').value.trim() || '',
+          notes: document.getElementById('f-source-notes').value.trim() || '',
+        };
+        const result = await GristHelpers.createRecord('SOURCE', fields);
+        GristHelpers.log(`Source créée (id=${result.id}) ✓`, 'ok');
+        sel.source = result.id;
+        toggleForm('source');
+        clearForm('source');
+        await refreshAll();
+        showTab('mix');
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // SAVE: CONCRETE_MIX
+    // =========================================================================
+    async function saveMix() {
+      const name = document.getElementById('f-mix-name').value.trim();
+      if (!name) { GristHelpers.log('Nom du mélange requis', 'warn'); return; }
+
+      try {
+        const fields = {
+          source_id: sel.source || 0,
+          mix_name: name,
+          cement_type: document.getElementById('f-mix-cement').value.trim() || '',
+          w_b_ratio: parseFloat(document.getElementById('f-mix-wbr').value) || 0,
+          total_binder_kg_m3: parseFloat(document.getElementById('f-mix-binder').value) || 0,
+          water_content_kg_m3: parseFloat(document.getElementById('f-mix-water').value) || 0,
+          admixture_type: document.getElementById('f-mix-admix-type').value.trim() || '',
+          admixture_dosage_pct: parseFloat(document.getElementById('f-mix-admix-dose').value) || 0,
+          air_content_pct: parseFloat(document.getElementById('f-mix-air').value) || 0,
+          slump_mm: parseFloat(document.getElementById('f-mix-slump').value) || 0,
+          curing_condition: document.getElementById('f-mix-curing').value.trim() || '',
+          curing_time_days: parseFloat(document.getElementById('f-mix-curing-days').value) || 0,
+        };
+        const result = await GristHelpers.createRecord('CONCRETE_MIX', fields);
+        GristHelpers.log(`Béton créé (id=${result.id}) ✓`, 'ok');
+        sel.mix = result.id;
+        toggleForm('mix');
+        clearForm('mix');
+        await refreshAll();
+        showTab('details');
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // SAVE: SITE
+    // =========================================================================
+    async function saveSite() {
+      const name = document.getElementById('f-site-name').value.trim();
+      if (!name) { GristHelpers.log('Nom du site requis', 'warn'); return; }
+
+      try {
+        const fields = {
+          site_name: name,
+          country: document.getElementById('f-site-country').value.trim() || '',
+          latitude: parseFloat(document.getElementById('f-site-lat').value) || 0,
+          longitude: parseFloat(document.getElementById('f-site-lng').value) || 0,
+          climate_zone: document.getElementById('f-site-climate').value.trim() || '',
+        };
+        const result = await GristHelpers.createRecord('SITE', fields);
+        GristHelpers.log(`Site créé (id=${result.id}) ✓`, 'ok');
+        sel.site = result.id;
+        toggleForm('site');
+        clearForm('site');
+        await refreshAll();
+        showTab('protocol');
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // SAVE: PROTOCOL
+    // =========================================================================
+    async function saveProtocol() {
+      if (!sel.mix) { GristHelpers.log('Sélectionnez d\'abord un béton', 'warn'); return; }
+
+      try {
+        let result;
+        if (protoType === 'chloride') {
+          const regime = document.getElementById('f-proto-regime').value;
+          if (!regime) { GristHelpers.log('Régime d\'exposition requis', 'warn'); return; }
+          result = await GristHelpers.createRecord('CHLORIDE_PROTOCOL', {
+            concrete_id: sel.mix,
+            site_id: sel.site || 0,
+            exposure_regime: regime,
+            concentration_value: parseFloat(document.getElementById('f-proto-conc').value) || 0,
+            concentration_unit: document.getElementById('f-proto-conc-unit').value || '',
+            temp_c: parseFloat(document.getElementById('f-proto-temp').value) || 0,
+          });
+        } else {
+          const expoType = document.getElementById('f-proto-carb-type').value;
+          if (!expoType) { GristHelpers.log('Type d\'exposition requis', 'warn'); return; }
+          result = await GristHelpers.createRecord('CARBONATION_PROTOCOL', {
+            concrete_id: sel.mix,
+            site_id: sel.site || 0,
+            exposure_type: expoType,
+            co2_pct: parseFloat(document.getElementById('f-proto-co2').value) || 0,
+            rh_pct: parseFloat(document.getElementById('f-proto-rh').value) || 0,
+            temp_c: parseFloat(document.getElementById('f-proto-carb-temp').value) || 0,
+          });
+        }
+        GristHelpers.log(`Protocole créé (id=${result.id}) ✓`, 'ok');
+        sel.protocol = result.id;
+        toggleForm('protocol');
+        await refreshAll();
+        showTab('results');
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // DETAILS: sub-tables management
+    // =========================================================================
+    function updateDetails() {
+      const hasM = !!sel.mix;
+      document.getElementById('details-empty').style.display = hasM ? 'none' : '';
+      document.getElementById('details-content').style.display = hasM ? '' : 'none';
+      if (!hasM) return;
+
+      // Aggregates
+      const aggs = allAggregates.filter(a => a.fields.concrete_id === sel.mix);
+      document.getElementById('agg-count').textContent = aggs.length;
+      document.getElementById('agg-rows').innerHTML = aggs.map(a => `
+        <tr>
+          <td>${a.fields.aggregate_type || ''}</td>
+          <td>${a.fields.size_min_mm ?? ''}</td>
+          <td>${a.fields.size_max_mm ?? ''}</td>
+          <td>${a.fields.content_kg_m3 ?? ''}</td>
+          <td class="row-actions"></td>
+        </tr>
+      `).join('');
+
+      // Binder
+      const binders = allBinders.filter(b => b.fields.concrete_id === sel.mix);
+      document.getElementById('binder-count').textContent = binders.length;
+      document.getElementById('binder-rows').innerHTML = binders.map(b => `
+        <tr>
+          <td>${b.fields.component_name || ''}</td>
+          <td>${b.fields.content_pct ?? ''}</td>
+          <td>${b.fields.basis || ''}</td>
+          <td class="row-actions"></td>
+        </tr>
+      `).join('');
+
+      // Cement
+      const cements = allCements.filter(c => c.fields.concrete_id === sel.mix);
+      document.getElementById('cement-count').textContent = cements.length;
+      document.getElementById('cement-rows').innerHTML = cements.map(c => `
+        <tr>
+          <td>${c.fields.phase_name || ''}</td>
+          <td>${c.fields.value_pct ?? ''}</td>
+          <td>${c.fields.method || ''}</td>
+          <td class="row-actions"></td>
+        </tr>
+      `).join('');
+
+      // Material properties
+      const props = allMatProps.filter(p => p.fields.concrete_id === sel.mix);
+      document.getElementById('matprop-count').textContent = props.length;
+      document.getElementById('matprop-rows').innerHTML = props.map(p => `
+        <tr>
+          <td>${p.fields.property_name || ''}</td>
+          <td>${p.fields.value ?? ''}</td>
+          <td>${p.fields.unit || ''}</td>
+          <td>${p.fields.test_age_days ?? ''}</td>
+          <td class="row-actions"></td>
+        </tr>
+      `).join('');
+    }
+
+    function addDetailRow(section) {
+      if (!sel.mix) { GristHelpers.log('Sélectionnez d\'abord un béton', 'warn'); return; }
+
+      const tbody = document.getElementById(section + '-rows');
+      const row = document.createElement('tr');
+      row.classList.add('new-row');
+
+      const configs = {
+        agg: [
+          { ph: 'Sable, gravier…', field: 'aggregate_type' },
+          { ph: '0', field: 'size_min_mm', type: 'number' },
+          { ph: '4', field: 'size_max_mm', type: 'number' },
+          { ph: '800', field: 'content_kg_m3', type: 'number' },
+        ],
+        binder: [
+          { ph: 'Ciment, laitier…', field: 'component_name' },
+          { ph: '70', field: 'content_pct', type: 'number' },
+          { ph: '% masse liant', field: 'basis' },
+        ],
+        cement: [
+          { ph: 'C3S, C2S…', field: 'phase_name' },
+          { ph: '60', field: 'value_pct', type: 'number' },
+          { ph: 'XRF, Bogue…', field: 'method' },
+        ],
+        matprop: [
+          { ph: 'fc28, porosité…', field: 'property_name' },
+          { ph: '45', field: 'value', type: 'number' },
+          { ph: 'MPa, %…', field: 'unit' },
+          { ph: '28', field: 'test_age_days', type: 'number' },
+        ],
+      };
+
+      row.innerHTML = configs[section].map(c =>
+        `<td><input type="${c.type || 'text'}" placeholder="${c.ph}" data-field="${c.field}" step="any"></td>`
+      ).join('') + `<td class="row-actions">
+        <button class="btn-icon" onclick="saveDetailRow('${section}', this)" title="Enregistrer">💾</button>
+        <button class="btn-icon" onclick="this.closest('tr').remove()" title="Supprimer">✕</button>
+      </td>`;
+      tbody.appendChild(row);
+
+      // Open the detail section
+      document.getElementById('detail-' + section).classList.add('open');
+    }
+
+    async function saveDetailRow(section, btn) {
+      const row = btn.closest('tr');
+      const inputs = row.querySelectorAll('input');
+      const fields = { concrete_id: sel.mix };
+
+      inputs.forEach(inp => {
+        const key = inp.dataset.field;
+        const val = inp.type === 'number' ? (parseFloat(inp.value) || 0) : inp.value.trim();
+        fields[key] = val;
+      });
+
+      const tableMap = {
+        agg: 'AGGREGATES',
+        binder: 'BINDER_COMPOSITION',
+        cement: 'CEMENT_CHARACTERIZATION',
+        matprop: 'MATERIAL_PROPERTIES',
+      };
+
+      try {
+        const result = await GristHelpers.createRecord(tableMap[section], fields);
+        GristHelpers.log(`${tableMap[section]} : ligne ajoutée (id=${result.id}) ✓`, 'ok');
+        await refreshAll();
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // RESULTS PANEL
+    // =========================================================================
+    function updateResultsPanel() {
+      const hasP = !!sel.protocol;
+      document.getElementById('results-empty').style.display = hasP ? 'none' : '';
+      document.getElementById('results-content').style.display = hasP ? '' : 'none';
+      document.getElementById('results-chl-table').style.display = protoType === 'chloride' ? '' : 'none';
+      document.getElementById('results-carb-table').style.display = protoType === 'carbonation' ? '' : 'none';
+
+      // Clear input rows
+      document.getElementById('results-chl-rows').innerHTML = '';
+      document.getElementById('results-carb-rows').innerHTML = '';
+    }
+
+    function addResultRow() {
+      if (!sel.protocol) return;
+      const tbodyId = protoType === 'chloride' ? 'results-chl-rows' : 'results-carb-rows';
+      const tbody = document.getElementById(tbodyId);
+      const row = document.createElement('tr');
+
+      if (protoType === 'chloride') {
+        row.innerHTML = `
+          <td><input type="number" placeholder="365" step="any" data-field="time_days"></td>
+          <td><input type="number" placeholder="5" step="any" data-field="depth_mm"></td>
+          <td><input type="number" placeholder="0.35" step="any" data-field="chloride_content_pct_binder"></td>
+          <td class="row-actions"><button class="btn-icon" onclick="this.closest('tr').remove()" title="Supprimer">✕</button></td>
+        `;
+      } else {
+        row.innerHTML = `
+          <td><input type="number" placeholder="365" step="any" data-field="time_days"></td>
+          <td><input type="number" placeholder="8.5" step="any" data-field="depth_mm"></td>
+          <td class="row-actions"><button class="btn-icon" onclick="this.closest('tr').remove()" title="Supprimer">✕</button></td>
+        `;
+      }
+
+      tbody.appendChild(row);
+    }
+
+    async function saveResults() {
+      if (!sel.protocol) { GristHelpers.log('Pas de protocole sélectionné', 'warn'); return; }
+
+      const tbodyId = protoType === 'chloride' ? 'results-chl-rows' : 'results-carb-rows';
+      const rows = document.getElementById(tbodyId).querySelectorAll('tr');
+      if (rows.length === 0) { GristHelpers.log('Aucune mesure à enregistrer', 'warn'); return; }
+
+      const tableName = protoType === 'chloride' ? 'CHLORIDE_RESULTS' : 'CARBONATION_RESULTS';
+      const refField = protoType === 'chloride' ? 'chl_protocol_id' : 'carb_protocol_id';
+
+      const records = [];
+      rows.forEach(row => {
+        const fields = {};
+        fields[refField] = sel.protocol;
+        row.querySelectorAll('input').forEach(inp => {
+          fields[inp.dataset.field] = parseFloat(inp.value) || 0;
+        });
+        records.push(fields);
+      });
+
+      try {
+        const results = await GristHelpers.bulkCreateRecords(tableName, records);
+        GristHelpers.log(`${results.length} mesure(s) enregistrée(s) dans ${tableName} ✓`, 'ok');
+        // Clear rows after save
+        document.getElementById(tbodyId).innerHTML = '';
+        await refreshAll();
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // CLEAR FORMS
+    // =========================================================================
+    function clearForm(section) {
+      const formEl = document.getElementById('form-' + section);
+      if (formEl) formEl.querySelectorAll('input, textarea, select').forEach(el => {
+        if (el.tagName === 'SELECT') {
+          el.selectedIndex = 0;
+        } else {
+          el.value = '';
+        }
+      });
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    (async function() {
+      GristHelpers.log('Initialisation Saisie de données…');
+      grist.ready({ requiredAccess: 'full', columns: [] });
+      GristHelpers.log('Connecté à Grist ✓', 'ok');
+      await GristHelpers.ensureSchema();
+      await refreshAll();
+      updateBreadcrumb();
+    })();
+  </script>
+</body>
+</html>

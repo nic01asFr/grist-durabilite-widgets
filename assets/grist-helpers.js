@@ -282,6 +282,18 @@ const GristHelpers = {
     return { id: result.retValues[0] };
   },
 
+  async updateRecord(tableName, rowId, fields) {
+    await grist.docApi.applyUserActions([
+      ['UpdateRecord', tableName, rowId, fields]
+    ]);
+  },
+
+  async bulkCreateRecords(tableName, recordsArray) {
+    const actions = recordsArray.map(fields => ['AddRecord', tableName, null, fields]);
+    const result = await grist.docApi.applyUserActions(actions);
+    return result.retValues.map(id => ({ id }));
+  },
+
   // =========================================================================
   // JOINTURES — Chlorures : CHLORIDE_ANALYSIS ← PROTOCOL ← MIX
   // =========================================================================
