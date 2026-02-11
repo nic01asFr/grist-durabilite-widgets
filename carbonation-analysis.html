@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analyse Carbonatation — Profondeur vs temps</title>
+
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    #chart { width: 100%; min-height: 340px; border-radius: 8px; overflow: hidden; }
+    .param-group input[type="number"] { width: 80px; }
+    #direct-input-card .param-group input[type="number"] { width: 120px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1><span class="icon">🧱</span> Analyse Carbonatation</h1>
+    <div class="status" id="status">
+      <span class="dot"></span>
+      <span id="status-text">Chargement Pyodide…</span>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="empty-state">
+    <div class="icon">🏗️</div>
+    <h3>En attente de données</h3>
+    <p>Sélectionnez un <strong>protocole carbonatation</strong> (CARBONATION_PROTOCOL) dans la table liée pour analyser le front de carbonatation.</p>
+  </div>
+
+  <!-- Main content -->
+  <div id="main-content" style="display:none">
+
+    <div class="card">
+      <div class="card-title">Contexte</div>
+      <div class="info-grid" id="context-info"></div>
+    </div>
+
+    <!-- Mode selector -->
+    <div class="card">
+      <div class="card-title">Mode d'entrée</div>
+      <div class="mode-selector">
+        <button class="mode-btn active" id="mode-profile" onclick="setMode('profile')">
+          📈 Profondeur vs temps
+        </button>
+        <button class="mode-btn" id="mode-direct" onclick="setMode('direct')">
+          🔢 Saisie directe K_carb
+        </button>
+      </div>
+    </div>
+
+    <!-- === MODE PROFIL === -->
+
+    <div class="card" id="chart-card">
+      <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Front de carbonatation</span>
+        <span id="nb-points" style="font-size:11px; color:var(--text-dim); text-transform:none; letter-spacing:0;"></span>
+      </div>
+      <div id="chart"></div>
+    </div>
+
+    <div class="card" id="fitting-controls-card">
+      <div class="card-title">Paramètres</div>
+      <div class="param-row" style="margin-bottom:12px;">
+        <div class="param-group">
+          <label>Enrobage :</label>
+          <input type="number" id="enrobage" value="30" step="5" min="10" max="120">
+          <label>mm</label>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-fit" disabled onclick="runFitting()">
+          ⚙️ Lancer le fitting
+        </button>
+        <button class="btn btn-secondary" id="btn-save" disabled onclick="saveResults()">
+          💾 Enregistrer
+        </button>
+      </div>
+    </div>
+
+    <!-- === MODE DIRECT === -->
+
+    <div class="card" id="direct-input-card" style="display:none">
+      <div class="card-title">Saisie directe</div>
+      <div class="param-row" style="margin-bottom:12px;">
+        <div class="param-group">
+          <label>K_carb :</label>
+          <input type="number" id="direct-kcarb" step="0.01" value="0.5">
+          <label>mm/√jour</label>
+        </div>
+        <div class="param-group">
+          <label>Enrobage :</label>
+          <input type="number" id="direct-enrobage" value="30" step="5" min="10" max="120">
+          <label>mm</label>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-calc-direct" disabled onclick="calcDirect()">
+          ⚙️ Calculer durée de vie
+        </button>
+        <button class="btn btn-secondary" id="btn-save-direct" disabled onclick="saveResults()">
+          💾 Enregistrer
+        </button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" id="results-card" style="display:none">
+      <div class="card-title">Résultats</div>
+      <div class="info-grid" id="results-info"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Journal</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let pyodide = null;
+    let pyodideReady = false;
+    let currentProtocol = null;
+    let currentMix = null;
+    let currentResults = null;
+    let lastFitResult = null;
+    let gristReady = false;
+    let currentMode = 'profile';
+
+    // =========================================================================
+    // MODE SWITCHING
+    // =========================================================================
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('mode-profile').classList.toggle('active', mode === 'profile');
+      document.getElementById('mode-direct').classList.toggle('active', mode === 'direct');
+      document.getElementById('chart-card').style.display = mode === 'profile' ? '' : 'none';
+      document.getElementById('fitting-controls-card').style.display = mode === 'profile' ? '' : 'none';
+      document.getElementById('direct-input-card').style.display = mode === 'direct' ? '' : 'none';
+      lastFitResult = null;
+      document.getElementById('results-card').style.display = 'none';
+      GristHelpers.log(`Mode : ${mode === 'profile' ? 'Profondeur vs temps' : 'Saisie directe K_carb'}`);
+      updateUI();
+    }
+
+    // =========================================================================
+    // PYODIDE INIT
+    // =========================================================================
+    async function initPyodide() {
+      GristHelpers.log('Chargement de Pyodide (Python WASM)…');
+      try {
+        pyodide = await loadPyodide();
+        GristHelpers.log('Pyodide chargé ✓', 'ok');
+        GristHelpers.log('Chargement numpy + scipy…');
+        await pyodide.loadPackage(['numpy', 'scipy']);
+        GristHelpers.log('numpy + scipy chargés ✓', 'ok');
+        pyodideReady = true;
+        updateUI();
+        GristHelpers.log('Prêt pour le fitting.', 'ok');
+      } catch (err) {
+        GristHelpers.log('Erreur Pyodide : ' + err.message, 'err');
+        GristHelpers.setStatus('Erreur Pyodide', 'error');
+      }
+    }
+
+    // =========================================================================
+    // GRIST — Select By CARBONATION_PROTOCOL
+    // =========================================================================
+    function initGrist() {
+      grist.ready({
+        requiredAccess: 'full',
+        columns: [
+          { name: 'concrete_id',   title: 'Béton' },
+          { name: 'site_id',       title: 'Site' },
+          { name: 'exposure_type', title: 'Type exposition' },
+          { name: 'co2_pct',       title: 'CO₂ (%)' },
+          { name: 'rh_pct',        title: 'HR (%)' },
+          { name: 'temp_c',        title: 'Température (°C)' },
+        ]
+      });
+
+      grist.onRecord(async function(record) {
+        GristHelpers.log(`Protocole carbonatation sélectionné : id=${record.id}`);
+        currentProtocol = record;
+        lastFitResult = null;
+        document.getElementById('results-card').style.display = 'none';
+
+        await fetchContext(record);
+        await fetchResults(record.id);
+        showContext();
+        updateUI();
+      });
+
+      gristReady = true;
+      GristHelpers.log('Connecté à Grist ✓', 'ok');
+    }
+
+    // =========================================================================
+    // FETCH CONTEXT
+    // =========================================================================
+    async function fetchContext(protocol) {
+      try {
+        if (protocol.concrete_id) {
+          const mixes = await GristHelpers.fetchAllRecords('CONCRETE_MIX');
+          const mix = mixes.find(m => m.id === protocol.concrete_id);
+          currentMix = mix ? mix.fields : null;
+          if (currentMix) GristHelpers.log(`Béton : ${currentMix.mix_name || 'id=' + protocol.concrete_id}`, 'ok');
+        } else {
+          currentMix = null;
+        }
+      } catch (err) {
+        GristHelpers.log('Erreur fetch contexte : ' + err.message, 'err');
+        currentMix = null;
+      }
+    }
+
+    // =========================================================================
+    // FETCH CARBONATION_RESULTS
+    // =========================================================================
+    async function fetchResults(protocolId) {
+      try {
+        const allResults = await GristHelpers.fetchAllRecords('CARBONATION_RESULTS');
+        const results = allResults
+          .filter(r =>
+            r.fields.carb_protocol_id === protocolId &&
+            r.fields.time_days != null &&
+            r.fields.depth_mm != null
+          )
+          .sort((a, b) => (a.fields.time_days || 0) - (b.fields.time_days || 0));
+
+        currentResults = results;
+        GristHelpers.log(`${results.length} points de carbonatation chargés`, results.length > 1 ? 'ok' : 'warn');
+
+        if (results.length > 0) {
+          plotProfile(results);
+        } else {
+          GristHelpers.log('Aucun résultat carbonatation trouvé', 'warn');
+          Plotly.purge('chart');
+        }
+      } catch (err) {
+        GristHelpers.log('Erreur fetch résultats : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // DISPLAY CONTEXT
+    // =========================================================================
+    function showContext() {
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+
+      const p = currentProtocol || {};
+      const m = currentMix || {};
+      const fields = [
+        { label: 'Mélange', value: m.mix_name || '—' },
+        { label: 'Ciment', value: m.cement_type || '—' },
+        { label: 'E/L', value: m.w_b_ratio != null ? m.w_b_ratio.toFixed(2) : '—' },
+        { label: 'Type expo.', value: p.exposure_type || '—' },
+        { label: 'CO₂', value: p.co2_pct != null ? p.co2_pct + ' %' : '—' },
+        { label: 'HR', value: p.rh_pct != null ? p.rh_pct + ' %' : '—' },
+        { label: 'Température', value: p.temp_c != null ? p.temp_c + ' °C' : '—' },
+      ];
+
+      document.getElementById('context-info').innerHTML = fields.map(f => `
+        <div class="info-item">
+          <div class="label">${f.label}</div>
+          <div class="value">${f.value}</div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // PLOT — Profondeur vs sqrt(temps)
+    // =========================================================================
+    function plotProfile(results, fitData = null) {
+      const t = results.map(r => r.fields.time_days);
+      const d = results.map(r => r.fields.depth_mm);
+
+      document.getElementById('nb-points').textContent = `${results.length} points`;
+
+      const traces = [{
+        x: t, y: d,
+        mode: 'markers', type: 'scatter', name: 'Mesures',
+        marker: { color: '#8b5cf6', size: 9, line: { color: '#4c1d95', width: 1.5 } }
+      }];
+
+      if (fitData) {
+        traces.push({
+          x: fitData.t_fit, y: fitData.d_fit,
+          mode: 'lines', type: 'scatter',
+          name: `K_carb (R²=${fitData.R2.toFixed(4)})`,
+          line: { color: '#f59e0b', width: 2.5 }
+        });
+
+        // Enrobage horizontal line
+        const enrobage = parseFloat(document.getElementById('enrobage').value);
+        traces.push({
+          x: [0, Math.max(...t) * 1.3], y: [enrobage, enrobage],
+          mode: 'lines', type: 'scatter', name: `Enrobage = ${enrobage} mm`,
+          line: { color: '#ef4444', width: 1.5, dash: 'dash' }
+        });
+      }
+
+      Plotly.newPlot('chart', traces, GristHelpers.plotlyDarkLayout({
+        xaxis: GristHelpers.plotlyDarkAxis('Temps (jours)'),
+        yaxis: GristHelpers.plotlyDarkAxis('Profondeur de carbonatation (mm)')
+      }), { responsive: true, displayModeBar: true, modeBarButtonsToRemove: ['lasso2d', 'select2d'], displaylogo: false });
+    }
+
+    // =========================================================================
+    // FITTING — K_carb : depth = K_carb * sqrt(time)
+    // =========================================================================
+    async function runFitting() {
+      if (!pyodideReady || !currentResults || currentResults.length < 2) {
+        GristHelpers.log('Il faut Pyodide + au moins 2 points', 'warn');
+        return;
+      }
+
+      const btn = document.getElementById('btn-fit');
+      btn.disabled = true; btn.textContent = '⏳ Calcul…';
+      GristHelpers.log('Lancement du fitting carbonatation (K_carb)…');
+
+      try {
+        const t_days = currentResults.map(r => r.fields.time_days);
+        const d_mm = currentResults.map(r => r.fields.depth_mm);
+        const enrobage = parseFloat(document.getElementById('enrobage').value);
+
+        pyodide.globals.set('t_days_js', pyodide.toPy(t_days));
+        pyodide.globals.set('d_mm_js', pyodide.toPy(d_mm));
+        pyodide.globals.set('enrobage_mm_js', enrobage);
+
+        const resultJson = pyodide.runPython(`
+import numpy as np
+from scipy.optimize import curve_fit
+import json
+
+t = np.array(list(t_days_js), dtype=float)
+d = np.array(list(d_mm_js), dtype=float)
+enrobage_mm = float(enrobage_mm_js)
+
+def carb_model(t, K):
+    return K * np.sqrt(t)
+
+try:
+    popt, pcov = curve_fit(carb_model, t, d, p0=[1.0], bounds=([0], [100]))
+    K_carb = popt[0]
+
+    d_pred = carb_model(t, K_carb)
+    SS_res = np.sum((d - d_pred)**2)
+    SS_tot = np.sum((d - np.mean(d))**2)
+    R2 = 1.0 - SS_res / SS_tot if SS_tot > 0 else 0.0
+    RMSE = np.sqrt(np.mean((d - d_pred)**2))
+
+    t_fit = np.linspace(0, max(t) * 1.3, 100)
+    d_fit = carb_model(t_fit, K_carb)
+
+    # Durée de vie : enrobage = K * sqrt(t_vie) => t_vie = (enrobage/K)^2
+    if K_carb > 0:
+        t_vie_jours = (enrobage_mm / K_carb)**2
+        duree_vie_ans = t_vie_jours / 365.25
+    else:
+        duree_vie_ans = -1
+
+    result = {
+        "success": True, "K_carb": float(K_carb),
+        "R2": float(R2), "RMSE": float(RMSE),
+        "duree_vie_ans": float(duree_vie_ans),
+        "enrobage_mm": float(enrobage_mm),
+        "t_fit": t_fit.tolist(), "d_fit": d_fit.tolist()
+    }
+except Exception as e:
+    result = {"success": False, "error": str(e)}
+
+json.dumps(result)
+        `);
+
+        const fit = JSON.parse(resultJson);
+        if (!fit.success) {
+          GristHelpers.log('Échec du fitting : ' + fit.error, 'err');
+          btn.disabled = false; btn.textContent = '⚙️ Lancer le fitting';
+          return;
+        }
+
+        lastFitResult = fit;
+        lastFitResult.source = 'fitting';
+        const kAn = fit.K_carb * Math.sqrt(365.25);
+        GristHelpers.log(`Fitting réussi : K_carb=${fit.K_carb.toFixed(4)} mm/√jour (${kAn.toFixed(2)} mm/√an), R²=${fit.R2.toFixed(4)}`, 'ok');
+        GristHelpers.log(`Durée de vie : ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' ans' : '∞'} (enrobage ${fit.enrobage_mm} mm)`, 'ok');
+
+        plotProfile(currentResults, fit);
+        showResults(fit);
+        document.getElementById('btn-save').disabled = false;
+      } catch (err) {
+        GristHelpers.log('Erreur fitting : ' + err.message, 'err');
+      }
+
+      btn.disabled = false; btn.textContent = '⚙️ Lancer le fitting';
+    }
+
+    // =========================================================================
+    // DIRECT CALCULATION
+    // =========================================================================
+    async function calcDirect() {
+      const kcarb = parseFloat(document.getElementById('direct-kcarb').value);
+      const enrobage = parseFloat(document.getElementById('direct-enrobage').value);
+
+      if (isNaN(kcarb) || kcarb <= 0) { GristHelpers.log('K_carb invalide', 'err'); return; }
+
+      const t_vie_jours = (enrobage / kcarb) ** 2;
+      const duree_vie_ans = t_vie_jours / 365.25;
+
+      lastFitResult = {
+        success: true,
+        K_carb: kcarb,
+        R2: null, RMSE: null,
+        duree_vie_ans: duree_vie_ans,
+        enrobage_mm: enrobage,
+        source: 'direct'
+      };
+
+      const kAn = kcarb * Math.sqrt(365.25);
+      GristHelpers.log(`Calcul direct : K_carb=${kcarb.toFixed(4)} mm/√jour (${kAn.toFixed(2)} mm/√an)`, 'ok');
+      GristHelpers.log(`Durée de vie : ${duree_vie_ans.toFixed(1)} ans (enrobage ${enrobage} mm)`, 'ok');
+
+      showResults(lastFitResult);
+      document.getElementById('btn-save-direct').disabled = false;
+    }
+
+    // =========================================================================
+    // SHOW RESULTS
+    // =========================================================================
+    function showResults(fit) {
+      document.getElementById('results-card').style.display = 'block';
+      const kAn = fit.K_carb * Math.sqrt(365.25);
+      const items = [
+        { label: 'K_carb', value: fit.K_carb.toFixed(4), unit: 'mm/√jour' },
+        { label: 'K_carb', value: kAn.toFixed(2), unit: 'mm/√an' },
+        { label: 'R²', value: fit.R2 != null ? fit.R2.toFixed(4) : '—', unit: '' },
+        { label: 'RMSE', value: fit.RMSE != null ? fit.RMSE.toFixed(3) : '—', unit: 'mm' },
+        { label: 'Durée de vie', value: fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) : '∞', unit: 'ans' },
+        { label: 'Enrobage', value: fit.enrobage_mm.toFixed(0), unit: 'mm' },
+      ];
+      document.getElementById('results-info').innerHTML = items.map(f => `
+        <div class="info-item">
+          <div class="label">${f.label}</div>
+          <div class="value">${f.value} <span class="unit">${f.unit}</span></div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // SAVE TO CARBONATION_ANALYSIS
+    // =========================================================================
+    async function saveResults() {
+      if (!lastFitResult || !currentProtocol) { GristHelpers.log('Rien à sauvegarder', 'warn'); return; }
+
+      const btnP = document.getElementById('btn-save');
+      const btnD = document.getElementById('btn-save-direct');
+      if (btnP) btnP.disabled = true;
+      if (btnD) btnD.disabled = true;
+      GristHelpers.log('Sauvegarde dans CARBONATION_ANALYSIS…');
+
+      try {
+        const fields = {
+          carb_protocol_id: currentProtocol.id,
+          K_carb: lastFitResult.K_carb,
+          R2: lastFitResult.R2,
+          RMSE: lastFitResult.RMSE,
+          seuil_carb_mm: lastFitResult.enrobage_mm,
+          enrobage_mm: lastFitResult.enrobage_mm,
+          duree_vie_ans: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null,
+          date_calcul: Date.now() / 1000,
+          statut: 'Brouillon'
+        };
+        const result = await GristHelpers.createRecord('CARBONATION_ANALYSIS', fields);
+        GristHelpers.log(`Enregistré dans CARBONATION_ANALYSIS (id=${result.id}) ✓`, 'ok');
+      } catch (err) {
+        GristHelpers.log('Erreur sauvegarde : ' + err.message, 'err');
+      }
+
+      if (btnP) btnP.disabled = false;
+      if (btnD) btnD.disabled = false;
+    }
+
+    // =========================================================================
+    // UI STATE
+    // =========================================================================
+    function updateUI() {
+      const btnFit = document.getElementById('btn-fit');
+      const btnDirect = document.getElementById('btn-calc-direct');
+      btnFit.disabled = !(pyodideReady && currentResults && currentResults.length >= 2);
+      btnDirect.disabled = false; // Calcul direct ne nécessite pas Pyodide
+      if (pyodideReady && gristReady) GristHelpers.setStatus('Prêt', 'ready');
+      else if (pyodideReady) GristHelpers.setStatus('Pyodide OK — en attente Grist…', '');
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    (async function() {
+      GristHelpers.log('Initialisation Analyse Carbonatation…');
+      initGrist();
+      await GristHelpers.ensureSchema();
+      await initPyodide();
+    })();
+  </script>
+</body>
+</html>

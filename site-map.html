@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carte des Sites — Durabilité</title>
+
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    body { padding: 0; }
+    .header { padding: 12px 16px; margin-bottom: 0; }
+    #map { width: 100%; height: calc(100vh - 56px); z-index: 1; }
+    .leaflet-container { background: var(--bg); }
+
+    .leaflet-popup-content-wrapper {
+      background: var(--surface); color: var(--text);
+      border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .leaflet-popup-tip { background: var(--surface); }
+    .leaflet-popup-close-button { color: var(--text-muted) !important; }
+    .leaflet-popup-close-button:hover { color: var(--text) !important; }
+    .leaflet-popup-content { margin: 12px 16px; font-size: 13px; line-height: 1.6; }
+
+    .popup-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--accent-light); }
+    .popup-stat {
+      display: flex; justify-content: space-between;
+      padding: 4px 0; border-bottom: 1px solid var(--surface2);
+    }
+    .popup-stat:last-child { border-bottom: none; }
+    .popup-stat .label { color: var(--text-muted); }
+    .popup-stat .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .legend {
+      position: fixed; bottom: 24px; right: 16px; z-index: 1000;
+      background: var(--surface); border-radius: 10px; padding: 12px 16px;
+      font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .legend h4 { margin-bottom: 8px; font-size: 13px; color: var(--text-muted); }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+    .map-info {
+      position: fixed; bottom: 24px; left: 16px; z-index: 1000;
+      background: var(--surface); border-radius: 10px; padding: 8px 14px;
+      font-size: 12px; color: var(--text-muted); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .log-overlay {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; width: 400px; max-width: 90vw;
+      background: var(--surface); border-radius: 10px; padding: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none;
+    }
+    .log-overlay.visible { display: block; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1><span class="icon">🗺️</span> Carte des Sites</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Rafraîchir</button>
+      <button class="btn btn-secondary" onclick="toggleLog()">📋 Journal</button>
+      <div class="status" id="status">
+        <span class="dot"></span>
+        <span id="status-text">Chargement…</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="legend">
+    <h4>Performance Dapp</h4>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>Excellent (&lt; 1×10⁻¹²)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>Bon (1–5×10⁻¹²)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Moyen (5×10⁻¹²–1×10⁻¹¹)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Faible (&gt; 1×10⁻¹¹)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#64748b;"></div><span>Sans données</span></div>
+  </div>
+
+  <div class="map-info" id="map-info">0 sites affichés</div>
+
+  <div class="log-overlay" id="log-overlay">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-size:13px; font-weight:600; color:var(--text-muted);">Journal</span>
+      <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="toggleLog()">✕</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let map = null;
+    let markers = [];
+
+    const CATEGORIES = [
+      { label: 'Excellent', max: 1e-12, color: '#22c55e' },
+      { label: 'Bon',       max: 5e-12, color: '#3b82f6' },
+      { label: 'Moyen',     max: 1e-11, color: '#f59e0b' },
+      { label: 'Faible',    max: Infinity, color: '#ef4444' }
+    ];
+
+    function getCategoryColor(dapp) {
+      for (const cat of CATEGORIES) { if (dapp < cat.max) return cat.color; }
+      return '#ef4444';
+    }
+    function getCategoryLabel(dapp) {
+      for (const cat of CATEGORIES) { if (dapp < cat.max) return cat.label; }
+      return 'Faible';
+    }
+
+    function toggleLog() {
+      document.getElementById('log-overlay').classList.toggle('visible');
+    }
+
+    // =========================================================================
+    // MAP INIT
+    // =========================================================================
+    function initMap() {
+      map = L.map('map').setView([43.3, 5.4], 6);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19
+      }).addTo(map);
+    }
+
+    // =========================================================================
+    // LOAD DATA — SITE + CHLORIDE_PROTOCOL + CHLORIDE_ANALYSIS
+    // =========================================================================
+    async function loadAllData() {
+      GristHelpers.log('Chargement des données…');
+      GristHelpers.setStatus('Chargement…', '');
+
+      try {
+        const [sites, protocols, analyses, mixes] = await Promise.all([
+          GristHelpers.fetchAllRecords('SITE'),
+          GristHelpers.fetchAllRecords('CHLORIDE_PROTOCOL'),
+          GristHelpers.fetchAllRecords('CHLORIDE_ANALYSIS'),
+          GristHelpers.fetchAllRecords('CONCRETE_MIX')
+        ]);
+
+        GristHelpers.log(`${sites.length} sites, ${protocols.length} protocoles, ${analyses.length} analyses`, 'ok');
+
+        // Index analyses by chl_protocol_id
+        const analysesByProto = {};
+        analyses.forEach(a => {
+          const pid = a.fields.chl_protocol_id;
+          if (!analysesByProto[pid]) analysesByProto[pid] = [];
+          analysesByProto[pid].push(a.fields);
+        });
+
+        // Index protocols by site_id, also attach mix info
+        const mixMap = new Map(mixes.map(m => [m.id, m.fields]));
+        const protosBySite = {};
+        protocols.forEach(p => {
+          const sid = p.fields.site_id;
+          if (!sid) return;
+          if (!protosBySite[sid]) protosBySite[sid] = [];
+          protosBySite[sid].push({
+            ...p.fields,
+            _id: p.id,
+            mix: mixMap.get(p.fields.concrete_id) || {},
+            analyses: analysesByProto[p.id] || []
+          });
+        });
+
+        // Build site data
+        const siteData = {};
+        let skipped = 0;
+        sites.forEach(s => {
+          const f = s.fields;
+          if (f.latitude == null || f.longitude == null) { skipped++; return; }
+
+          const siteProtos = protosBySite[s.id] || [];
+          const allSiteAnalyses = siteProtos.flatMap(p => p.analyses);
+          const mixNames = [...new Set(siteProtos.map(p => p.mix.mix_name).filter(Boolean))];
+
+          siteData[s.id] = {
+            name: f.site_name || `Site ${s.id}`,
+            lat: f.latitude,
+            lng: f.longitude,
+            country: f.country || '',
+            protocols: siteProtos,
+            analyses: allSiteAnalyses,
+            mixNames: mixNames
+          };
+        });
+
+        if (skipped > 0) GristHelpers.log(`${skipped} sites ignorés (sans coordonnées GPS)`, 'warn');
+
+        renderMarkers(siteData);
+        const nbSites = Object.keys(siteData).length;
+        document.getElementById('map-info').textContent = `${nbSites} site${nbSites > 1 ? 's' : ''} affiché${nbSites > 1 ? 's' : ''}`;
+        GristHelpers.setStatus(`${nbSites} sites`, 'ready');
+      } catch (err) {
+        GristHelpers.log('Erreur : ' + err.message, 'err');
+        GristHelpers.setStatus('Erreur', 'error');
+      }
+    }
+
+    // =========================================================================
+    // RENDER MARKERS
+    // =========================================================================
+    function renderMarkers(siteData) {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      const bounds = [];
+
+      Object.values(siteData).forEach(site => {
+        const dappValues = site.analyses.map(a => a.Dapp).filter(v => v != null && v > 0);
+        const dureeValues = site.analyses.map(a => a.duree_vie_ans).filter(v => v != null && v > 0);
+
+        const dappMoyen = dappValues.length > 0
+          ? dappValues.reduce((a, b) => a + b, 0) / dappValues.length : null;
+        const dureeMoy = dureeValues.length > 0
+          ? dureeValues.reduce((a, b) => a + b, 0) / dureeValues.length : null;
+
+        const color = dappMoyen ? getCategoryColor(dappMoyen) : '#64748b';
+        const radius = 8 + Math.min(site.analyses.length, 10);
+
+        const marker = L.circleMarker([site.lat, site.lng], {
+          radius, fillColor: color, fillOpacity: 0.8, color: '#fff', weight: 2
+        });
+
+        const popupHtml = `
+          <div class="popup-title">${site.name}</div>
+          ${site.country ? `<div style="font-size:11px; color:var(--text-dim); margin-bottom:6px;">${site.country}</div>` : ''}
+          <div class="popup-stat"><span class="label">Protocoles</span><span class="value">${site.protocols.length}</span></div>
+          <div class="popup-stat"><span class="label">Analyses</span><span class="value">${site.analyses.length}</span></div>
+          <div class="popup-stat"><span class="label">Dapp moyen</span><span class="value">${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}</span></div>
+          <div class="popup-stat"><span class="label">Durée de vie moy.</span><span class="value">${dureeMoy ? dureeMoy.toFixed(1) + ' ans' : '—'}</span></div>
+          <div class="popup-stat"><span class="label">Performance</span><span class="value" style="color:${color}">${dappMoyen ? getCategoryLabel(dappMoyen) : '—'}</span></div>
+          ${site.mixNames.length > 0 ? `
+          <div class="popup-stat" style="flex-direction:column; gap:2px;">
+            <span class="label">Mélanges</span>
+            <span class="value" style="font-size:12px; font-weight:400;">${site.mixNames.join(', ')}</span>
+          </div>` : ''}
+        `;
+
+        marker.bindPopup(popupHtml, { maxWidth: 300 });
+        marker.addTo(map);
+        markers.push(marker);
+        bounds.push([site.lat, site.lng]);
+
+        GristHelpers.log(`Site "${site.name}" : ${site.protocols.length} proto, ${site.analyses.length} analyses, Dapp=${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}`, 'ok');
+      });
+
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+      } else {
+        GristHelpers.log('Aucun site avec coordonnées GPS trouvé', 'warn');
+      }
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    (async function() {
+      GristHelpers.log('Initialisation Carte des Sites…');
+      initMap();
+      grist.ready({ requiredAccess: 'full' });
+      GristHelpers.log('Connecté à Grist ✓', 'ok');
+      await GristHelpers.ensureSchema();
+      loadAllData();
+    })();
+  </script>
+</body>
+</html>

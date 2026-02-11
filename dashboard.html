@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Comparatif — Durabilité</title>
+
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    @media (max-width: 600px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    .chart-container { width: 100%; min-height: 400px; border-radius: 8px; overflow: hidden; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .data-table th {
+      text-align: left; padding: 8px 10px; background: var(--bg);
+      color: var(--text-muted); font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.3px; border-bottom: 1px solid var(--surface2);
+      position: sticky; top: 0;
+    }
+    .data-table td { padding: 6px 10px; border-bottom: 1px solid var(--surface2); font-variant-numeric: tabular-nums; }
+    .data-table tr:hover td { background: var(--bg); }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1><span class="icon">📈</span> Dashboard Comparatif</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Rafraîchir</button>
+      <div class="status" id="status">
+        <span class="dot"></span>
+        <span id="status-text">Chargement…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="card">
+    <div class="card-title">Vue d'ensemble</div>
+    <div class="stats-row" id="summary-stats">
+      <div class="info-item"><div class="label">Analyses</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Mélanges</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Dapp moyen</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Durée de vie moy.</div><div class="value">—</div></div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card">
+    <div class="card-title">Filtres</div>
+    <div class="filter-bar">
+      <select id="filter-mix"><option value="">Tous mélanges</option></select>
+      <select id="filter-cement"><option value="">Tous ciments</option></select>
+      <select id="filter-regime"><option value="">Tous régimes</option></select>
+      <select id="filter-source"><option value="">Toutes sources</option></select>
+      <button class="btn btn-secondary" onclick="resetFilters()">Réinitialiser</button>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" data-tab="dapp-mix" onclick="showTab('dapp-mix')">Dapp par mélange</div>
+      <div class="tab" data-tab="wl-dapp" onclick="showTab('wl-dapp')">E/L vs Dapp</div>
+      <div class="tab" data-tab="duree-vie" onclick="showTab('duree-vie')">Durée de vie</div>
+    </div>
+    <div id="tab-dapp-mix" class="tab-content active">
+      <div id="chart-dapp-mix" class="chart-container"></div>
+    </div>
+    <div id="tab-wl-dapp" class="tab-content">
+      <div id="chart-wl-dapp" class="chart-container"></div>
+    </div>
+    <div id="tab-duree-vie" class="tab-content">
+      <div id="chart-duree-vie" class="chart-container"></div>
+    </div>
+  </div>
+
+  <!-- Data table -->
+  <div class="card">
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>Données filtrées</span>
+      <span id="table-count" style="font-size:11px; color:var(--text-dim); text-transform:none; letter-spacing:0;"></span>
+    </div>
+    <div style="overflow-x:auto; max-height:300px; overflow-y:auto;">
+      <table class="data-table">
+        <thead><tr>
+          <th>Mélange</th><th>Ciment</th><th>E/L</th><th>Régime</th>
+          <th>Dapp (m²/s)</th><th>Cs</th><th>R²</th><th>Durée vie</th><th>Source</th>
+        </tr></thead>
+        <tbody id="data-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Journal</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let allData = [];       // Joined: CHLORIDE_ANALYSIS + protocol + mix
+    let filteredData = [];
+    let activeTab = 'dapp-mix';
+
+    const PALETTE = [
+      '#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6',
+      '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
+      '#e879f9', '#fb923c', '#2dd4bf', '#a78bfa', '#fbbf24'
+    ];
+
+    // =========================================================================
+    // LOAD DATA — CHLORIDE_ANALYSIS + CHLORIDE_PROTOCOL + CONCRETE_MIX
+    // =========================================================================
+    async function loadAllData() {
+      GristHelpers.log('Chargement des données…');
+      GristHelpers.setStatus('Chargement…', '');
+
+      try {
+        const [analyses, protocols, mixes] = await Promise.all([
+          GristHelpers.fetchAllRecords('CHLORIDE_ANALYSIS'),
+          GristHelpers.fetchAllRecords('CHLORIDE_PROTOCOL'),
+          GristHelpers.fetchAllRecords('CONCRETE_MIX')
+        ]);
+
+        allData = GristHelpers.joinChlorideData(analyses, protocols, mixes);
+        GristHelpers.log(`${allData.length} analyses chargées (${mixes.length} mélanges, ${protocols.length} protocoles)`, 'ok');
+
+        populateFilters(allData);
+        applyFilters();
+        GristHelpers.setStatus(`${allData.length} analyses`, 'ready');
+      } catch (err) {
+        GristHelpers.log('Erreur chargement : ' + err.message, 'err');
+        GristHelpers.setStatus('Erreur', 'error');
+      }
+    }
+
+    // =========================================================================
+    // FILTERS
+    // =========================================================================
+    function populateFilters(data) {
+      const uniqueMix = [...new Set(data.map(d => d.mix.mix_name).filter(Boolean))].sort();
+      const uniqueCement = [...new Set(data.map(d => d.mix.cement_type).filter(Boolean))].sort();
+      const uniqueRegime = [...new Set(data.map(d => d.protocol.exposure_regime).filter(Boolean))].sort();
+      const uniqueSource = [...new Set(data.map(d => d.source_dapp).filter(Boolean))].sort();
+
+      fillSelect('filter-mix', uniqueMix);
+      fillSelect('filter-cement', uniqueCement);
+      fillSelect('filter-regime', uniqueRegime);
+      fillSelect('filter-source', uniqueSource);
+    }
+
+    function fillSelect(id, values) {
+      const sel = document.getElementById(id);
+      const defaultText = sel.options[0].text;
+      sel.innerHTML = `<option value="">${defaultText}</option>`;
+      values.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v;
+        sel.appendChild(opt);
+      });
+      sel.onchange = applyFilters;
+    }
+
+    function applyFilters() {
+      const mix = document.getElementById('filter-mix').value;
+      const cement = document.getElementById('filter-cement').value;
+      const regime = document.getElementById('filter-regime').value;
+      const source = document.getElementById('filter-source').value;
+
+      filteredData = allData.filter(d => {
+        if (mix && d.mix.mix_name !== mix) return false;
+        if (cement && d.mix.cement_type !== cement) return false;
+        if (regime && d.protocol.exposure_regime !== regime) return false;
+        if (source && d.source_dapp !== source) return false;
+        return true;
+      });
+
+      GristHelpers.log(`${filteredData.length}/${allData.length} analyses après filtrage`);
+      updateSummary(filteredData);
+      renderActiveChart();
+      renderDataTable(filteredData);
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-mix').value = '';
+      document.getElementById('filter-cement').value = '';
+      document.getElementById('filter-regime').value = '';
+      document.getElementById('filter-source').value = '';
+      applyFilters();
+    }
+
+    // =========================================================================
+    // TABS
+    // =========================================================================
+    function showTab(tabName) {
+      activeTab = tabName;
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tabName));
+      renderActiveChart();
+    }
+
+    function renderActiveChart() {
+      switch (activeTab) {
+        case 'dapp-mix': renderDappByMix(filteredData); break;
+        case 'wl-dapp': renderWlVsDapp(filteredData); break;
+        case 'duree-vie': renderDureeVie(filteredData); break;
+      }
+    }
+
+    // =========================================================================
+    // SUMMARY STATS
+    // =========================================================================
+    function updateSummary(data) {
+      const nbAnalyses = data.length;
+      const mixNames = new Set(data.map(d => d.mix.mix_name).filter(Boolean));
+      const dappValues = data.map(d => d.Dapp).filter(v => v != null && v > 0);
+      const dappMoyen = dappValues.length > 0 ? dappValues.reduce((a, b) => a + b, 0) / dappValues.length : null;
+      const dureeVies = data.map(d => d.duree_vie_ans).filter(v => v != null && v > 0);
+      const dureeMoy = dureeVies.length > 0 ? dureeVies.reduce((a, b) => a + b, 0) / dureeVies.length : null;
+
+      document.getElementById('summary-stats').innerHTML = `
+        <div class="info-item"><div class="label">Analyses</div><div class="value">${nbAnalyses}</div></div>
+        <div class="info-item"><div class="label">Mélanges</div><div class="value">${mixNames.size}</div></div>
+        <div class="info-item"><div class="label">Dapp moyen</div><div class="value">${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'} <span class="unit">m²/s</span></div></div>
+        <div class="info-item"><div class="label">Durée de vie moy.</div><div class="value">${dureeMoy ? dureeMoy.toFixed(1) : '—'} <span class="unit">ans</span></div></div>
+      `;
+    }
+
+    // =========================================================================
+    // CHART 1: Dapp par mélange (box plots)
+    // =========================================================================
+    function renderDappByMix(data) {
+      const groups = {};
+      data.forEach(d => {
+        const key = d.mix.mix_name || 'Inconnu';
+        if (!groups[key]) groups[key] = [];
+        if (d.Dapp != null && d.Dapp > 0) groups[key].push(d.Dapp);
+      });
+
+      const names = Object.keys(groups).sort();
+      const traces = names.map((name, i) => ({
+        y: groups[name], type: 'box', name: name,
+        marker: { color: PALETTE[i % PALETTE.length] },
+        boxpoints: 'all', jitter: 0.3, pointpos: -1.5
+      }));
+
+      Plotly.newPlot('chart-dapp-mix', traces, GristHelpers.plotlyDarkLayout({
+        yaxis: GristHelpers.plotlyDarkAxis('Dapp (m²/s)'),
+        xaxis: GristHelpers.plotlyDarkAxis(''),
+        showlegend: false
+      }), { responsive: true, displaylogo: false });
+    }
+
+    // =========================================================================
+    // CHART 2: E/L vs Dapp (scatter)
+    // =========================================================================
+    function renderWlVsDapp(data) {
+      const valid = data.filter(d => d.mix.w_b_ratio != null && d.Dapp != null && d.Dapp > 0);
+
+      if (valid.length === 0) {
+        Plotly.purge('chart-wl-dapp');
+        document.getElementById('chart-wl-dapp').innerHTML =
+          '<div class="empty-state" style="padding:40px"><h3>Pas de données E/L</h3><p>Renseignez <strong>w_b_ratio</strong> dans CONCRETE_MIX.</p></div>';
+        return;
+      }
+
+      const mixNames = [...new Set(valid.map(d => d.mix.mix_name || 'Inconnu'))].sort();
+      const traces = mixNames.map((name, i) => {
+        const pts = valid.filter(d => (d.mix.mix_name || 'Inconnu') === name);
+        return {
+          x: pts.map(d => d.mix.w_b_ratio), y: pts.map(d => d.Dapp),
+          mode: 'markers', type: 'scatter', name: name,
+          marker: { color: PALETTE[i % PALETTE.length], size: 10, line: { color: 'rgba(255,255,255,0.3)', width: 1 } },
+          text: pts.map(d => `${d.mix.mix_name}<br>Dapp: ${GristHelpers.formatDapp(d.Dapp)}`)
+        };
+      });
+
+      Plotly.newPlot('chart-wl-dapp', traces, GristHelpers.plotlyDarkLayout({
+        xaxis: GristHelpers.plotlyDarkAxis('Rapport E/L'),
+        yaxis: GristHelpers.plotlyDarkAxis('Dapp (m²/s)')
+      }), { responsive: true, displaylogo: false });
+    }
+
+    // =========================================================================
+    // CHART 3: Durée de vie (bar chart)
+    // =========================================================================
+    function renderDureeVie(data) {
+      const groups = {};
+      data.forEach(d => {
+        const key = d.mix.mix_name || 'Inconnu';
+        if (!groups[key]) groups[key] = [];
+        if (d.duree_vie_ans != null && d.duree_vie_ans > 0) groups[key].push(d.duree_vie_ans);
+      });
+
+      const names = Object.keys(groups).filter(k => groups[k].length > 0).sort();
+      if (names.length === 0) {
+        Plotly.purge('chart-duree-vie');
+        document.getElementById('chart-duree-vie').innerHTML =
+          '<div class="empty-state" style="padding:40px"><h3>Pas de données</h3><p>Lancez des analyses pour générer des estimations de durée de vie.</p></div>';
+        return;
+      }
+
+      const means = names.map(n => { const v = groups[n]; return v.reduce((a, b) => a + b, 0) / v.length; });
+      const mins = names.map(n => Math.min(...groups[n]));
+      const maxs = names.map(n => Math.max(...groups[n]));
+      const counts = names.map(n => groups[n].length);
+
+      Plotly.newPlot('chart-duree-vie', [{
+        x: names, y: means, type: 'bar', name: 'Moyenne',
+        marker: { color: names.map((_, i) => PALETTE[i % PALETTE.length]) },
+        error_y: {
+          type: 'data', symmetric: false,
+          array: maxs.map((m, i) => m - means[i]),
+          arrayminus: means.map((m, i) => m - mins[i]),
+          color: '#94a3b8', thickness: 1.5
+        },
+        text: counts.map((c, i) => `n=${c}, moy=${means[i].toFixed(1)} ans`),
+        hoverinfo: 'text+name'
+      }], GristHelpers.plotlyDarkLayout({
+        xaxis: GristHelpers.plotlyDarkAxis(''),
+        yaxis: GristHelpers.plotlyDarkAxis('Durée de vie (ans)'),
+        showlegend: false
+      }), { responsive: true, displaylogo: false });
+    }
+
+    // =========================================================================
+    // DATA TABLE
+    // =========================================================================
+    function renderDataTable(data) {
+      document.getElementById('table-count').textContent = `${data.length} lignes`;
+      document.getElementById('data-table-body').innerHTML = data.map(d => `
+        <tr>
+          <td>${d.mix.mix_name || '—'}</td>
+          <td>${d.mix.cement_type || '—'}</td>
+          <td>${d.mix.w_b_ratio != null ? d.mix.w_b_ratio.toFixed(2) : '—'}</td>
+          <td>${d.protocol.exposure_regime || '—'}</td>
+          <td>${d.Dapp != null ? GristHelpers.formatDapp(d.Dapp) : '—'}</td>
+          <td>${d.Cs != null ? d.Cs.toFixed(3) : '—'}</td>
+          <td>${d.R2 != null ? d.R2.toFixed(4) : '—'}</td>
+          <td>${d.duree_vie_ans != null && d.duree_vie_ans > 0 ? d.duree_vie_ans.toFixed(1) : '—'}</td>
+          <td>${d.source_dapp || '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    (async function() {
+      GristHelpers.log('Initialisation Dashboard Comparatif…');
+      grist.ready({ requiredAccess: 'full' });
+      GristHelpers.log('Connecté à Grist ✓', 'ok');
+      await GristHelpers.ensureSchema();
+      loadAllData();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analyse Fick — Profils chlorures</title>
+
+  <!-- Shared styles -->
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <!-- Grist Plugin API -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <!-- Pyodide (Python WASM) -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+  <!-- Shared helpers -->
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    #chart { width: 100%; min-height: 340px; border-radius: 8px; overflow: hidden; }
+    .param-group input[type="number"] { width: 80px; }
+    #direct-input-card .param-group input[type="number"] { width: 120px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <h1><span class="icon">📊</span> Analyse Fick</h1>
+    <div class="status" id="status">
+      <span class="dot"></span>
+      <span id="status-text">Chargement Pyodide…</span>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="empty-state">
+    <div class="icon">🧪</div>
+    <h3>En attente de données</h3>
+    <p>Sélectionnez un <strong>protocole chlorures</strong> (CHLORIDE_PROTOCOL) dans la table liée pour analyser le profil.</p>
+  </div>
+
+  <!-- Main content (hidden until data) -->
+  <div id="main-content" style="display:none">
+
+    <!-- Context info -->
+    <div class="card">
+      <div class="card-title">Contexte</div>
+      <div class="info-grid" id="context-info"></div>
+    </div>
+
+    <!-- Input Mode Selection -->
+    <div class="card">
+      <div class="card-title">Mode d'entrée</div>
+      <div class="mode-selector">
+        <button class="mode-btn active" id="mode-profile" onclick="setMode('profile')">
+          📈 Profil de chlorures
+        </button>
+        <button class="mode-btn" id="mode-direct" onclick="setMode('direct')">
+          🔢 Saisie directe Dapp
+        </button>
+      </div>
+    </div>
+
+    <!-- === MODE PROFIL === -->
+
+    <div class="card" id="chart-card">
+      <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Profil de chlorures</span>
+        <span id="nb-points" style="font-size:11px; color:var(--text-dim); text-transform:none; letter-spacing:0;"></span>
+      </div>
+      <div id="chart"></div>
+    </div>
+
+    <div class="card" id="fitting-controls-card">
+      <div class="card-title">Paramètres de fitting</div>
+      <div class="param-row" style="margin-bottom:12px;">
+        <div class="param-group">
+          <label>Seuil Cl⁻ critique :</label>
+          <input type="number" id="seuil-cl" value="0.4" step="0.05" min="0.05" max="2.0">
+          <label>% liant</label>
+        </div>
+        <div class="param-group">
+          <label>Enrobage :</label>
+          <input type="number" id="enrobage" value="50" step="5" min="10" max="120">
+          <label>mm</label>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-fit" disabled onclick="runFitting()">
+          ⚙️ Lancer le fitting
+        </button>
+        <button class="btn btn-secondary" id="btn-save" disabled onclick="saveResults()">
+          💾 Enregistrer
+        </button>
+      </div>
+    </div>
+
+    <!-- === MODE DIRECT === -->
+
+    <div class="card" id="direct-input-card" style="display:none">
+      <div class="card-title">Saisie directe des paramètres</div>
+      <div class="param-row" style="margin-bottom:12px;">
+        <div class="param-group">
+          <label>Dapp :</label>
+          <input type="number" id="direct-dapp" step="1e-13" value="1e-12">
+          <label>m²/s</label>
+        </div>
+        <div class="param-group">
+          <label>Cs :</label>
+          <input type="number" id="direct-cs" step="0.1" value="3.0">
+          <label>% liant</label>
+        </div>
+        <div class="param-group">
+          <label>Âge :</label>
+          <input type="number" id="direct-age" step="1" value="365" style="width:80px">
+          <label>jours</label>
+        </div>
+      </div>
+      <div class="param-row" style="margin-bottom:12px;">
+        <div class="param-group">
+          <label>Seuil Cl⁻ critique :</label>
+          <input type="number" id="direct-seuil" value="0.4" step="0.05" min="0.05" max="2.0">
+          <label>% liant</label>
+        </div>
+        <div class="param-group">
+          <label>Enrobage :</label>
+          <input type="number" id="direct-enrobage" value="50" step="5" min="10" max="120">
+          <label>mm</label>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-primary" id="btn-calc-direct" disabled onclick="calcDirect()">
+          ⚙️ Calculer durée de vie
+        </button>
+        <button class="btn btn-secondary" id="btn-save-direct" disabled onclick="saveResults()">
+          💾 Enregistrer
+        </button>
+      </div>
+    </div>
+
+    <!-- Results (shared) -->
+    <div class="card" id="results-card" style="display:none">
+      <div class="card-title">Résultats</div>
+      <div class="info-grid" id="results-info"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">Journal</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    let pyodide = null;
+    let pyodideReady = false;
+    let currentProtocol = null;   // CHLORIDE_PROTOCOL record (from onRecord)
+    let currentMix = null;        // CONCRETE_MIX fields (fetched)
+    let currentResults = null;    // CHLORIDE_RESULTS records (filtered)
+    let lastFitResult = null;
+    let gristReady = false;
+    let currentMode = 'profile';
+
+    // =========================================================================
+    // MODE SWITCHING
+    // =========================================================================
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('mode-profile').classList.toggle('active', mode === 'profile');
+      document.getElementById('mode-direct').classList.toggle('active', mode === 'direct');
+      document.getElementById('chart-card').style.display = mode === 'profile' ? '' : 'none';
+      document.getElementById('fitting-controls-card').style.display = mode === 'profile' ? '' : 'none';
+      document.getElementById('direct-input-card').style.display = mode === 'direct' ? '' : 'none';
+      lastFitResult = null;
+      document.getElementById('results-card').style.display = 'none';
+      GristHelpers.log(`Mode : ${mode === 'profile' ? 'Profil de chlorures' : 'Saisie directe Dapp'}`);
+      updateUI();
+    }
+
+    // =========================================================================
+    // PYODIDE INIT
+    // =========================================================================
+    async function initPyodide() {
+      GristHelpers.log('Chargement de Pyodide (Python WASM)…');
+      try {
+        pyodide = await loadPyodide();
+        GristHelpers.log('Pyodide chargé ✓', 'ok');
+        GristHelpers.log('Chargement numpy + scipy…');
+        await pyodide.loadPackage(['numpy', 'scipy']);
+        GristHelpers.log('numpy + scipy chargés ✓', 'ok');
+        pyodideReady = true;
+        updateUI();
+        GristHelpers.log('Prêt pour le fitting.', 'ok');
+      } catch (err) {
+        GristHelpers.log('Erreur Pyodide : ' + err.message, 'err');
+        GristHelpers.setStatus('Erreur Pyodide', 'error');
+      }
+    }
+
+    // =========================================================================
+    // GRIST CONNECTION — Select By CHLORIDE_PROTOCOL
+    // =========================================================================
+    function initGrist() {
+      grist.ready({
+        requiredAccess: 'full',
+        columns: [
+          { name: 'concrete_id',        title: 'Béton' },
+          { name: 'site_id',            title: 'Site' },
+          { name: 'exposure_regime',    title: 'Régime exposition' },
+          { name: 'concentration_value', title: 'Concentration' },
+          { name: 'concentration_unit', title: 'Unité concentration' },
+          { name: 'temp_c',             title: 'Température (°C)' },
+        ]
+      });
+
+      grist.onRecord(async function(record) {
+        GristHelpers.log(`Protocole Cl⁻ sélectionné : id=${record.id}`);
+        currentProtocol = record;
+        lastFitResult = null;
+        document.getElementById('results-card').style.display = 'none';
+
+        await fetchContext(record);
+        await fetchResults(record.id);
+        showContext();
+        updateUI();
+      });
+
+      gristReady = true;
+      GristHelpers.log('Connecté à Grist ✓', 'ok');
+    }
+
+    // =========================================================================
+    // FETCH CONTEXT — CONCRETE_MIX + SOURCE
+    // =========================================================================
+    async function fetchContext(protocol) {
+      try {
+        if (protocol.concrete_id) {
+          const mixes = await GristHelpers.fetchAllRecords('CONCRETE_MIX');
+          const mix = mixes.find(m => m.id === protocol.concrete_id);
+          currentMix = mix ? mix.fields : null;
+          if (currentMix) GristHelpers.log(`Béton : ${currentMix.mix_name || 'id=' + protocol.concrete_id}`, 'ok');
+        } else {
+          currentMix = null;
+        }
+      } catch (err) {
+        GristHelpers.log('Erreur fetch contexte : ' + err.message, 'err');
+        currentMix = null;
+      }
+    }
+
+    // =========================================================================
+    // FETCH CHLORIDE_RESULTS — profils Cl⁻ pour ce protocole
+    // =========================================================================
+    async function fetchResults(protocolId) {
+      try {
+        const allResults = await GristHelpers.fetchAllRecords('CHLORIDE_RESULTS');
+        const results = allResults
+          .filter(r =>
+            r.fields.chl_protocol_id === protocolId &&
+            r.fields.depth_mm != null &&
+            r.fields.chloride_content_pct_binder != null
+          )
+          .sort((a, b) => (a.fields.depth_mm || 0) - (b.fields.depth_mm || 0));
+
+        currentResults = results;
+        GristHelpers.log(`${results.length} points de profil chargés`, results.length > 2 ? 'ok' : 'warn');
+
+        if (results.length > 0) {
+          const age = results[0].fields.time_days;
+          if (age) GristHelpers.log(`Âge d'exposition : ${age} jours (${(age / 365.25).toFixed(1)} ans)`);
+          plotProfile(results);
+        } else {
+          GristHelpers.log('Aucun profil Cl⁻ trouvé pour ce protocole', 'warn');
+          Plotly.purge('chart');
+        }
+      } catch (err) {
+        GristHelpers.log('Erreur fetch résultats : ' + err.message, 'err');
+      }
+    }
+
+    // =========================================================================
+    // DISPLAY CONTEXT
+    // =========================================================================
+    function showContext() {
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+
+      const p = currentProtocol || {};
+      const m = currentMix || {};
+      const fields = [
+        { label: 'Mélange', value: m.mix_name || '—' },
+        { label: 'Ciment', value: m.cement_type || '—' },
+        { label: 'E/L', value: m.w_b_ratio != null ? m.w_b_ratio.toFixed(2) : '—' },
+        { label: 'Régime', value: p.exposure_regime || '—' },
+        { label: 'Concentration', value: p.concentration_value != null ? p.concentration_value + ' ' + (p.concentration_unit || '') : '—' },
+        { label: 'Température', value: p.temp_c != null ? p.temp_c + ' °C' : '—' },
+      ];
+
+      document.getElementById('context-info').innerHTML = fields.map(f => `
+        <div class="info-item">
+          <div class="label">${f.label}</div>
+          <div class="value">${f.value}</div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // PLOT PROFILE
+    // =========================================================================
+    function plotProfile(results, fitData = null) {
+      const x = results.map(r => r.fields.depth_mm);
+      const y = results.map(r => r.fields.chloride_content_pct_binder);
+
+      document.getElementById('nb-points').textContent = `${results.length} points`;
+
+      const traces = [{
+        x, y,
+        mode: 'markers', type: 'scatter', name: 'Mesures',
+        marker: { color: '#3b82f6', size: 9, line: { color: '#1e3a5f', width: 1.5 } }
+      }];
+
+      if (fitData) {
+        traces.push({
+          x: fitData.x_fit, y: fitData.y_fit,
+          mode: 'lines', type: 'scatter',
+          name: `Fick (R²=${fitData.R2.toFixed(4)})`,
+          line: { color: '#f59e0b', width: 2.5, shape: 'spline' }
+        });
+        const seuil = parseFloat(document.getElementById('seuil-cl').value);
+        traces.push({
+          x: [0, Math.max(...x) * 1.1], y: [seuil, seuil],
+          mode: 'lines', type: 'scatter', name: `Seuil = ${seuil}`,
+          line: { color: '#ef4444', width: 1.5, dash: 'dash' }
+        });
+        const enrobage = parseFloat(document.getElementById('enrobage').value);
+        traces.push({
+          x: [enrobage, enrobage], y: [0, Math.max(...y) * 1.1],
+          mode: 'lines', type: 'scatter', name: `Enrobage = ${enrobage} mm`,
+          line: { color: '#22c55e', width: 1.5, dash: 'dot' }
+        });
+      }
+
+      Plotly.newPlot('chart', traces, GristHelpers.plotlyDarkLayout({
+        xaxis: GristHelpers.plotlyDarkAxis('Profondeur (mm)'),
+        yaxis: GristHelpers.plotlyDarkAxis('Cl⁻ (% liant)')
+      }), { responsive: true, displayModeBar: true, modeBarButtonsToRemove: ['lasso2d', 'select2d'], displaylogo: false });
+    }
+
+    // =========================================================================
+    // FICK FITTING — MODE PROFIL
+    // =========================================================================
+    async function runFitting() {
+      if (!pyodideReady || !currentResults || currentResults.length < 3) {
+        GristHelpers.log('Il faut Pyodide + au moins 3 points de profil', 'warn');
+        return;
+      }
+
+      const btn = document.getElementById('btn-fit');
+      btn.disabled = true;
+      btn.textContent = '⏳ Calcul en cours…';
+      GristHelpers.log('Lancement du fitting Fick…');
+
+      try {
+        const x_mm = currentResults.map(r => r.fields.depth_mm);
+        const y_vals = currentResults.map(r => r.fields.chloride_content_pct_binder);
+        const age_jours = currentResults[0]?.fields.time_days || 365;
+        const seuil = parseFloat(document.getElementById('seuil-cl').value);
+        const enrobage = parseFloat(document.getElementById('enrobage').value);
+
+        pyodide.globals.set('x_mm_js', pyodide.toPy(x_mm));
+        pyodide.globals.set('y_vals_js', pyodide.toPy(y_vals));
+        pyodide.globals.set('age_jours_js', age_jours);
+        pyodide.globals.set('seuil_js', seuil);
+        pyodide.globals.set('enrobage_mm_js', enrobage);
+
+        const resultJson = pyodide.runPython(`
+import numpy as np
+from scipy.optimize import curve_fit
+from scipy.special import erfc, erfcinv
+import json
+
+x_mm = np.array(list(x_mm_js), dtype=float)
+y = np.array(list(y_vals_js), dtype=float)
+age_jours = float(age_jours_js)
+seuil = float(seuil_js)
+enrobage_mm = float(enrobage_mm_js)
+
+x_m = x_mm / 1000.0
+t_s = age_jours * 86400.0
+
+def fick_model(x, Cs, Dapp):
+    arg = x / (2.0 * np.sqrt(Dapp * t_s))
+    return Cs * erfc(arg)
+
+try:
+    popt, pcov = curve_fit(
+        fick_model, x_m, y,
+        p0=[max(y) * 1.1, 1e-12],
+        bounds=([0, 1e-15], [100, 1e-8]),
+        maxfev=20000
+    )
+    Cs_fit, Dapp_fit = popt
+    y_pred = fick_model(x_m, *popt)
+    SS_res = np.sum((y - y_pred)**2)
+    SS_tot = np.sum((y - np.mean(y))**2)
+    R2 = 1.0 - SS_res / SS_tot if SS_tot > 0 else 0.0
+    RMSE = np.sqrt(np.mean((y - y_pred)**2))
+    x_fit_m = np.linspace(0, max(x_m) * 1.2, 100)
+    y_fit = fick_model(x_fit_m, *popt)
+
+    enrobage_m = enrobage_mm / 1000.0
+    ratio = seuil / Cs_fit
+    if 0 < ratio < 1:
+        inv_val = erfcinv(ratio)
+        if inv_val > 0:
+            t_life_s = (enrobage_m / (2.0 * inv_val))**2 / Dapp_fit
+            duree_vie_ans = t_life_s / (365.25 * 86400)
+        else:
+            duree_vie_ans = float('inf')
+    else:
+        duree_vie_ans = float('inf') if ratio >= 1 else 0.0
+
+    prof_crit_mm = 2.0 * erfcinv(ratio) * np.sqrt(Dapp_fit * t_s) * 1000 if 0 < ratio < 1 else 0.0
+
+    result = {
+        "success": True, "Cs": float(Cs_fit), "Dapp": float(Dapp_fit),
+        "R2": float(R2), "RMSE": float(RMSE),
+        "duree_vie_ans": float(duree_vie_ans) if duree_vie_ans != float('inf') else -1,
+        "profondeur_crit_mm": float(prof_crit_mm),
+        "x_fit": (x_fit_m * 1000).tolist(), "y_fit": y_fit.tolist(),
+        "age_jours": int(age_jours), "seuil": float(seuil), "enrobage_mm": float(enrobage_mm)
+    }
+except Exception as e:
+    result = {"success": False, "error": str(e)}
+
+json.dumps(result)
+        `);
+
+        const fit = JSON.parse(resultJson);
+        if (!fit.success) {
+          GristHelpers.log('Échec du fitting : ' + fit.error, 'err');
+          btn.disabled = false; btn.textContent = '⚙️ Lancer le fitting';
+          return;
+        }
+
+        lastFitResult = fit;
+        lastFitResult.source = 'fitting';
+        GristHelpers.log(`Fitting réussi : Cs=${fit.Cs.toFixed(3)}, Dapp=${fit.Dapp.toExponential(2)}, R²=${fit.R2.toFixed(4)}`, 'ok');
+        GristHelpers.log(`Durée de vie : ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' ans' : '∞'}`, 'ok');
+
+        plotProfile(currentResults, fit);
+        showResults(fit);
+        document.getElementById('btn-save').disabled = false;
+      } catch (err) {
+        GristHelpers.log('Erreur fitting : ' + err.message, 'err');
+      }
+
+      btn.disabled = false;
+      btn.textContent = '⚙️ Lancer le fitting';
+    }
+
+    // =========================================================================
+    // DIRECT CALCULATION — MODE DIRECT
+    // =========================================================================
+    async function calcDirect() {
+      if (!pyodideReady) { GristHelpers.log('Pyodide pas encore prêt…', 'warn'); return; }
+
+      const dapp = parseFloat(document.getElementById('direct-dapp').value);
+      const cs = parseFloat(document.getElementById('direct-cs').value);
+      const ageJours = parseFloat(document.getElementById('direct-age').value) || 365;
+      const seuil = parseFloat(document.getElementById('direct-seuil').value);
+      const enrobage = parseFloat(document.getElementById('direct-enrobage').value);
+
+      if (isNaN(dapp) || dapp <= 0) { GristHelpers.log('Dapp invalide', 'err'); return; }
+      if (isNaN(cs) || cs <= 0) { GristHelpers.log('Cs invalide', 'err'); return; }
+
+      const btn = document.getElementById('btn-calc-direct');
+      btn.disabled = true; btn.textContent = '⏳ Calcul…';
+      GristHelpers.log(`Calcul direct : Dapp=${dapp.toExponential(2)}, Cs=${cs}`);
+
+      try {
+        pyodide.globals.set('dapp_js', dapp);
+        pyodide.globals.set('cs_js', cs);
+        pyodide.globals.set('age_jours_js', ageJours);
+        pyodide.globals.set('seuil_js', seuil);
+        pyodide.globals.set('enrobage_mm_js', enrobage);
+
+        const resultJson = pyodide.runPython(`
+import json, numpy as np
+from scipy.special import erfcinv
+
+dapp = float(dapp_js); cs = float(cs_js)
+age_jours = float(age_jours_js); seuil = float(seuil_js)
+enrobage_mm = float(enrobage_mm_js)
+enrobage_m = enrobage_mm / 1000.0
+t_s = age_jours * 86400.0
+
+ratio = seuil / cs
+if 0 < ratio < 1:
+    inv_val = erfcinv(ratio)
+    if inv_val > 0:
+        t_life_s = (enrobage_m / (2.0 * inv_val))**2 / dapp
+        duree_vie_ans = t_life_s / (365.25 * 86400)
+        prof_crit_mm = 2.0 * inv_val * np.sqrt(dapp * t_s) * 1000
+    else:
+        duree_vie_ans = -1; prof_crit_mm = 0.0
+else:
+    duree_vie_ans = -1 if ratio >= 1 else 0.0; prof_crit_mm = 0.0
+
+result = {
+    "success": True, "Cs": cs, "Dapp": dapp, "R2": None, "RMSE": None,
+    "duree_vie_ans": float(duree_vie_ans), "profondeur_crit_mm": float(prof_crit_mm),
+    "age_jours": int(age_jours), "seuil": seuil, "enrobage_mm": enrobage_mm
+}
+json.dumps(result)
+        `);
+
+        const fit = JSON.parse(resultJson);
+        if (!fit.success) { GristHelpers.log('Erreur : ' + (fit.error || 'inconnue'), 'err'); }
+        else {
+          lastFitResult = fit; lastFitResult.source = 'direct';
+          GristHelpers.log(`Durée de vie : ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' ans' : '∞'}`, 'ok');
+          showResults(fit);
+          document.getElementById('btn-save-direct').disabled = false;
+        }
+      } catch (err) { GristHelpers.log('Erreur calcul : ' + err.message, 'err'); }
+
+      btn.disabled = false; btn.textContent = '⚙️ Calculer durée de vie';
+    }
+
+    // =========================================================================
+    // SHOW RESULTS
+    // =========================================================================
+    function showResults(fit) {
+      document.getElementById('results-card').style.display = 'block';
+      const items = [
+        { label: 'Cs', value: fit.Cs != null ? fit.Cs.toFixed(3) : '—', unit: '% liant' },
+        { label: 'Dapp', value: GristHelpers.formatDapp(fit.Dapp), unit: 'm²/s' },
+        { label: 'R²', value: fit.R2 != null ? fit.R2.toFixed(4) : '—', unit: '' },
+        { label: 'RMSE', value: fit.RMSE != null ? fit.RMSE.toFixed(4) : '—', unit: '' },
+        { label: 'Durée de vie', value: fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) : '∞', unit: 'ans' },
+        { label: 'Prof. critique', value: fit.profondeur_crit_mm.toFixed(1), unit: 'mm' },
+      ];
+      document.getElementById('results-info').innerHTML = items.map(f => `
+        <div class="info-item">
+          <div class="label">${f.label}</div>
+          <div class="value">${f.value} <span class="unit">${f.unit}</span></div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // SAVE TO CHLORIDE_ANALYSIS
+    // =========================================================================
+    async function saveResults() {
+      if (!lastFitResult || !currentProtocol) { GristHelpers.log('Rien à sauvegarder', 'warn'); return; }
+
+      const btnP = document.getElementById('btn-save');
+      const btnD = document.getElementById('btn-save-direct');
+      if (btnP) btnP.disabled = true;
+      if (btnD) btnD.disabled = true;
+      GristHelpers.log('Sauvegarde dans CHLORIDE_ANALYSIS…');
+
+      try {
+        const fields = {
+          chl_protocol_id: currentProtocol.id,
+          Dapp: lastFitResult.Dapp,
+          Cs: lastFitResult.Cs,
+          R2: lastFitResult.R2,
+          RMSE: lastFitResult.RMSE,
+          seuil_cl: lastFitResult.seuil,
+          enrobage_mm: lastFitResult.enrobage_mm,
+          duree_vie_ans: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null,
+          profondeur_crit_mm: lastFitResult.profondeur_crit_mm,
+          source_dapp: lastFitResult.source || 'fitting',
+          date_calcul: Date.now() / 1000,
+          statut: 'Brouillon'
+        };
+        const result = await GristHelpers.createRecord('CHLORIDE_ANALYSIS', fields);
+        GristHelpers.log(`Enregistré dans CHLORIDE_ANALYSIS (id=${result.id}) ✓`, 'ok');
+      } catch (err) {
+        GristHelpers.log('Erreur sauvegarde : ' + err.message, 'err');
+      }
+
+      if (btnP) btnP.disabled = false;
+      if (btnD) btnD.disabled = false;
+    }
+
+    // =========================================================================
+    // UI STATE
+    // =========================================================================
+    function updateUI() {
+      const btnFit = document.getElementById('btn-fit');
+      const btnDirect = document.getElementById('btn-calc-direct');
+      btnFit.disabled = !(pyodideReady && currentResults && currentResults.length >= 3);
+      btnDirect.disabled = !pyodideReady;
+      if (pyodideReady && gristReady) GristHelpers.setStatus('Prêt', 'ready');
+      else if (pyodideReady) GristHelpers.setStatus('Pyodide OK — en attente Grist…', '');
+    }
+
+    // =========================================================================
+    // INIT
+    // =========================================================================
+    (async function() {
+      GristHelpers.log('Initialisation Analyse Fick…');
+      initGrist();
+      await GristHelpers.ensureSchema();
+      await initPyodide();
+    })();
+  </script>
+</body>
+</html>
