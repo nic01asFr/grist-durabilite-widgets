@@ -460,6 +460,10 @@
       document.querySelectorAll('.tab-panel').forEach(p =>
         p.classList.toggle('active', p.id === 'panel-' + tabName)
       );
+      // Rafraîchir le contenu du panneau actif
+      if (tabName === 'details') updateDetails();
+      if (tabName === 'results') updateResultsPanel();
+      if (tabName === 'protocol') populateDropdowns();
       updateBreadcrumb();
     }
 
@@ -595,6 +599,13 @@
       const v = document.getElementById('sel-mix').value;
       sel.mix = v ? parseInt(v) : null;
       sel.protocol = null;
+      // Résoudre la source amont automatiquement
+      if (sel.mix) {
+        const mix = allMixes.find(m => m.id === sel.mix);
+        if (mix && mix.fields.source_id && !sel.source) {
+          sel.source = mix.fields.source_id;
+        }
+      }
       populateDropdowns();
       updateBreadcrumb();
       updateDetails();
@@ -609,6 +620,24 @@
     function onSelectProtocol() {
       const v = document.getElementById('sel-protocol').value;
       sel.protocol = v ? parseInt(v) : null;
+      // Résoudre béton et site amont automatiquement
+      if (sel.protocol) {
+        const protos = protoType === 'chloride' ? allChlProtocols : allCarbProtocols;
+        const proto = protos.find(p => p.id === sel.protocol);
+        if (proto) {
+          if (proto.fields.concrete_id && !sel.mix) {
+            sel.mix = proto.fields.concrete_id;
+            const mix = allMixes.find(m => m.id === sel.mix);
+            if (mix && mix.fields.source_id && !sel.source) {
+              sel.source = mix.fields.source_id;
+            }
+          }
+          if (proto.fields.site_id && !sel.site) {
+            sel.site = proto.fields.site_id;
+          }
+        }
+        populateDropdowns();
+      }
       updateBreadcrumb();
       updateResultsPanel();
     }
