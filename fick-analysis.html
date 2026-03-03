@@ -5,15 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Analyse Fick — Profils chlorures</title>
 
-  <!-- Shared styles -->
   <link rel="stylesheet" href="assets/shared-styles.css">
-  <!-- Grist Plugin API -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-  <!-- Pyodide (Python WASM) -->
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-  <!-- Plotly.js -->
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
-  <!-- Shared helpers -->
   <script src="assets/grist-helpers.js"></script>
 
   <style>
@@ -24,7 +19,6 @@
 </head>
 <body>
 
-  <!-- Header -->
   <div class="header">
     <h1><span class="icon">📊</span> Analyse Fick</h1>
     <div class="status" id="status">
@@ -33,23 +27,19 @@
     </div>
   </div>
 
-  <!-- Empty state -->
   <div id="empty-state" class="empty-state">
     <div class="icon">🧪</div>
     <h3>En attente de données</h3>
-    <p>Sélectionnez un <strong>protocole chlorures</strong> (CHLORIDE_PROTOCOL) dans la table liée pour analyser le profil.</p>
+    <p>Sélectionnez une <strong>mesure</strong> (MEASUREMENT) liée à un profil Cl⁻ (result_type=curve, test=cl_profil).</p>
   </div>
 
-  <!-- Main content (hidden until data) -->
   <div id="main-content" style="display:none">
 
-    <!-- Context info -->
     <div class="card">
       <div class="card-title">Contexte</div>
       <div class="info-grid" id="context-info"></div>
     </div>
 
-    <!-- Input Mode Selection -->
     <div class="card">
       <div class="card-title">Mode d'entrée</div>
       <div class="mode-selector">
@@ -61,8 +51,6 @@
         </button>
       </div>
     </div>
-
-    <!-- === MODE PROFIL === -->
 
     <div class="card" id="chart-card">
       <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
@@ -85,6 +73,11 @@
           <input type="number" id="enrobage" value="50" step="5" min="10" max="120">
           <label>mm</label>
         </div>
+        <div class="param-group">
+          <label>Age :</label>
+          <input type="number" id="age-jours" value="365" step="1" min="1">
+          <label>jours</label>
+        </div>
       </div>
       <div class="controls">
         <button class="btn btn-primary" id="btn-fit" disabled onclick="runFitting()">
@@ -95,8 +88,6 @@
         </button>
       </div>
     </div>
-
-    <!-- === MODE DIRECT === -->
 
     <div class="card" id="direct-input-card" style="display:none">
       <div class="card-title">Saisie directe des paramètres</div>
@@ -139,13 +130,11 @@
       </div>
     </div>
 
-    <!-- Results (shared) -->
     <div class="card" id="results-card" style="display:none">
       <div class="card-title">Résultats</div>
       <div class="info-grid" id="results-info"></div>
     </div>
 
-    <!-- Log -->
     <div class="card">
       <div class="card-title">Journal</div>
       <div class="log" id="log"></div>
@@ -158,9 +147,11 @@
     // =========================================================================
     let pyodide = null;
     let pyodideReady = false;
-    let currentProtocol = null;   // CHLORIDE_PROTOCOL record (from onRecord)
-    let currentMix = null;        // CONCRETE_MIX fields (fetched)
-    let currentResults = null;    // CHLORIDE_RESULTS records (filtered)
+    let currentMeasurement = null;  // MEASUREMENT record (from onRecord)
+    let currentMaterial   = null;   // MATERIAL fields
+    let currentMix        = null;   // MIX_DESIGN fields
+    let currentExposure   = null;   // EXPOSURE fields
+    let currentProfilePoints = null; // [{x: depth_mm, y: chloride_pct}]
     let lastFitResult = null;
     let gristReady = false;
     let currentMode = 'profile';
@@ -202,24 +193,22 @@
     }
 
     // =========================================================================
-    // GRIST CONNECTION — Select By CHLORIDE_PROTOCOL
+    // GRIST CONNECTION — Select By MEASUREMENT
     // =========================================================================
     function initGrist() {
       grist.ready({
         requiredAccess: 'full',
         columns: [
-          { name: 'concrete_id',        title: 'Béton' },
-          { name: 'site_id',            title: 'Site' },
-          { name: 'exposure_regime',    title: 'Régime exposition' },
-          { name: 'concentration_value', title: 'Concentration' },
-          { name: 'concentration_unit', title: 'Unité concentration' },
-          { name: 'temp_c',             title: 'Température (°C)' },
+          { name: 'id_material',      title: 'Matériau' },
+          { name: 'sample_type',      title: "Type d'échantillon" },
+          { name: 'id_source',        title: 'Source' },
+          { name: 'preparation_date', title: 'Date préparation' },
         ]
       });
 
       grist.onRecord(async function(record) {
-        GristHelpers.log(`Protocole Cl⁻ sélectionné : id=${record.id}`);
-        currentProtocol = record;
+        GristHelpers.log(`Mesure sélectionnée : id=${record.id}`);
+        currentMeasurement = record;
         lastFitResult = null;
         document.getElementById('results-card').style.display = 'none';
 
@@ -234,51 +223,90 @@
     }
 
     // =========================================================================
-    // FETCH CONTEXT — CONCRETE_MIX + SOURCE
+    // FETCH CONTEXT — MATERIAL + MIX_DESIGN + EXPOSURE
     // =========================================================================
-    async function fetchContext(protocol) {
+    async function fetchContext(measurement) {
+      currentMaterial = null;
+      currentMix = null;
+      currentExposure = null;
+      if (!measurement.id_material) return;
       try {
-        if (protocol.concrete_id) {
-          const mixes = await GristHelpers.fetchAllRecords('CONCRETE_MIX');
-          const mix = mixes.find(m => m.id === protocol.concrete_id);
+        const [materials, mixes, exposures] = await Promise.all([
+          GristHelpers.fetchAllRecords('MATERIAL'),
+          GristHelpers.fetchAllRecords('MIX_DESIGN'),
+          GristHelpers.fetchAllRecords('EXPOSURE'),
+        ]);
+        const mat = materials.find(m => m.id === measurement.id_material);
+        currentMaterial = mat ? mat.fields : null;
+        if (currentMaterial) {
+          const mix = mixes.find(m => m.id === currentMaterial.id_mix_design);
           currentMix = mix ? mix.fields : null;
-          if (currentMix) GristHelpers.log(`Béton : ${currentMix.mix_name || 'id=' + protocol.concrete_id}`, 'ok');
-        } else {
-          currentMix = null;
+          const expo = exposures.find(e => e.id === currentMaterial.id_exposure);
+          currentExposure = expo ? expo.fields : null;
+          GristHelpers.log(`Matériau : ${currentMaterial.name || 'id=' + measurement.id_material}`, 'ok');
         }
       } catch (err) {
         GristHelpers.log('Erreur fetch contexte : ' + err.message, 'err');
-        currentMix = null;
       }
     }
 
     // =========================================================================
-    // FETCH CHLORIDE_RESULTS — profils Cl⁻ pour ce protocole
+    // FETCH PROFILE — RESULT(curve, cl_profil) → CURVE → DATA_CURVE
     // =========================================================================
-    async function fetchResults(protocolId) {
+    async function fetchResults(measurementId) {
+      currentProfilePoints = null;
       try {
-        const allResults = await GristHelpers.fetchAllRecords('CHLORIDE_RESULTS');
-        const results = allResults
-          .filter(r =>
-            r.fields.chl_protocol_id === protocolId &&
-            r.fields.depth_mm != null &&
-            r.fields.chloride_content_pct_binder != null
-          )
-          .sort((a, b) => (a.fields.depth_mm || 0) - (b.fields.depth_mm || 0));
+        const [tests, results, curves, dataPoints] = await Promise.all([
+          GristHelpers.fetchAllRecords('TEST'),
+          GristHelpers.fetchAllRecords('RESULT'),
+          GristHelpers.fetchAllRecords('CURVE'),
+          GristHelpers.fetchAllRecords('DATA_CURVE'),
+        ]);
 
-        currentResults = results;
-        GristHelpers.log(`${results.length} points de profil chargés`, results.length > 2 ? 'ok' : 'warn');
+        const clTest = tests.find(t => t.fields.name === 'cl_profil');
+        if (!clTest) {
+          GristHelpers.log('Aucun test "cl_profil" trouvé dans la table TEST', 'warn');
+          return;
+        }
 
-        if (results.length > 0) {
-          const age = results[0].fields.time_days;
-          if (age) GristHelpers.log(`Âge d'exposition : ${age} jours (${(age / 365.25).toFixed(1)} ans)`);
-          plotProfile(results);
+        const curveResult = results.find(r =>
+          r.fields.id_measurement === measurementId &&
+          r.fields.result_type === 'curve' &&
+          r.fields.id_test === clTest.id
+        );
+        if (!curveResult) {
+          GristHelpers.log('Aucun profil Cl⁻ (result_type=curve, test=cl_profil) pour cette mesure', 'warn');
+          Plotly.purge('chart');
+          return;
+        }
+
+        const curve = curves.find(c => c.fields.id_result === curveResult.id);
+        if (!curve) {
+          GristHelpers.log('Métadonnées de courbe (CURVE) introuvables', 'warn');
+          return;
+        }
+
+        // Infill age from TEST.experiment_duration if available
+        if (clTest.fields.experiment_duration) {
+          document.getElementById('age-jours').value = clTest.fields.experiment_duration;
+        }
+
+        const points = dataPoints
+          .filter(p => p.fields.id_curve === curve.id && p.fields.x != null && p.fields.y != null)
+          .sort((a, b) => a.fields.x - b.fields.x)
+          .map(p => ({ x: p.fields.x, y: p.fields.y }));
+
+        currentProfilePoints = points;
+        GristHelpers.log(`${points.length} points (${curve.fields.x_name || 'x'} vs ${curve.fields.y_name || 'y'})`, points.length > 2 ? 'ok' : 'warn');
+
+        if (points.length > 0) {
+          plotProfile(points);
         } else {
-          GristHelpers.log('Aucun profil Cl⁻ trouvé pour ce protocole', 'warn');
+          GristHelpers.log('Courbe vide — aucun point DATA_CURVE', 'warn');
           Plotly.purge('chart');
         }
       } catch (err) {
-        GristHelpers.log('Erreur fetch résultats : ' + err.message, 'err');
+        GristHelpers.log('Erreur fetch profil : ' + err.message, 'err');
       }
     }
 
@@ -289,17 +317,17 @@
       document.getElementById('empty-state').style.display = 'none';
       document.getElementById('main-content').style.display = 'block';
 
-      const p = currentProtocol || {};
-      const m = currentMix || {};
+      const mat  = currentMaterial  || {};
+      const mix  = currentMix       || {};
+      const expo = currentExposure  || {};
       const fields = [
-        { label: 'Mélange', value: m.mix_name || '—' },
-        { label: 'Ciment', value: m.cement_type || '—' },
-        { label: 'E/L', value: m.w_b_ratio != null ? m.w_b_ratio.toFixed(2) : '—' },
-        { label: 'Régime', value: p.exposure_regime || '—' },
-        { label: 'Concentration', value: p.concentration_value != null ? p.concentration_value + ' ' + (p.concentration_unit || '') : '—' },
-        { label: 'Température', value: p.temp_c != null ? p.temp_c + ' °C' : '—' },
+        { label: 'Matériau',          value: mat.name          || '—' },
+        { label: 'Type matériau',     value: mat.material_type || '—' },
+        { label: 'E/C',               value: mix.wc_ratio != null ? mix.wc_ratio.toFixed(2) : '—' },
+        { label: 'Ciment (kg/m³)',    value: mix.cement_content_kg ?? '—' },
+        { label: "Type d'exposition", value: expo.exposure_type   || '—' },
+        { label: 'Nature exposition', value: expo.exposure_nature || '—' },
       ];
-
       document.getElementById('context-info').innerHTML = fields.map(f => `
         <div class="info-item">
           <div class="label">${f.label}</div>
@@ -311,11 +339,11 @@
     // =========================================================================
     // PLOT PROFILE
     // =========================================================================
-    function plotProfile(results, fitData = null) {
-      const x = results.map(r => r.fields.depth_mm);
-      const y = results.map(r => r.fields.chloride_content_pct_binder);
+    function plotProfile(points, fitData = null) {
+      const x = points.map(p => p.x);
+      const y = points.map(p => p.y);
 
-      document.getElementById('nb-points').textContent = `${results.length} points`;
+      document.getElementById('nb-points').textContent = `${points.length} points`;
 
       const traces = [{
         x, y,
@@ -354,7 +382,7 @@
     // FICK FITTING — MODE PROFIL
     // =========================================================================
     async function runFitting() {
-      if (!pyodideReady || !currentResults || currentResults.length < 3) {
+      if (!pyodideReady || !currentProfilePoints || currentProfilePoints.length < 3) {
         GristHelpers.log('Il faut Pyodide + au moins 3 points de profil', 'warn');
         return;
       }
@@ -365,16 +393,16 @@
       GristHelpers.log('Lancement du fitting Fick…');
 
       try {
-        const x_mm = currentResults.map(r => r.fields.depth_mm);
-        const y_vals = currentResults.map(r => r.fields.chloride_content_pct_binder);
-        const age_jours = currentResults[0]?.fields.time_days || 365;
-        const seuil = parseFloat(document.getElementById('seuil-cl').value);
+        const x_mm    = currentProfilePoints.map(p => p.x);
+        const y_vals  = currentProfilePoints.map(p => p.y);
+        const age_jours = parseFloat(document.getElementById('age-jours').value) || 365;
+        const seuil   = parseFloat(document.getElementById('seuil-cl').value);
         const enrobage = parseFloat(document.getElementById('enrobage').value);
 
-        pyodide.globals.set('x_mm_js', pyodide.toPy(x_mm));
-        pyodide.globals.set('y_vals_js', pyodide.toPy(y_vals));
-        pyodide.globals.set('age_jours_js', age_jours);
-        pyodide.globals.set('seuil_js', seuil);
+        pyodide.globals.set('x_mm_js',       pyodide.toPy(x_mm));
+        pyodide.globals.set('y_vals_js',      pyodide.toPy(y_vals));
+        pyodide.globals.set('age_jours_js',   age_jours);
+        pyodide.globals.set('seuil_js',       seuil);
         pyodide.globals.set('enrobage_mm_js', enrobage);
 
         const resultJson = pyodide.runPython(`
@@ -449,10 +477,10 @@ json.dumps(result)
 
         lastFitResult = fit;
         lastFitResult.source = 'fitting';
-        GristHelpers.log(`Fitting réussi : Cs=${fit.Cs.toFixed(3)}, Dapp=${fit.Dapp.toExponential(2)}, R²=${fit.R2.toFixed(4)}`, 'ok');
+        GristHelpers.log(`Fitting : Cs=${fit.Cs.toFixed(3)}, Dapp=${fit.Dapp.toExponential(2)}, R²=${fit.R2.toFixed(4)}`, 'ok');
         GristHelpers.log(`Durée de vie : ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' ans' : '∞'}`, 'ok');
 
-        plotProfile(currentResults, fit);
+        plotProfile(currentProfilePoints, fit);
         showResults(fit);
         document.getElementById('btn-save').disabled = false;
       } catch (err) {
@@ -469,24 +497,24 @@ json.dumps(result)
     async function calcDirect() {
       if (!pyodideReady) { GristHelpers.log('Pyodide pas encore prêt…', 'warn'); return; }
 
-      const dapp = parseFloat(document.getElementById('direct-dapp').value);
-      const cs = parseFloat(document.getElementById('direct-cs').value);
+      const dapp    = parseFloat(document.getElementById('direct-dapp').value);
+      const cs      = parseFloat(document.getElementById('direct-cs').value);
       const ageJours = parseFloat(document.getElementById('direct-age').value) || 365;
-      const seuil = parseFloat(document.getElementById('direct-seuil').value);
+      const seuil   = parseFloat(document.getElementById('direct-seuil').value);
       const enrobage = parseFloat(document.getElementById('direct-enrobage').value);
 
       if (isNaN(dapp) || dapp <= 0) { GristHelpers.log('Dapp invalide', 'err'); return; }
-      if (isNaN(cs) || cs <= 0) { GristHelpers.log('Cs invalide', 'err'); return; }
+      if (isNaN(cs)   || cs   <= 0) { GristHelpers.log('Cs invalide', 'err'); return; }
 
       const btn = document.getElementById('btn-calc-direct');
       btn.disabled = true; btn.textContent = '⏳ Calcul…';
       GristHelpers.log(`Calcul direct : Dapp=${dapp.toExponential(2)}, Cs=${cs}`);
 
       try {
-        pyodide.globals.set('dapp_js', dapp);
-        pyodide.globals.set('cs_js', cs);
-        pyodide.globals.set('age_jours_js', ageJours);
-        pyodide.globals.set('seuil_js', seuil);
+        pyodide.globals.set('dapp_js',        dapp);
+        pyodide.globals.set('cs_js',          cs);
+        pyodide.globals.set('age_jours_js',   ageJours);
+        pyodide.globals.set('seuil_js',       seuil);
         pyodide.globals.set('enrobage_mm_js', enrobage);
 
         const resultJson = pyodide.runPython(`
@@ -538,12 +566,12 @@ json.dumps(result)
     function showResults(fit) {
       document.getElementById('results-card').style.display = 'block';
       const items = [
-        { label: 'Cs', value: fit.Cs != null ? fit.Cs.toFixed(3) : '—', unit: '% liant' },
-        { label: 'Dapp', value: GristHelpers.formatDapp(fit.Dapp), unit: 'm²/s' },
-        { label: 'R²', value: fit.R2 != null ? fit.R2.toFixed(4) : '—', unit: '' },
-        { label: 'RMSE', value: fit.RMSE != null ? fit.RMSE.toFixed(4) : '—', unit: '' },
-        { label: 'Durée de vie', value: fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) : '∞', unit: 'ans' },
-        { label: 'Prof. critique', value: fit.profondeur_crit_mm.toFixed(1), unit: 'mm' },
+        { label: 'Cs',           value: fit.Cs   != null ? fit.Cs.toFixed(3)   : '—', unit: '% liant' },
+        { label: 'Dapp',         value: GristHelpers.formatDapp(fit.Dapp),              unit: 'm²/s'   },
+        { label: 'R²',           value: fit.R2   != null ? fit.R2.toFixed(4)   : '—', unit: ''        },
+        { label: 'RMSE',         value: fit.RMSE != null ? fit.RMSE.toFixed(4) : '—', unit: ''        },
+        { label: 'Durée de vie', value: fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) : '∞',   unit: 'ans' },
+        { label: 'Prof. critique', value: fit.profondeur_crit_mm.toFixed(1),            unit: 'mm'     },
       ];
       document.getElementById('results-info').innerHTML = items.map(f => `
         <div class="info-item">
@@ -554,34 +582,52 @@ json.dumps(result)
     }
 
     // =========================================================================
-    // SAVE TO CHLORIDE_ANALYSIS
+    // SAVE TO RESULT (scalar, diffusivity)
     // =========================================================================
     async function saveResults() {
-      if (!lastFitResult || !currentProtocol) { GristHelpers.log('Rien à sauvegarder', 'warn'); return; }
+      if (!lastFitResult || !currentMeasurement) { GristHelpers.log('Rien à sauvegarder', 'warn'); return; }
 
       const btnP = document.getElementById('btn-save');
       const btnD = document.getElementById('btn-save-direct');
       if (btnP) btnP.disabled = true;
       if (btnD) btnD.disabled = true;
-      GristHelpers.log('Sauvegarde dans CHLORIDE_ANALYSIS…');
+      GristHelpers.log('Sauvegarde dans RESULT (scalaires diffusivité)…');
 
       try {
-        const fields = {
-          chl_protocol_id: currentProtocol.id,
-          Dapp: lastFitResult.Dapp,
-          Cs: lastFitResult.Cs,
-          R2: lastFitResult.R2,
-          RMSE: lastFitResult.RMSE,
-          seuil_cl: lastFitResult.seuil,
-          enrobage_mm: lastFitResult.enrobage_mm,
-          duree_vie_ans: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null,
-          profondeur_crit_mm: lastFitResult.profondeur_crit_mm,
-          source_dapp: lastFitResult.source || 'fitting',
-          date_calcul: Date.now() / 1000,
-          statut: 'Brouillon'
-        };
-        const result = await GristHelpers.createRecord('CHLORIDE_ANALYSIS', fields);
-        GristHelpers.log(`Enregistré dans CHLORIDE_ANALYSIS (id=${result.id}) ✓`, 'ok');
+        // Find or create 'diffusivity' test
+        const tests = await GristHelpers.fetchAllRecords('TEST');
+        let diffTest = tests.find(t => t.fields.name === 'diffusivity');
+        if (!diffTest) {
+          const r = await GristHelpers.createRecord('TEST', {
+            name: 'diffusivity', test_type: 'natural', standard_name: 'Fick 2nd law'
+          });
+          diffTest = { id: r.id };
+          GristHelpers.log('Test "diffusivity" créé ✓', 'ok');
+        }
+
+        const today = Math.floor(Date.now() / 1000);
+        const params = [
+          { operator: 'Dapp',             value: lastFitResult.Dapp,                       unit: 'm2/s'  },
+          { operator: 'Cs',               value: lastFitResult.Cs,                          unit: '%'     },
+          { operator: 'R2',               value: lastFitResult.R2,                          unit: ''      },
+          { operator: 'RMSE',             value: lastFitResult.RMSE,                        unit: ''      },
+          { operator: 'duree_vie_ans',    value: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null, unit: 'ans' },
+          { operator: 'profondeur_crit',  value: lastFitResult.profondeur_crit_mm,          unit: 'mm'    },
+          { operator: 'source_dapp',      value: lastFitResult.source === 'fitting' ? 1 : 0, unit: ''     },
+        ].filter(p => p.value != null);
+
+        const records = params.map(p => ({
+          id_measurement: currentMeasurement.id,
+          id_test:        diffTest.id,
+          result_type:    'scalar',
+          name:           String(p.value),
+          unit:           p.unit,
+          operator:       p.operator,
+          result_date:    today,
+        }));
+
+        const results = await GristHelpers.bulkCreateRecords('RESULT', records);
+        GristHelpers.log(`${results.length} paramètre(s) enregistrés dans RESULT ✓`, 'ok');
       } catch (err) {
         GristHelpers.log('Erreur sauvegarde : ' + err.message, 'err');
       }
@@ -594,9 +640,9 @@ json.dumps(result)
     // UI STATE
     // =========================================================================
     function updateUI() {
-      const btnFit = document.getElementById('btn-fit');
+      const btnFit    = document.getElementById('btn-fit');
       const btnDirect = document.getElementById('btn-calc-direct');
-      btnFit.disabled = !(pyodideReady && currentResults && currentResults.length >= 3);
+      btnFit.disabled    = !(pyodideReady && currentProfilePoints && currentProfilePoints.length >= 3);
       btnDirect.disabled = !pyodideReady;
       if (pyodideReady && gristReady) GristHelpers.setStatus('Prêt', 'ready');
       else if (pyodideReady) GristHelpers.setStatus('Pyodide OK — en attente Grist…', '');

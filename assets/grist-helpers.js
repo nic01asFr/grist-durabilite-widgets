@@ -1,173 +1,202 @@
 // =========================================================================
 // GristHelpers — Utilitaires partagés pour les widgets durabilité
-// Schéma v1.1 — 13 tables (10 commanditaire + SITE, CHLORIDE_ANALYSIS, CARBONATION_ANALYSIS)
+// Schéma v2.0 — 11 tables (architecture générique)
 // =========================================================================
 const GristHelpers = {
 
   // =========================================================================
-  // SCHEMA — Définition complète des 13 tables
+  // SCHEMA — Définition complète des 11 tables
   // =========================================================================
   SCHEMA: {
-
-    // --- Données bibliographiques ---
-    SOURCE: {
-      columns: [
-        { id: 'authors',   fields: { type: 'Text',    label: 'Auteurs' } },
-        { id: 'title',     fields: { type: 'Text',    label: 'Titre' } },
-        { id: 'journal',   fields: { type: 'Text',    label: 'Revue' } },
-        { id: 'year',      fields: { type: 'Int',     label: 'Année' } },
-        { id: 'doi',       fields: { type: 'Text',    label: 'DOI' } },
-        { id: 'url',       fields: { type: 'Text',    label: 'URL' } },
-        { id: 'notes',     fields: { type: 'Text',    label: 'Notes' } },
-      ]
-    },
-
-    // --- Formulation béton ---
-    CONCRETE_MIX: {
-      columns: [
-        { id: 'source_id',              fields: { type: 'Ref:SOURCE',       label: 'Source' } },
-        { id: 'mix_name',               fields: { type: 'Text',             label: 'Nom du mélange' } },
-        { id: 'cement_type',            fields: { type: 'Text',             label: 'Type de ciment' } },
-        { id: 'total_binder_kg_m3',     fields: { type: 'Numeric',          label: 'Liant total (kg/m³)' } },
-        { id: 'w_b_ratio',              fields: { type: 'Numeric',          label: 'E/L' } },
-        { id: 'water_content_kg_m3',    fields: { type: 'Numeric',          label: 'Eau (kg/m³)' } },
-        { id: 'admixture_type',         fields: { type: 'Text',             label: 'Type adjuvant' } },
-        { id: 'admixture_dosage_pct',   fields: { type: 'Numeric',          label: 'Dosage adjuvant (%)' } },
-        { id: 'air_content_pct',        fields: { type: 'Numeric',          label: 'Air entraîné (%)' } },
-        { id: 'slump_mm',               fields: { type: 'Numeric',          label: 'Affaissement (mm)' } },
-        { id: 'curing_condition',       fields: { type: 'Text',             label: 'Condition de cure' } },
-        { id: 'curing_time_days',       fields: { type: 'Numeric',          label: 'Durée cure (jours)' } },
-      ]
-    },
-
-    // --- Granulats (N lignes par béton) ---
-    AGGREGATES: {
-      columns: [
-        { id: 'concrete_id',    fields: { type: 'Ref:CONCRETE_MIX', label: 'Béton' } },
-        { id: 'size_min_mm',    fields: { type: 'Numeric',          label: 'Taille min (mm)' } },
-        { id: 'size_max_mm',    fields: { type: 'Numeric',          label: 'Taille max (mm)' } },
-        { id: 'content_kg_m3',  fields: { type: 'Numeric',          label: 'Dosage (kg/m³)' } },
-        { id: 'aggregate_type', fields: { type: 'Text',             label: 'Type granulat' } },
-      ]
-    },
-
-    // --- Composition du liant (N lignes par béton) ---
-    BINDER_COMPOSITION: {
-      columns: [
-        { id: 'concrete_id',    fields: { type: 'Ref:CONCRETE_MIX', label: 'Béton' } },
-        { id: 'component_name', fields: { type: 'Text',             label: 'Composant' } },
-        { id: 'content_pct',    fields: { type: 'Numeric',          label: 'Teneur (%)' } },
-        { id: 'basis',          fields: { type: 'Text',             label: 'Base de calcul' } },
-      ]
-    },
-
-    // --- Caractérisation ciment (phases Bogue, etc.) ---
-    CEMENT_CHARACTERIZATION: {
-      columns: [
-        { id: 'concrete_id', fields: { type: 'Ref:CONCRETE_MIX', label: 'Béton' } },
-        { id: 'phase_name',  fields: { type: 'Text',             label: 'Phase' } },
-        { id: 'value_pct',   fields: { type: 'Numeric',          label: 'Valeur (%)' } },
-        { id: 'method',      fields: { type: 'Text',             label: 'Méthode' } },
-      ]
-    },
-
-    // --- Propriétés matériau (EAV : résistance, porosité, etc.) ---
-    MATERIAL_PROPERTIES: {
-      columns: [
-        { id: 'concrete_id',   fields: { type: 'Ref:CONCRETE_MIX', label: 'Béton' } },
-        { id: 'property_name', fields: { type: 'Text',             label: 'Propriété' } },
-        { id: 'value',         fields: { type: 'Numeric',          label: 'Valeur' } },
-        { id: 'unit',          fields: { type: 'Text',             label: 'Unité' } },
-        { id: 'test_age_days', fields: { type: 'Numeric',          label: 'Âge essai (jours)' } },
-      ]
-    },
 
     // --- Sites géographiques ---
     SITE: {
       columns: [
-        { id: 'site_name',    fields: { type: 'Text',    label: 'Nom du site' } },
-        { id: 'latitude',     fields: { type: 'Numeric',  label: 'Latitude' } },
-        { id: 'longitude',    fields: { type: 'Numeric',  label: 'Longitude' } },
-        { id: 'country',      fields: { type: 'Text',    label: 'Pays' } },
-        { id: 'climate_zone', fields: { type: 'Text',    label: 'Zone climatique' } },
+        { id: 'latitude',       fields: { type: 'Numeric', label: 'Latitude' } },
+        { id: 'longitude',      fields: { type: 'Numeric', label: 'Longitude' } },
+        { id: 'country_region', fields: { type: 'Text',    label: 'Pays / Région' } },
       ]
     },
 
-    // --- Protocoles chlorures ---
-    CHLORIDE_PROTOCOL: {
+    // --- Conditions d'exposition ---
+    EXPOSURE: {
       columns: [
-        { id: 'concrete_id',        fields: { type: 'Ref:CONCRETE_MIX', label: 'Béton' } },
-        { id: 'site_id',            fields: { type: 'Ref:SITE',         label: 'Site' } },
-        { id: 'exposure_regime',    fields: { type: 'Text',             label: 'Régime exposition' } },
-        { id: 'concentration_value', fields: { type: 'Numeric',         label: 'Concentration' } },
-        { id: 'concentration_unit', fields: { type: 'Text',             label: 'Unité concentration' } },
-        { id: 'temp_c',             fields: { type: 'Numeric',          label: 'Température (°C)' } },
+        { id: 'exposure_type',        fields: { type: 'Choice',  label: "Type d'exposition",  widgetOptions: '{"choices":["laboratory","in-situ"]}' } },
+        { id: 'exposure_nature',      fields: { type: 'Choice',  label: "Nature d'exposition", widgetOptions: '{"choices":["atmospheric","spray","splash","tidal","submerged"]}' } },
+        { id: 'wetting_duration_pct', fields: { type: 'Numeric', label: 'Mouillage (%)' } },
+        { id: 'drying_duration_pct',  fields: { type: 'Numeric', label: 'Séchage (%)' } },
       ]
     },
 
-    // --- Résultats chlorures (profils) ---
-    CHLORIDE_RESULTS: {
+    // --- Références bibliographiques ---
+    SOURCE: {
       columns: [
-        { id: 'chl_protocol_id',           fields: { type: 'Ref:CHLORIDE_PROTOCOL', label: 'Protocole Cl⁻' } },
-        { id: 'time_days',                 fields: { type: 'Numeric',               label: 'Temps (jours)' } },
-        { id: 'depth_mm',                  fields: { type: 'Numeric',               label: 'Profondeur (mm)' } },
-        { id: 'chloride_content_pct_binder', fields: { type: 'Numeric',             label: 'Cl⁻ (% liant)' } },
+        { id: 'title',       fields: { type: 'Text', label: 'Titre' } },
+        { id: 'authors',     fields: { type: 'Text', label: 'Auteurs' } },
+        { id: 'doi',         fields: { type: 'Text', label: 'DOI' } },
+        { id: 'url',         fields: { type: 'Text', label: 'URL' } },
+        { id: 'year',        fields: { type: 'Int',  label: 'Année' } },
+        { id: 'journal',     fields: { type: 'Text', label: 'Revue' } },
+        { id: 'notes',       fields: { type: 'Text', label: 'Notes' } },
+        { id: 'designation', fields: { type: 'Text', label: 'Désignation' } },
       ]
     },
 
-    // --- Analyses chlorures (résultats fitting / saisie directe) ---
-    CHLORIDE_ANALYSIS: {
+    // --- Liants : ciments, additions minérales ---
+    BINDER: {
       columns: [
-        { id: 'chl_protocol_id',  fields: { type: 'Ref:CHLORIDE_PROTOCOL', label: 'Protocole Cl⁻' } },
-        { id: 'Dapp',             fields: { type: 'Numeric',               label: 'Dapp (m²/s)' } },
-        { id: 'Cs',               fields: { type: 'Numeric',               label: 'Cs (% liant)' } },
-        { id: 'R2',               fields: { type: 'Numeric',               label: 'R²' } },
-        { id: 'RMSE',             fields: { type: 'Numeric',               label: 'RMSE' } },
-        { id: 'seuil_cl',         fields: { type: 'Numeric',               label: 'Seuil Cl⁻' } },
-        { id: 'enrobage_mm',      fields: { type: 'Numeric',               label: 'Enrobage (mm)' } },
-        { id: 'duree_vie_ans',    fields: { type: 'Numeric',               label: 'Durée de vie (ans)' } },
-        { id: 'profondeur_crit_mm', fields: { type: 'Numeric',             label: 'Prof. critique (mm)' } },
-        { id: 'source_dapp',      fields: { type: 'Text',                  label: 'Source Dapp' } },
-        { id: 'date_calcul',      fields: { type: 'DateTime:Europe/Paris', label: 'Date calcul' } },
-        { id: 'statut',           fields: { type: 'Text',                  label: 'Statut' } },
+        { id: 'name',             fields: { type: 'Text',    label: 'Nom' } },
+        { id: 'binder_type',      fields: { type: 'Choice',  label: 'Type liant', widgetOptions: '{"choices":["portland_cement","blended_cement","fly_ash","slag","silica_fume","limestone_filler","natural_pozzolan","other"]}' } },
+        { id: 'density_kg_m3',    fields: { type: 'Numeric', label: 'Masse volumique (kg/m³)' } },
+        { id: 'specific_surface', fields: { type: 'Numeric', label: 'Finesse Blaine (cm²/g)' } },
+        { id: 'loss_on_ignition', fields: { type: 'Numeric', label: 'PAF (%)' } },
+        // Composition Bogue
+        { id: 'C3S',              fields: { type: 'Numeric', label: 'C₃S (%)' } },
+        { id: 'C2S',              fields: { type: 'Numeric', label: 'C₂S (%)' } },
+        { id: 'C3A',              fields: { type: 'Numeric', label: 'C₃A (%)' } },
+        { id: 'C4AF',             fields: { type: 'Numeric', label: 'C₄AF (%)' } },
+        // Composition oxyde
+        { id: 'SiO2',             fields: { type: 'Numeric', label: 'SiO₂ (%)' } },
+        { id: 'Al2O3',            fields: { type: 'Numeric', label: 'Al₂O₃ (%)' } },
+        { id: 'Fe2O3',            fields: { type: 'Numeric', label: 'Fe₂O₃ (%)' } },
+        { id: 'CaO',              fields: { type: 'Numeric', label: 'CaO (%)' } },
+        { id: 'MgO',              fields: { type: 'Numeric', label: 'MgO (%)' } },
+        { id: 'SO3',              fields: { type: 'Numeric', label: 'SO₃ (%)' } },
+        { id: 'K2O',              fields: { type: 'Numeric', label: 'K₂O (%)' } },
+        { id: 'Na2O',             fields: { type: 'Numeric', label: 'Na₂O (%)' } },
+        { id: 'notes',            fields: { type: 'Text',    label: 'Notes' } },
       ]
     },
 
-    // --- Protocoles carbonatation ---
-    CARBONATION_PROTOCOL: {
+    // --- Granulats : sables, graviers ---
+    AGGREGATE: {
       columns: [
-        { id: 'concrete_id',   fields: { type: 'Ref:CONCRETE_MIX', label: 'Béton' } },
-        { id: 'site_id',       fields: { type: 'Ref:SITE',         label: 'Site' } },
-        { id: 'exposure_type', fields: { type: 'Text',             label: 'Type exposition' } },
-        { id: 'co2_pct',       fields: { type: 'Numeric',          label: 'CO₂ (%)' } },
-        { id: 'rh_pct',        fields: { type: 'Numeric',          label: 'HR (%)' } },
-        { id: 'temp_c',        fields: { type: 'Numeric',          label: 'Température (°C)' } },
+        { id: 'name',                 fields: { type: 'Text',    label: 'Nom' } },
+        { id: 'aggregate_type',       fields: { type: 'Choice',  label: 'Type granulat', widgetOptions: '{"choices":["sand","gravel","crushed_stone","lightweight","recycled"]}' } },
+        { id: 'size_min_mm',          fields: { type: 'Numeric', label: 'D min (mm)' } },
+        { id: 'size_max_mm',          fields: { type: 'Numeric', label: 'D max (mm)' } },
+        { id: 'density_kg_m3',        fields: { type: 'Numeric', label: 'Masse volumique (kg/m³)' } },
+        { id: 'water_absorption_pct', fields: { type: 'Numeric', label: 'Absorption eau (%)' } },
+        { id: 'notes',                fields: { type: 'Text',    label: 'Notes' } },
       ]
     },
 
-    // --- Résultats carbonatation (profondeurs) ---
-    CARBONATION_RESULTS: {
+    // --- Formulation du béton ---
+    MIX_DESIGN: {
       columns: [
-        { id: 'carb_protocol_id', fields: { type: 'Ref:CARBONATION_PROTOCOL', label: 'Protocole carbo.' } },
-        { id: 'time_days',        fields: { type: 'Numeric',                  label: 'Temps (jours)' } },
-        { id: 'depth_mm',         fields: { type: 'Numeric',                  label: 'Profondeur (mm)' } },
+        { id: 'id_binder_cement',                    fields: { type: 'Ref:BINDER',    label: 'Ciment' } },
+        { id: 'cement_content_kg',                   fields: { type: 'Numeric',       label: 'Ciment (kg/m³)' } },
+        { id: 'id_binder_scm',                       fields: { type: 'Ref:BINDER',    label: 'Addition minérale' } },
+        { id: 'scm_content_kg',                      fields: { type: 'Numeric',       label: 'Addition (kg/m³)' } },
+        { id: 'water_type',                          fields: { type: 'Choice',        label: "Type d'eau", widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
+        { id: 'water_content_kg',                    fields: { type: 'Numeric',       label: 'Eau (kg/m³)' } },
+        { id: 'id_aggregate',                        fields: { type: 'Ref:AGGREGATE', label: 'Granulat' } },
+        { id: 'aggregate_content_kg',                fields: { type: 'Numeric',       label: 'Granulats (kg/m³)' } },
+        { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric',       label: 'GWP (kg éq. CO₂/m³)' } },
+        { id: 'wc_ratio',                            fields: { type: 'Numeric',       label: 'E/C' } },
+        { id: 'admix_type',                          fields: { type: 'Text',          label: 'Type adjuvant' } },
+        { id: 'adjuvant_content',                    fields: { type: 'Numeric',       label: 'Adjuvant (kg/m³)' } },
+        { id: 'entrained_air',                       fields: { type: 'Numeric',       label: 'Air entraîné (%)' } },
       ]
     },
 
-    // --- Analyses carbonatation (résultats fitting / saisie directe) ---
-    CARBONATION_ANALYSIS: {
+    // --- Conditions de cure ---
+    CURING_CONDITION: {
       columns: [
-        { id: 'carb_protocol_id', fields: { type: 'Ref:CARBONATION_PROTOCOL', label: 'Protocole carbo.' } },
-        { id: 'K_carb',           fields: { type: 'Numeric',                  label: 'K_carb (mm/√jour)' } },
-        { id: 'R2',               fields: { type: 'Numeric',                  label: 'R²' } },
-        { id: 'RMSE',             fields: { type: 'Numeric',                  label: 'RMSE' } },
-        { id: 'seuil_carb_mm',    fields: { type: 'Numeric',                  label: 'Seuil carbo. (mm)' } },
-        { id: 'enrobage_mm',      fields: { type: 'Numeric',                  label: 'Enrobage (mm)' } },
-        { id: 'duree_vie_ans',    fields: { type: 'Numeric',                  label: 'Durée de vie (ans)' } },
-        { id: 'date_calcul',      fields: { type: 'DateTime:Europe/Paris',    label: 'Date calcul' } },
-        { id: 'statut',           fields: { type: 'Text',                     label: 'Statut' } },
+        { id: 'temperature_c',    fields: { type: 'Numeric', label: 'Température (°C)' } },
+        { id: 'humidity_pct',     fields: { type: 'Numeric', label: 'Humidité (%)' } },
+        { id: 'wind_protection',  fields: { type: 'Bool',    label: 'Protection vent' } },
+        { id: 'solar_protection', fields: { type: 'Bool',    label: 'Protection solaire' } },
+        { id: 'curing_method',    fields: { type: 'Choice',  label: 'Méthode de cure', widgetOptions: '{"choices":["water_spraying","wet_covering","curing_compounds","forms_left_in_place","wet_curing","water_immersion"]}' } },
+        { id: 'standard_name',    fields: { type: 'Text',    label: 'Norme' } },
       ]
     },
+
+    // --- Définition des tests (indépendant du matériau) ---
+    TEST: {
+      columns: [
+        { id: 'name',                fields: { type: 'Choice',  label: 'Propriété mesurée', widgetOptions: '{"choices":["calorimetry","carbonation","cl_profil","diffusivity","Rc","gas_permeability","sorptivity","porosity","total_porosity","resistivity","org_density"]}' } },
+        { id: 'standard_name',       fields: { type: 'Text',    label: 'Norme' } },
+        { id: 'experiment_duration', fields: { type: 'Numeric', label: "Durée d'essai (jours)" } },
+        { id: 'test_type',           fields: { type: 'Choice',  label: "Type d'essai", widgetOptions: '{"choices":["natural","accelerated","total_cl","free_cl"]}' } },
+      ]
+    },
+
+    // --- Matériau cimentaire étudié ---
+    MATERIAL: {
+      columns: [
+        { id: 'id_site',             fields: { type: 'Ref:SITE',             label: 'Site' } },
+        { id: 'id_exposure',         fields: { type: 'Ref:EXPOSURE',         label: 'Exposition' } },
+        { id: 'id_mix_design',       fields: { type: 'Ref:MIX_DESIGN',       label: 'Formulation' } },
+        { id: 'id_curing_condition', fields: { type: 'Ref:CURING_CONDITION', label: 'Cure' } },
+        { id: 'manufacturing_date',  fields: { type: 'Date',                 label: 'Date fabrication' } },
+        { id: 'demolding_date',      fields: { type: 'Date',                 label: 'Date décoffrage' } },
+        { id: 'name',                fields: { type: 'Text',                 label: 'Nom' } },
+        { id: 'material_type',       fields: { type: 'Choice',               label: 'Type matériau', widgetOptions: '{"choices":["cement_paste","mortar","concrete"]}' } },
+      ]
+    },
+
+    // --- Campagne de mesure sur un matériau ---
+    MEASUREMENT: {
+      columns: [
+        { id: 'id_material',       fields: { type: 'Ref:MATERIAL', label: 'Matériau' } },
+        { id: 'sample_type',       fields: { type: 'Choice',       label: "Type d'échantillon", widgetOptions: '{"choices":["laboratory_sample","bridge_pier"]}' } },
+        { id: 'id_source',         fields: { type: 'Ref:SOURCE',   label: 'Source' } },
+        { id: 'preparation_date',  fields: { type: 'Date',         label: 'Date préparation' } },
+        { id: 'sample_mass_g',     fields: { type: 'Numeric',      label: 'Masse (g)' } },
+        { id: 'sample_dimensions', fields: { type: 'Text',         label: 'Dimensions' } },
+      ]
+    },
+
+    // --- Résultat d'un test (scalaire ou courbe) ---
+    RESULT: {
+      columns: [
+        { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Mesure' } },
+        { id: 'id_test',        fields: { type: 'Ref:TEST',        label: 'Test' } },
+        { id: 'result_date',    fields: { type: 'Date',            label: 'Date résultat' } },
+        { id: 'result_type',    fields: { type: 'Choice',          label: 'Type résultat', widgetOptions: '{"choices":["scalar","curve"]}' } },
+        { id: 'name',           fields: { type: 'Text',            label: 'Valeur / Nom' } },
+        { id: 'unit',           fields: { type: 'Text',            label: 'Unité' } },
+        { id: 'operator',       fields: { type: 'Text',            label: 'Opérateur' } },
+      ]
+    },
+
+    // --- Métadonnées d'une courbe ---
+    CURVE: {
+      columns: [
+        { id: 'id_result', fields: { type: 'Ref:RESULT', label: 'Résultat' } },
+        { id: 'x_name',    fields: { type: 'Text',       label: 'Axe X' } },
+        { id: 'y_name',    fields: { type: 'Text',       label: 'Axe Y' } },
+        { id: 'x_unit',    fields: { type: 'Text',       label: 'Unité X' } },
+        { id: 'y_unit',    fields: { type: 'Text',       label: 'Unité Y' } },
+      ]
+    },
+
+    // --- Points de données d'une courbe ---
+    DATA_CURVE: {
+      columns: [
+        { id: 'id_curve', fields: { type: 'Ref:CURVE', label: 'Courbe' } },
+        { id: 'x',        fields: { type: 'Numeric',   label: 'X' } },
+        { id: 'y',        fields: { type: 'Numeric',   label: 'Y' } },
+      ]
+    },
+  },
+
+  // =========================================================================
+  // ENUMS — Valeurs autorisées pour les colonnes Choice (miroir des ENUMs SQL)
+  // =========================================================================
+  ENUMS: {
+    exposure_type:   ['laboratory', 'in-situ'],
+    exposure_nature: ['atmospheric', 'spray', 'splash', 'tidal', 'submerged'],
+    material_type:   ['cement_paste', 'mortar', 'concrete'],
+    water_type:      ['tap_water', 'pure_water', 'sea_water'],
+    curing_method:   ['water_spraying', 'wet_covering', 'curing_compounds', 'forms_left_in_place', 'wet_curing', 'water_immersion'],
+    sample_type:     ['laboratory_sample', 'bridge_pier'],
+    test_name:       ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density'],
+    test_type:       ['natural', 'accelerated', 'total_cl', 'free_cl'],
+    result_type:     ['scalar', 'curve'],
+    binder_type:     ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'other'],
+    aggregate_type:  ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],
   },
 
   // =========================================================================
@@ -176,11 +205,14 @@ const GristHelpers = {
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
-    log('Vérification du schéma Grist (13 tables)…');
+    log('Vérification du schéma Grist (11 tables)…');
 
     try {
-      // Lire les métadonnées Grist via postMessage (pas de CORS)
-      const metaTables = await grist.docApi.fetchTable('_grist_Tables');
+      // Lire les métadonnées en parallèle
+      const [metaTables, metaCols] = await Promise.all([
+        grist.docApi.fetchTable('_grist_Tables'),
+        grist.docApi.fetchTable('_grist_Tables_column'),
+      ]);
       const existingTables = new Set(metaTables.tableId);
 
       // Index rowId → nom de table pour les colonnes
@@ -188,9 +220,6 @@ const GristHelpers = {
       metaTables.id.forEach((rowId, i) => {
         tableRowIdToName[rowId] = metaTables.tableId[i];
       });
-
-      // Lire les colonnes existantes
-      const metaCols = await grist.docApi.fetchTable('_grist_Tables_column');
       const existingColumns = {};
       metaCols.parentId.forEach((parentRowId, i) => {
         const tableName = tableRowIdToName[parentRowId];
@@ -295,41 +324,46 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // JOINTURES — Chlorures : CHLORIDE_ANALYSIS ← PROTOCOL ← MIX
+  // JOINTURES — result ← measurement ← material + test
+  // Retourne chaque résultat enrichi de sa mesure, son matériau et son test.
   // =========================================================================
-  joinChlorideData(analyses, protocols, mixes) {
-    const protoMap = new Map(protocols.map(p => [p.id, p.fields]));
-    const mixMap = new Map(mixes.map(m => [m.id, m.fields]));
-    return analyses
-      .filter(a => protoMap.has(a.fields.chl_protocol_id))
-      .map(a => {
-        const proto = protoMap.get(a.fields.chl_protocol_id);
-        const mix = proto ? mixMap.get(proto.concrete_id) : null;
+  joinResultData(results, measurements, materials, tests) {
+    const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
+    const materialMap = new Map(materials.map(m => [m.id, m.fields]));
+    const testMap     = new Map(tests.map(t => [t.id, t.fields]));
+    return results
+      .filter(r => measureMap.has(r.fields.id_measurement))
+      .map(r => {
+        const measure  = measureMap.get(r.fields.id_measurement);
+        const material = measure ? materialMap.get(measure.id_material) : null;
+        const test     = testMap.get(r.fields.id_test);
         return {
-          ...a.fields,
-          _id: a.id,
-          protocol: proto || {},
-          mix: mix || {}
+          ...r.fields,
+          _id:         r.id,
+          measurement: measure  || {},
+          material:    material || {},
+          test:        test     || {},
         };
       });
   },
 
   // =========================================================================
-  // JOINTURES — Carbonatation : CARBONATION_ANALYSIS ← PROTOCOL ← MIX
+  // JOINTURES — data_curve ← curve ← result
+  // Retourne chaque point enrichi des métadonnées de sa courbe et son résultat.
   // =========================================================================
-  joinCarbonatationData(analyses, protocols, mixes) {
-    const protoMap = new Map(protocols.map(p => [p.id, p.fields]));
-    const mixMap = new Map(mixes.map(m => [m.id, m.fields]));
-    return analyses
-      .filter(a => protoMap.has(a.fields.carb_protocol_id))
-      .map(a => {
-        const proto = protoMap.get(a.fields.carb_protocol_id);
-        const mix = proto ? mixMap.get(proto.concrete_id) : null;
+  joinCurvePoints(dataPoints, curves, results) {
+    const curveMap  = new Map(curves.map(c => [c.id, c.fields]));
+    const resultMap = new Map(results.map(r => [r.id, r.fields]));
+    return dataPoints
+      .filter(p => curveMap.has(p.fields.id_curve))
+      .map(p => {
+        const curve  = curveMap.get(p.fields.id_curve);
+        const result = curve ? resultMap.get(curve.id_result) : null;
         return {
-          ...a.fields,
-          _id: a.id,
-          protocol: proto || {},
-          mix: mix || {}
+          ...p.fields,
+          _id:    p.id,
+          curve:  curve  || {},
+          result: result || {},
         };
       });
   },

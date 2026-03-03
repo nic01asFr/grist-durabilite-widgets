@@ -102,9 +102,9 @@
     let markers = [];
 
     const CATEGORIES = [
-      { label: 'Excellent', max: 1e-12, color: '#22c55e' },
-      { label: 'Bon',       max: 5e-12, color: '#3b82f6' },
-      { label: 'Moyen',     max: 1e-11, color: '#f59e0b' },
+      { label: 'Excellent', max: 1e-12,    color: '#22c55e' },
+      { label: 'Bon',       max: 5e-12,    color: '#3b82f6' },
+      { label: 'Moyen',     max: 1e-11,    color: '#f59e0b' },
       { label: 'Faible',    max: Infinity, color: '#ef4444' }
     ];
 
@@ -133,68 +133,96 @@
     }
 
     // =========================================================================
-    // LOAD DATA — SITE + CHLORIDE_PROTOCOL + CHLORIDE_ANALYSIS
+    // LOAD DATA — SITE + MATERIAL + MEASUREMENT + RESULT(Dapp)
     // =========================================================================
     async function loadAllData() {
       GristHelpers.log('Chargement des données…');
       GristHelpers.setStatus('Chargement…', '');
 
       try {
-        const [sites, protocols, analyses, mixes] = await Promise.all([
+        const [sites, materials, measurements, results] = await Promise.all([
           GristHelpers.fetchAllRecords('SITE'),
-          GristHelpers.fetchAllRecords('CHLORIDE_PROTOCOL'),
-          GristHelpers.fetchAllRecords('CHLORIDE_ANALYSIS'),
-          GristHelpers.fetchAllRecords('CONCRETE_MIX')
+          GristHelpers.fetchAllRecords('MATERIAL'),
+          GristHelpers.fetchAllRecords('MEASUREMENT'),
+          GristHelpers.fetchAllRecords('RESULT'),
         ]);
 
-        GristHelpers.log(`${sites.length} sites, ${protocols.length} protocoles, ${analyses.length} analyses`, 'ok');
+        GristHelpers.log(`${sites.length} sites, ${materials.length} matériaux, ${measurements.length} mesures, ${results.length} résultats`, 'ok');
 
-        // Index analyses by chl_protocol_id
-        const analysesByProto = {};
-        analyses.forEach(a => {
-          const pid = a.fields.chl_protocol_id;
-          if (!analysesByProto[pid]) analysesByProto[pid] = [];
-          analysesByProto[pid].push(a.fields);
+        // Build lookup maps
+        const measureMap = new Map(measurements.map(m => [m.id, m.fields]));
+
+        // Dapp results: operator='Dapp', result_type='scalar'
+        const dappResults = results.filter(r =>
+          r.fields.result_type === 'scalar' && r.fields.operator === 'Dapp' && r.fields.name
+        );
+
+        // duree_vie results
+        const dureeResults = results.filter(r =>
+          r.fields.result_type === 'scalar' && r.fields.operator === 'duree_vie_ans' && r.fields.name
+        );
+
+        // Index dapp by measurement_id
+        const dappByMeasurement  = new Map();
+        dappResults.forEach(r => {
+          const v = parseFloat(r.fields.name);
+          if (!isNaN(v) && v > 0) dappByMeasurement.set(r.fields.id_measurement, v);
         });
 
-        // Index protocols by site_id, also attach mix info
-        const mixMap = new Map(mixes.map(m => [m.id, m.fields]));
-        const protosBySite = {};
-        protocols.forEach(p => {
-          const sid = p.fields.site_id;
+        const dureeByMeasurement = new Map();
+        dureeResults.forEach(r => {
+          const v = parseFloat(r.fields.name);
+          if (!isNaN(v) && v > 0) dureeByMeasurement.set(r.fields.id_measurement, v);
+        });
+
+        // Group materials by site_id
+        const materialsBySite = new Map();
+        materials.forEach(mat => {
+          const sid = mat.fields.id_site;
           if (!sid) return;
-          if (!protosBySite[sid]) protosBySite[sid] = [];
-          protosBySite[sid].push({
-            ...p.fields,
-            _id: p.id,
-            mix: mixMap.get(p.fields.concrete_id) || {},
-            analyses: analysesByProto[p.id] || []
-          });
+          if (!materialsBySite.has(sid)) materialsBySite.set(sid, []);
+          materialsBySite.get(sid).push(mat);
         });
 
-        // Build site data
+        // Measurements index by material_id
+        const measureByMaterial = new Map();
+        measurements.forEach(m => {
+          const mid = m.fields.id_material;
+          if (!mid) return;
+          if (!measureByMaterial.has(mid)) measureByMaterial.set(mid, []);
+          measureByMaterial.get(mid).push(m.id);
+        });
+
+        // Build siteData
         const siteData = {};
         let skipped = 0;
         sites.forEach(s => {
           const f = s.fields;
           if (f.latitude == null || f.longitude == null) { skipped++; return; }
 
-          const siteProtos = protosBySite[s.id] || [];
-          const allSiteAnalyses = siteProtos.flatMap(p => p.analyses);
-          const mixNames = [...new Set(siteProtos.map(p => p.mix.mix_name).filter(Boolean))];
+          const siteMaterials = materialsBySite.get(s.id) || [];
+          const matNames = [...new Set(siteMaterials.map(m => m.fields.name).filter(Boolean))];
+
+          // Collect all measurement IDs for this site's materials
+          const measureIds = siteMaterials.flatMap(mat => measureByMaterial.get(mat.id) || []);
+
+          // Collect Dapp values
+          const dappValues  = measureIds.map(mid => dappByMeasurement.get(mid)).filter(v => v != null);
+          const dureeValues = measureIds.map(mid => dureeByMeasurement.get(mid)).filter(v => v != null);
 
           siteData[s.id] = {
-            name: f.site_name || `Site ${s.id}`,
+            label: f.country_region || `Site ${s.id}`,
             lat: f.latitude,
             lng: f.longitude,
-            country: f.country || '',
-            protocols: siteProtos,
-            analyses: allSiteAnalyses,
-            mixNames: mixNames
+            nbMaterials:  siteMaterials.length,
+            nbMeasures:   measureIds.length,
+            dappValues,
+            dureeValues,
+            matNames,
           };
         });
 
-        if (skipped > 0) GristHelpers.log(`${skipped} sites ignorés (sans coordonnées GPS)`, 'warn');
+        if (skipped > 0) GristHelpers.log(`${skipped} site(s) ignorés (sans coordonnées GPS)`, 'warn');
 
         renderMarkers(siteData);
         const nbSites = Object.keys(siteData).length;
@@ -215,33 +243,29 @@
       const bounds = [];
 
       Object.values(siteData).forEach(site => {
-        const dappValues = site.analyses.map(a => a.Dapp).filter(v => v != null && v > 0);
-        const dureeValues = site.analyses.map(a => a.duree_vie_ans).filter(v => v != null && v > 0);
+        const dappMoyen = site.dappValues.length > 0
+          ? site.dappValues.reduce((a, b) => a + b, 0) / site.dappValues.length : null;
+        const dureeMoy = site.dureeValues.length > 0
+          ? site.dureeValues.reduce((a, b) => a + b, 0) / site.dureeValues.length : null;
 
-        const dappMoyen = dappValues.length > 0
-          ? dappValues.reduce((a, b) => a + b, 0) / dappValues.length : null;
-        const dureeMoy = dureeValues.length > 0
-          ? dureeValues.reduce((a, b) => a + b, 0) / dureeValues.length : null;
-
-        const color = dappMoyen ? getCategoryColor(dappMoyen) : '#64748b';
-        const radius = 8 + Math.min(site.analyses.length, 10);
+        const color  = dappMoyen ? getCategoryColor(dappMoyen) : '#64748b';
+        const radius = 8 + Math.min(site.nbMeasures, 10);
 
         const marker = L.circleMarker([site.lat, site.lng], {
           radius, fillColor: color, fillOpacity: 0.8, color: '#fff', weight: 2
         });
 
         const popupHtml = `
-          <div class="popup-title">${site.name}</div>
-          ${site.country ? `<div style="font-size:11px; color:var(--text-dim); margin-bottom:6px;">${site.country}</div>` : ''}
-          <div class="popup-stat"><span class="label">Protocoles</span><span class="value">${site.protocols.length}</span></div>
-          <div class="popup-stat"><span class="label">Analyses</span><span class="value">${site.analyses.length}</span></div>
+          <div class="popup-title">${site.label}</div>
+          <div class="popup-stat"><span class="label">Matériaux</span><span class="value">${site.nbMaterials}</span></div>
+          <div class="popup-stat"><span class="label">Mesures</span><span class="value">${site.nbMeasures}</span></div>
           <div class="popup-stat"><span class="label">Dapp moyen</span><span class="value">${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}</span></div>
           <div class="popup-stat"><span class="label">Durée de vie moy.</span><span class="value">${dureeMoy ? dureeMoy.toFixed(1) + ' ans' : '—'}</span></div>
           <div class="popup-stat"><span class="label">Performance</span><span class="value" style="color:${color}">${dappMoyen ? getCategoryLabel(dappMoyen) : '—'}</span></div>
-          ${site.mixNames.length > 0 ? `
+          ${site.matNames.length > 0 ? `
           <div class="popup-stat" style="flex-direction:column; gap:2px;">
-            <span class="label">Mélanges</span>
-            <span class="value" style="font-size:12px; font-weight:400;">${site.mixNames.join(', ')}</span>
+            <span class="label">Matériaux</span>
+            <span class="value" style="font-size:12px; font-weight:400;">${site.matNames.join(', ')}</span>
           </div>` : ''}
         `;
 
@@ -250,7 +274,7 @@
         markers.push(marker);
         bounds.push([site.lat, site.lng]);
 
-        GristHelpers.log(`Site "${site.name}" : ${site.protocols.length} proto, ${site.analyses.length} analyses, Dapp=${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}`, 'ok');
+        GristHelpers.log(`Site "${site.label}" : ${site.nbMaterials} mat., ${site.nbMeasures} mesures, Dapp=${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}`, 'ok');
       });
 
       if (bounds.length > 0) {
