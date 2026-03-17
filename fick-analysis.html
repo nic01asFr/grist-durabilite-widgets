@@ -154,10 +154,23 @@
   <!-- ===================================================================== -->
   <div class="tab-pane active" id="pane-fick">
 
+    <div class="card" id="measurement-selector-card">
+      <div class="card-title" style="margin-bottom:8px;">Sélectionner un profil</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <select id="fick-measurement-select" onchange="onFickMeasurementSelect(this.value)"
+                style="flex:1; min-width:200px; padding:6px 9px;
+                       background:var(--bg); border:1px solid var(--surface2);
+                       border-radius:6px; color:var(--text); font-size:12px;">
+          <option value="">— Chargement des données… —</option>
+        </select>
+        <span id="fick-select-count" style="font-size:11px; color:var(--text-dim); white-space:nowrap;"></span>
+      </div>
+    </div>
+
     <div id="empty-state" class="empty-state">
       <div class="icon">🧪</div>
       <h3>En attente de données</h3>
-      <p>Sélectionnez une <strong>mesure</strong> (MEASUREMENT) liée à un profil Cl⁻.</p>
+      <p>Choisissez un profil dans le menu ci-dessus, ou sélectionnez une ligne <strong>MEASUREMENT</strong> dans Grist.</p>
     </div>
 
     <div id="fick-content" style="display:none">
@@ -526,6 +539,7 @@
 
         buildBinderFilter();
         catIndexGlobal.clear();
+        populateFickSelector();
 
         if (activeTab === 'profils') renderProfils();
         if (activeTab === 'table')   renderTable();
@@ -917,6 +931,80 @@
     }
 
     // =========================================================================
+    // FICK — SÉLECTEUR DE PROFIL INTERNE
+    // =========================================================================
+    function getMeasurementIdFromProfile(p) {
+      if (!rawData) return null;
+      const curve = rawData.curves.find(c => c.id === p.curve_id);
+      return curve ? curve.fields.id_measurement : null;
+    }
+
+    function populateFickSelector() {
+      const sel = document.getElementById('fick-measurement-select');
+      const cnt = document.getElementById('fick-select-count');
+      if (!sel) return;
+
+      if (!allProfiles || allProfiles.length === 0) {
+        sel.innerHTML = '<option value="">— Aucun profil Cl\u207B disponible —</option>';
+        if (cnt) cnt.textContent = '';
+        return;
+      }
+
+      const opts = allProfiles.map(p => {
+        const measId = getMeasurementIdFromProfile(p);
+        if (!measId) return null;
+        const mat    = p.material.name || '?';
+        const nature = p.exposure.exposure_nature || '?';
+        const dur    = p.scalars.exposure_duration != null
+                       ? p.scalars.exposure_duration.toFixed(0) + ' ans' : '?';
+        const src    = p.source.designation ||
+                       (p.source.authors ? p.source.authors.split(',')[0].trim() : '?');
+        const nPts   = p.points.length;
+        const label  = `${mat} \u2014 ${nature} \u2014 ${dur} \u2014 ${src} (${nPts} pts)`;
+        return `<option value="${measId}">${label}</option>`;
+      }).filter(Boolean);
+
+      sel.innerHTML = '<option value="">— Choisir un profil —</option>' + opts.join('');
+      if (cnt) cnt.textContent = `${opts.length} profil${opts.length > 1 ? 's' : ''} disponible${opts.length > 1 ? 's' : ''}`;
+    }
+
+    async function onFickMeasurementSelect(measurementIdStr) {
+      if (!measurementIdStr) return;
+      const measurementId = parseInt(measurementIdStr);
+
+      // Trouver le profil correspondant dans allProfiles
+      const profile = allProfiles.find(p => getMeasurementIdFromProfile(p) === measurementId);
+      if (!profile) {
+        GristHelpers.log('Profil introuvable pour cette mesure', 'err');
+        return;
+      }
+
+      // Reconstruire currentMeasurement depuis rawData
+      const measRec = rawData && rawData.measurements.find(m => m.id === measurementId);
+      currentMeasurement = { id: measurementId, ...(measRec ? measRec.fields : {}) };
+      lastFitResult = null;
+      document.getElementById('results-card').style.display = 'none';
+
+      // Charger le contexte depuis les données déjà en mémoire
+      currentMaterial  = profile.material;
+      currentMix       = profile.mix;
+      currentExposure  = profile.exposure;
+      currentProfilePoints = profile.points;
+
+      const matName = profile.material.name || `id=${measurementId}`;
+      GristHelpers.log(`Mesure sélectionnée : id=${measurementId}`);
+      GristHelpers.log(`Matériau : ${matName}`, 'ok');
+      GristHelpers.log(
+        `${profile.points.length} point${profile.points.length > 1 ? 's' : ''} chargé${profile.points.length > 1 ? 's' : ''}`,
+        profile.points.length > 2 ? 'ok' : 'warn'
+      );
+
+      showFickContext();
+      if (profile.points.length > 0) plotFick(profile.points);
+      updateFickUI();
+    }
+
+    // =========================================================================
     // PYODIDE INIT
     // =========================================================================
     async function initPyodide() {
@@ -947,6 +1035,9 @@
         currentMeasurement = record;
         lastFitResult = null;
         document.getElementById('results-card').style.display = 'none';
+        // Sync le sélecteur interne
+        const sel = document.getElementById('fick-measurement-select');
+        if (sel) sel.value = String(record.id);
         await fetchFickContext(record);
         await fetchFickProfile(record.id);
         showFickContext();
@@ -1360,6 +1451,7 @@ json.dumps(result)
       GristHelpers.log('Initialisation Chlorures…');
       initGrist();
       await GristHelpers.ensureSchema();
+      await loadAllData();
       await initPyodide();
     })();
   </script>
