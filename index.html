@@ -53,7 +53,7 @@
     <div class="badge">CEREMA Méditerranée</div>
     <h1>Widgets Grist pour la <strong>durabilité des bétons</strong></h1>
     <p class="subtitle">
-      Collection de widgets custom pour l'analyse de durabilité des bétons en milieu marin.
+      Collection de widgets custom pour l'analyse de durabilité des bétons exposés aux chlorures et à la carbonatation.
       Utilisables directement dans <a href="https://grist.numerique.gouv.fr" style="color:#3b82f6;">Grist</a> comme widgets personnalisés.
       Schéma v2.3 — 14 tables auto-provisionnées.
     </p>
@@ -77,16 +77,15 @@
     <a href="fick-analysis.html" class="widget-card">
       <div class="top">
         <span class="icon">📊</span>
-        <span class="name">Analyse Fick</span>
+        <span class="name">Chlorures — Profils &amp; Analyse Fick</span>
         <span class="tag ready">Prêt</span>
       </div>
       <div class="desc">
-        Ajustement des profils de chlorures par la loi de Fick.
-        Double mode : profil mesuré (fitting scipy) ou saisie directe du D<sub>app</sub>.
-        Calcul de D<sub>app</sub>, C<sub>s</sub>, R², durée de vie et profondeur critique.
+        3 onglets fusionnés : fitting Fick sur mesure sélectionnée (D<sub>app</sub>, C<sub>s</sub>, R², durée de vie),
+        visualisation comparative de tous les profils avec filtres, et tableau récapitulatif avec tri et recherche.
       </div>
       <div class="tech">
-        <span>Pyodide</span><span>scipy</span><span>Plotly.js</span><span>CHLORIDE_PROTOCOL</span>
+        <span>Pyodide</span><span>scipy</span><span>Plotly.js</span><span>MEASUREMENT</span><span>DATA_CURVE</span>
       </div>
     </a>
 
@@ -121,19 +120,35 @@
       </div>
     </a>
 
-    <a href="profil-chlorure.html" class="widget-card">
+    <a href="editor.html" class="widget-card">
       <div class="top">
-        <span class="icon">📈</span>
-        <span class="name">Profils Chlorure</span>
+        <span class="icon">✏️</span>
+        <span class="name">Éditeur de données</span>
         <span class="tag ready">Prêt</span>
       </div>
       <div class="desc">
-        Visualisation comparative des profils en chlorures (concentration vs profondeur).
-        Filtres par nature/type d'exposition, ciment, durée et type Cl⁻ (total/libre).
-        Couleur par exposition, ciment, source, E/C ou durée (continue).
+        Édition complète d'un matériau sélectionné et de toutes ses données liées :
+        site, exposition, formulation, liants (ajout/suppression), cure, source bibliographique.
+        Suivi des modifications avec sauvegarde en un clic.
       </div>
       <div class="tech">
-        <span>Plotly.js</span><span>DATA_CURVE</span><span>CURVE</span><span>SCALAR</span>
+        <span>MATERIAL</span><span>MIX_DESIGN</span><span>BINDER</span><span>SOURCE</span>
+      </div>
+    </a>
+
+    <a href="export.html" class="widget-card">
+      <div class="top">
+        <span class="icon">📤</span>
+        <span class="name">Export CSV</span>
+        <span class="tag ready">Prêt</span>
+      </div>
+      <div class="desc">
+        Tableau plat de tous les profils chlorure avec sélection des colonnes par groupe
+        (source, matériau, site, exposition, formulation, liants, cure, résultats).
+        Export CSV avec choix du séparateur et BOM UTF-8 pour Excel.
+      </div>
+      <div class="tech">
+        <span>CSV</span><span>joinChlorideProfiles</span><span>10 groupes</span>
       </div>
     </a>
 
