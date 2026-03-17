@@ -44,9 +44,9 @@
   <div class="card">
     <div class="card-title">Vue d'ensemble</div>
     <div class="stats-row" id="summary-stats">
-      <div class="info-item"><div class="label">Analyses Dapp</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Analyses D</div><div class="value">—</div></div>
       <div class="info-item"><div class="label">Mélanges</div><div class="value">—</div></div>
-      <div class="info-item"><div class="label">Dapp moyen</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">D moyen</div><div class="value">—</div></div>
       <div class="info-item"><div class="label">Durée de vie moy.</div><div class="value">—</div></div>
     </div>
   </div>
@@ -66,13 +66,13 @@
   <!-- Charts -->
   <div class="card">
     <div class="tabs">
-      <div class="tab active" data-tab="dapp-mix"   onclick="showTab('dapp-mix')">Dapp par mélange</div>
-      <div class="tab"        data-tab="wl-dapp"    onclick="showTab('wl-dapp')">E/C vs Dapp</div>
-      <div class="tab"        data-tab="duree-vie"  onclick="showTab('duree-vie')">Durée de vie</div>
+      <div class="tab active" data-tab="d-mix"    onclick="showTab('d-mix')">D par mélange</div>
+      <div class="tab"        data-tab="wl-d"     onclick="showTab('wl-d')">E/C vs D</div>
+      <div class="tab"        data-tab="duree-vie" onclick="showTab('duree-vie')">Durée de vie</div>
     </div>
-    <div id="tab-dapp-mix"  class="tab-content active"><div id="chart-dapp-mix"  class="chart-container"></div></div>
-    <div id="tab-wl-dapp"   class="tab-content">       <div id="chart-wl-dapp"   class="chart-container"></div></div>
-    <div id="tab-duree-vie" class="tab-content">        <div id="chart-duree-vie" class="chart-container"></div></div>
+    <div id="tab-d-mix"    class="tab-content active"><div id="chart-d-mix"    class="chart-container"></div></div>
+    <div id="tab-wl-d"     class="tab-content">       <div id="chart-wl-d"    class="chart-container"></div></div>
+    <div id="tab-duree-vie" class="tab-content">       <div id="chart-duree-vie" class="chart-container"></div></div>
   </div>
 
   <!-- Data table -->
@@ -86,7 +86,7 @@
         <thead><tr>
           <th>Matériau</th><th>Mélange</th><th>E/C</th>
           <th>Type expo.</th><th>Nature expo.</th>
-          <th>Dapp (m²/s)</th><th>Durée vie</th><th>Source</th>
+          <th>D (m²/s)</th><th>Durée vie</th><th>Source</th>
         </tr></thead>
         <tbody id="data-table-body"></tbody>
       </table>
@@ -101,14 +101,17 @@
   <script>
     // =========================================================================
     // STATE
-    // =========================================================================
-    // Each item in allData: { _id, Dapp, duree_vie_ans, source_dapp,
+    // Chaque élément de allData : {
+    //   _id, D, duree_vie_ans,
     //   material: {name, material_type, id_mix_design, id_exposure},
-    //   mix:      {wc_ratio, cement_content_kg, ...},
-    //   exposure: {exposure_type, exposure_nature} }
-    let allData = [];
+    //   mix:      {wc_ratio, cement_content_kg, …},
+    //   exposure: {exposure_type, exposure_nature},
+    //   source:   {authors, designation, year}
+    // }
+    // =========================================================================
+    let allData     = [];
     let filteredData = [];
-    let activeTab = 'dapp-mix';
+    let activeTab   = 'd-mix';
 
     const PALETTE = [
       '#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6',
@@ -118,70 +121,64 @@
 
     // =========================================================================
     // LOAD DATA
-    // RESULT(scalar, operator='Dapp') → MEASUREMENT → MATERIAL → MIX_DESIGN + EXPOSURE
+    // Architecture v2.2 :
+    //   SCALAR (name='D') → MEASUREMENT → MATERIAL → MIX_DESIGN + EXPOSURE
+    //   duree_vie : SCALAR name='duree_vie_ans' sur le même MEASUREMENT
     // =========================================================================
     async function loadAllData() {
       GristHelpers.log('Chargement des données…');
       GristHelpers.setStatus('Chargement…', '');
 
       try {
-        const [results, measurements, materials, mixes, exposures, tests, dureResults] = await Promise.all([
-          GristHelpers.fetchAllRecords('RESULT'),
+        const [scalars, measurements, materials, mixes, exposures, sources] = await Promise.all([
+          GristHelpers.fetchAllRecords('SCALAR'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MIX_DESIGN'),
           GristHelpers.fetchAllRecords('EXPOSURE'),
-          GristHelpers.fetchAllRecords('TEST'),
-          GristHelpers.fetchAllRecords('RESULT'),  // reused below for duree_vie_ans
+          GristHelpers.fetchAllRecords('SOURCE'),
         ]);
 
-        // Build lookup maps
+        // Lookup maps
         const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
         const materialMap = new Map(materials.map(m => [m.id, m.fields]));
         const mixMap      = new Map(mixes.map(m => [m.id, m.fields]));
         const exposureMap = new Map(exposures.map(e => [e.id, e.fields]));
+        const sourceMap   = new Map(sources.map(s => [s.id, s.fields]));
 
-        // Find diffusivity test IDs
-        const diffTestIds = new Set(tests.filter(t => t.fields.name === 'diffusivity').map(t => t.id));
-
-        // Build duree_vie_ans lookup: measurement_id → duree_vie_ans value
+        // Duree de vie : SCALAR name='duree_vie_ans', groupé par id_measurement
         const dureeMap = new Map();
-        results.forEach(r => {
-          if (r.fields.operator === 'duree_vie_ans' && r.fields.name) {
-            const v = parseFloat(r.fields.name);
-            if (!isNaN(v) && v > 0) dureeMap.set(r.fields.id_measurement, v);
+        scalars.forEach(s => {
+          if (s.fields.name === 'duree_vie_ans' && s.fields.value != null) {
+            dureeMap.set(s.fields.id_measurement, s.fields.value);
           }
         });
 
-        // Build source_dapp lookup
-        const sourceMap = new Map();
-        results.forEach(r => {
-          if (r.fields.operator === 'source_dapp') sourceMap.set(r.fields.id_measurement, r.fields.name);
-        });
-
-        // Filter Dapp scalar results (from diffusivity tests or operator='Dapp')
-        const dappResults = results.filter(r =>
-          r.fields.result_type === 'scalar' &&
-          r.fields.operator === 'Dapp' &&
-          r.fields.name != null
+        // Scalaires D (coefficient de diffusion apparent)
+        const dScalars = scalars.filter(s =>
+          s.fields.name === 'D' &&
+          s.fields.value != null &&
+          s.fields.value > 0
         );
 
-        allData = dappResults.map(r => {
-          const dapp      = parseFloat(r.fields.name);
-          const measure   = measureMap.get(r.fields.id_measurement) || {};
-          const material  = materialMap.get(measure.id_material)    || {};
-          const mix       = mixMap.get(material.id_mix_design)      || {};
-          const exposure  = exposureMap.get(material.id_exposure)   || {};
+        allData = dScalars.map(s => {
+          const measure  = measureMap.get(s.fields.id_measurement)  || {};
+          const material = materialMap.get(measure.id_material)     || {};
+          const mix      = mixMap.get(material.id_mix_design)       || {};
+          const exposure = exposureMap.get(material.id_exposure)    || {};
+          const source   = sourceMap.get(measure.id_source)        || {};
           return {
-            _id:          r.id,
-            Dapp:         isNaN(dapp) ? null : dapp,
-            duree_vie_ans: dureeMap.get(r.fields.id_measurement) || null,
-            source_dapp:  sourceMap.get(r.fields.id_measurement) || '—',
-            material, mix, exposure,
+            _id:           s.id,
+            D:             s.fields.value,
+            duree_vie_ans: dureeMap.get(s.fields.id_measurement) || null,
+            material,
+            mix,
+            exposure,
+            source,
           };
-        }).filter(d => d.Dapp != null && d.Dapp > 0);
+        });
 
-        GristHelpers.log(`${allData.length} valeurs Dapp chargées (${mixes.length} mélanges, ${exposures.length} expositions)`, 'ok');
+        GristHelpers.log(`${allData.length} valeurs D chargées (${mixes.length} mélanges, ${exposures.length} expositions)`, 'ok');
 
         populateFilters(allData);
         applyFilters();
@@ -196,18 +193,20 @@
     // FILTERS
     // =========================================================================
     function populateFilters(data) {
-      const mixNames      = [...new Set(data.map(d => d.mix.wc_ratio != null ? (d.material.id_mix_design || '') : '').filter(Boolean))];
-      // Use material name as mix identifier if available
-      const matNames      = [...new Set(data.map(d => d.material.name).filter(Boolean))].sort();
-      const expoTypes     = [...new Set(data.map(d => d.exposure.exposure_type).filter(Boolean))].sort();
-      const expoNatures   = [...new Set(data.map(d => d.exposure.exposure_nature).filter(Boolean))].sort();
-      const sourceDapps   = [...new Set(data.map(d => d.source_dapp).filter(v => v && v !== '—'))].sort();
+      const matNames    = [...new Set(data.map(d => d.material.name).filter(Boolean))].sort();
+      const expoTypes   = [...new Set(data.map(d => d.exposure.exposure_type).filter(Boolean))].sort();
+      const expoNatures = [...new Set(data.map(d => d.exposure.exposure_nature).filter(Boolean))].sort();
+      const srcLabels   = [...new Set(data.map(d => sourceLabel(d.source)).filter(Boolean))].sort();
 
-      // Use material name as the "mix" filter for display
       fillSelect('filter-mix',            matNames,    'Tous matériaux');
       fillSelect('filter-exposure-type',  expoTypes,   'Tous types expo.');
       fillSelect('filter-exposure-nature',expoNatures, 'Toutes natures');
-      fillSelect('filter-source',         sourceDapps, 'Toutes sources');
+      fillSelect('filter-source',         srcLabels,   'Toutes sources');
+    }
+
+    function sourceLabel(source) {
+      if (!source) return null;
+      return source.designation || source.authors || null;
     }
 
     function fillSelect(id, values, defaultText) {
@@ -228,10 +227,10 @@
       const sourceFilter = document.getElementById('filter-source').value;
 
       filteredData = allData.filter(d => {
-        if (matFilter  && d.material.name            !== matFilter)  return false;
-        if (expoType   && d.exposure.exposure_type   !== expoType)   return false;
-        if (expoNature && d.exposure.exposure_nature !== expoNature) return false;
-        if (sourceFilter && d.source_dapp            !== sourceFilter) return false;
+        if (matFilter    && d.material.name              !== matFilter)  return false;
+        if (expoType     && d.exposure.exposure_type     !== expoType)   return false;
+        if (expoNature   && d.exposure.exposure_nature   !== expoNature) return false;
+        if (sourceFilter && sourceLabel(d.source)        !== sourceFilter) return false;
         return true;
       });
 
@@ -259,9 +258,9 @@
 
     function renderActiveChart() {
       switch (activeTab) {
-        case 'dapp-mix':  renderDappByMix(filteredData);  break;
-        case 'wl-dapp':   renderWlVsDapp(filteredData);   break;
-        case 'duree-vie': renderDureeVie(filteredData);   break;
+        case 'd-mix':    renderDByMix(filteredData);   break;
+        case 'wl-d':     renderWlVsD(filteredData);    break;
+        case 'duree-vie': renderDureeVie(filteredData); break;
       }
     }
 
@@ -269,29 +268,29 @@
     // SUMMARY STATS
     // =========================================================================
     function updateSummary(data) {
-      const mixIds    = new Set(data.map(d => d.material.id_mix_design).filter(Boolean));
-      const dappVals  = data.map(d => d.Dapp).filter(v => v != null && v > 0);
-      const dappMoyen = dappVals.length > 0 ? dappVals.reduce((a, b) => a + b, 0) / dappVals.length : null;
+      const mixIds   = new Set(data.map(d => d.material.id_mix_design).filter(Boolean));
+      const dVals    = data.map(d => d.D).filter(v => v != null && v > 0);
+      const dMoyen   = dVals.length > 0 ? dVals.reduce((a, b) => a + b, 0) / dVals.length : null;
       const dureeVies = data.map(d => d.duree_vie_ans).filter(v => v != null && v > 0);
       const dureeMoy  = dureeVies.length > 0 ? dureeVies.reduce((a, b) => a + b, 0) / dureeVies.length : null;
 
       document.getElementById('summary-stats').innerHTML = `
-        <div class="info-item"><div class="label">Analyses Dapp</div><div class="value">${data.length}</div></div>
+        <div class="info-item"><div class="label">Analyses D</div><div class="value">${data.length}</div></div>
         <div class="info-item"><div class="label">Mélanges</div><div class="value">${mixIds.size}</div></div>
-        <div class="info-item"><div class="label">Dapp moyen</div><div class="value">${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'} <span class="unit">m²/s</span></div></div>
+        <div class="info-item"><div class="label">D moyen</div><div class="value">${dMoyen ? GristHelpers.formatDapp(dMoyen) : '—'} <span class="unit">m²/s</span></div></div>
         <div class="info-item"><div class="label">Durée de vie moy.</div><div class="value">${dureeMoy ? dureeMoy.toFixed(1) : '—'} <span class="unit">ans</span></div></div>
       `;
     }
 
     // =========================================================================
-    // CHART 1: Dapp par matériau (box plots)
+    // CHART 1 : D par matériau (box plots)
     // =========================================================================
-    function renderDappByMix(data) {
+    function renderDByMix(data) {
       const groups = {};
       data.forEach(d => {
         const key = d.material.name || `mix_${d.material.id_mix_design}` || 'Inconnu';
         if (!groups[key]) groups[key] = [];
-        if (d.Dapp > 0) groups[key].push(d.Dapp);
+        if (d.D > 0) groups[key].push(d.D);
       });
 
       const names  = Object.keys(groups).sort();
@@ -301,22 +300,22 @@
         boxpoints: 'all', jitter: 0.3, pointpos: -1.5
       }));
 
-      Plotly.newPlot('chart-dapp-mix', traces, GristHelpers.plotlyDarkLayout({
-        yaxis: GristHelpers.plotlyDarkAxis('Dapp (m²/s)'),
+      Plotly.newPlot('chart-d-mix', traces, GristHelpers.plotlyDarkLayout({
+        yaxis: GristHelpers.plotlyDarkAxis('D (m²/s)'),
         xaxis: GristHelpers.plotlyDarkAxis(''),
         showlegend: false
       }), { responsive: true, displaylogo: false });
     }
 
     // =========================================================================
-    // CHART 2: E/C vs Dapp (scatter)
+    // CHART 2 : E/C vs D (scatter)
     // =========================================================================
-    function renderWlVsDapp(data) {
-      const valid = data.filter(d => d.mix.wc_ratio != null && d.Dapp > 0);
+    function renderWlVsD(data) {
+      const valid = data.filter(d => d.mix.wc_ratio != null && d.D > 0);
 
       if (valid.length === 0) {
-        Plotly.purge('chart-wl-dapp');
-        document.getElementById('chart-wl-dapp').innerHTML =
+        Plotly.purge('chart-wl-d');
+        document.getElementById('chart-wl-d').innerHTML =
           '<div class="empty-state" style="padding:40px"><h3>Pas de données E/C</h3><p>Renseignez <strong>wc_ratio</strong> dans MIX_DESIGN.</p></div>';
         return;
       }
@@ -325,21 +324,21 @@
       const traces = matNames.map((name, i) => {
         const pts = valid.filter(d => (d.material.name || 'Inconnu') === name);
         return {
-          x: pts.map(d => d.mix.wc_ratio), y: pts.map(d => d.Dapp),
+          x: pts.map(d => d.mix.wc_ratio), y: pts.map(d => d.D),
           mode: 'markers', type: 'scatter', name,
           marker: { color: PALETTE[i % PALETTE.length], size: 10, line: { color: 'rgba(255,255,255,0.3)', width: 1 } },
-          text: pts.map(d => `${d.material.name || '?'}<br>Dapp: ${GristHelpers.formatDapp(d.Dapp)}`)
+          text: pts.map(d => `${d.material.name || '?'}<br>D: ${GristHelpers.formatDapp(d.D)}`)
         };
       });
 
-      Plotly.newPlot('chart-wl-dapp', traces, GristHelpers.plotlyDarkLayout({
+      Plotly.newPlot('chart-wl-d', traces, GristHelpers.plotlyDarkLayout({
         xaxis: GristHelpers.plotlyDarkAxis('Rapport E/C'),
-        yaxis: GristHelpers.plotlyDarkAxis('Dapp (m²/s)')
+        yaxis: GristHelpers.plotlyDarkAxis('D (m²/s)')
       }), { responsive: true, displaylogo: false });
     }
 
     // =========================================================================
-    // CHART 3: Durée de vie (bar chart)
+    // CHART 3 : Durée de vie (bar chart)
     // =========================================================================
     function renderDureeVie(data) {
       const groups = {};
@@ -353,7 +352,7 @@
       if (names.length === 0) {
         Plotly.purge('chart-duree-vie');
         document.getElementById('chart-duree-vie').innerHTML =
-          '<div class="empty-state" style="padding:40px"><h3>Pas de données</h3><p>Lancez des analyses pour générer des estimations de durée de vie.</p></div>';
+          '<div class="empty-state" style="padding:40px"><h3>Pas de données</h3><p>Enregistrez un scalaire <strong>duree_vie_ans</strong> dans SCALAR.</p></div>';
         return;
       }
 
@@ -367,15 +366,15 @@
         marker: { color: names.map((_, i) => PALETTE[i % PALETTE.length]) },
         error_y: {
           type: 'data', symmetric: false,
-          array: maxs.map((m, i) => m - means[i]),
+          array:      maxs.map((m, i) => m - means[i]),
           arrayminus: means.map((m, i) => m - mins[i]),
           color: '#94a3b8', thickness: 1.5
         },
-        text: counts.map((c, i) => `n=${c}, moy=${means[i].toFixed(1)} ans`),
+        text:      counts.map((c, i) => `n=${c}, moy=${means[i].toFixed(1)} ans`),
         hoverinfo: 'text+name'
       }], GristHelpers.plotlyDarkLayout({
-        xaxis: GristHelpers.plotlyDarkAxis(''),
-        yaxis: GristHelpers.plotlyDarkAxis('Durée de vie (ans)'),
+        xaxis:      GristHelpers.plotlyDarkAxis(''),
+        yaxis:      GristHelpers.plotlyDarkAxis('Durée de vie (ans)'),
         showlegend: false
       }), { responsive: true, displaylogo: false });
     }
@@ -387,14 +386,14 @@
       document.getElementById('table-count').textContent = `${data.length} lignes`;
       document.getElementById('data-table-body').innerHTML = data.map(d => `
         <tr>
-          <td>${d.material.name            || '—'}</td>
-          <td>${d.material.id_mix_design   ? `mix#${d.material.id_mix_design}` : '—'}</td>
-          <td>${d.mix.wc_ratio != null     ? d.mix.wc_ratio.toFixed(2) : '—'}</td>
-          <td>${d.exposure.exposure_type   || '—'}</td>
-          <td>${d.exposure.exposure_nature || '—'}</td>
-          <td>${GristHelpers.formatDapp(d.Dapp)}</td>
+          <td>${d.material.name           || '—'}</td>
+          <td>${d.material.id_mix_design  ? `mix#${d.material.id_mix_design}` : '—'}</td>
+          <td>${d.mix.wc_ratio != null    ? d.mix.wc_ratio.toFixed(2) : '—'}</td>
+          <td>${d.exposure.exposure_type  || '—'}</td>
+          <td>${d.exposure.exposure_nature|| '—'}</td>
+          <td>${GristHelpers.formatDapp(d.D)}</td>
           <td>${d.duree_vie_ans != null && d.duree_vie_ans > 0 ? d.duree_vie_ans.toFixed(1) : '—'}</td>
-          <td>${d.source_dapp || '—'}</td>
+          <td>${sourceLabel(d.source)     || '—'}</td>
         </tr>
       `).join('');
     }

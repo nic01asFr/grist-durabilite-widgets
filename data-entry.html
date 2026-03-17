@@ -24,7 +24,7 @@
       color: var(--text-muted); max-width: 180px; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
     }
-    .breadcrumb .crumb.set  { color: var(--success); border: 1px solid var(--success); }
+    .breadcrumb .crumb.set    { color: var(--success); border: 1px solid var(--success); }
     .breadcrumb .crumb.active { color: var(--accent-light); border: 1px solid var(--accent); }
     .breadcrumb .sep { color: var(--text-dim); }
 
@@ -92,6 +92,15 @@
       background: var(--bg); color: var(--text-muted); border: 1px solid var(--surface2);
     }
     .context-tag.set { color: var(--success); border-color: var(--success); }
+
+    .result-section {
+      border: 1px solid var(--surface2); border-radius: 8px;
+      padding: 12px; margin-bottom: 12px;
+    }
+    .result-section-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.3px; color: var(--text-muted); margin-bottom: 10px;
+    }
 
     .log { max-height: 100px; }
   </style>
@@ -179,7 +188,6 @@
         <button class="btn btn-secondary" onclick="openBinderForm('scm')">+ Nouveau</button>
       </div>
     </div>
-    <!-- Shared binder creation form -->
     <div class="card" id="form-binder-card" style="display:none;">
       <div class="card-title" id="form-binder-title">Nouveau liant</div>
       <div class="form-grid">
@@ -202,7 +210,6 @@
         <div class="form-field"><label>Finesse Blaine (cm²/g)</label><input type="number" id="f-b-surface" step="100" placeholder="3500"></div>
         <div class="form-field"><label>PAF (%)</label><input type="number" id="f-b-loi" step="0.1" placeholder="2.5"></div>
       </div>
-
       <div class="collapsible">
         <div class="collapsible-header" onclick="toggleCollapsible('bogue')">
           Composition Bogue (phases clinker)
@@ -217,7 +224,6 @@
           </div>
         </div>
       </div>
-
       <div class="collapsible">
         <div class="collapsible-header" onclick="toggleCollapsible('oxide')">
           Composition oxyde (% massique)
@@ -236,7 +242,6 @@
           </div>
         </div>
       </div>
-
       <div class="form-field" style="margin-bottom:8px;">
         <label>Notes</label>
         <textarea id="f-b-notes" placeholder="Norme, fournisseur, lot…" style="min-height:48px;"></textarea>
@@ -294,7 +299,6 @@
   <div class="tab-panel" id="panel-mix">
     <div class="card">
       <div class="card-title">Formulation (MIX_DESIGN)</div>
-      <!-- Context bar showing selected binder/aggregate -->
       <div class="context-bar" id="mix-context-bar"></div>
       <div class="selector-row">
         <select id="sel-mix" onchange="onSel('mix')">
@@ -473,7 +477,8 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- TAB: MEASUREMENT -->
+  <!-- TAB: MEASUREMENT                                              -->
+  <!-- TEST est choisi ici — la campagne de mesure porte l'id_test  -->
   <!-- ============================================================ -->
   <div class="tab-panel" id="panel-measurement">
     <div class="card">
@@ -487,6 +492,13 @@
       <div id="form-measurement" style="display:none;">
         <div class="context-bar" id="measurement-context-bar" style="margin-bottom:10px;"></div>
         <div class="form-grid">
+          <!-- Test lié à la campagne -->
+          <div class="form-field">
+            <label>Test <span class="req">*</span></label>
+            <select id="f-meas-test">
+              <option value="">— Sélectionner ou créer —</option>
+            </select>
+          </div>
           <div class="form-field">
             <label>Type d'échantillon</label>
             <select id="f-meas-sample-type">
@@ -495,37 +507,37 @@
               <option value="bridge_pier">bridge_pier</option>
             </select>
           </div>
-          <div class="form-field"><label>Date préparation</label><input type="date" id="f-meas-date"></div>
-          <div class="form-field"><label>Masse (g)</label><input type="number" id="f-meas-mass" step="0.1" min="0" placeholder="500"></div>
-          <div class="form-field"><label>Dimensions</label><input type="text" id="f-meas-dims" placeholder="100×100×300 mm"></div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-secondary" onclick="toggleForm('measurement')">Annuler</button>
-          <button class="btn btn-primary" onclick="saveMeasurement()">Enregistrer la mesure</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================ -->
-  <!-- TAB: RESULTS (TEST + RESULT + CURVE + DATA_CURVE) -->
-  <!-- ============================================================ -->
-  <div class="tab-panel" id="panel-results">
-    <div class="card">
-      <div class="card-title">Test et résultats (TEST / RESULT)</div>
-      <div id="results-empty" class="empty-state" style="padding:24px;">
-        <h3>Sélectionnez d'abord une mesure</h3>
-        <p>Créez ou choisissez une campagne de mesure dans l'onglet précédent.</p>
-      </div>
-      <div id="results-content" style="display:none;">
-
-        <!-- Test selection -->
-        <div style="margin-bottom:12px;">
-          <div class="selector-row">
-            <select id="sel-test"><option value="">— Sélectionner un test —</option></select>
-            <button class="btn btn-secondary" onclick="toggleForm('test')">+ Nouveau test</button>
+          <div class="form-field">
+            <label>Dimensions</label>
+            <select id="f-meas-dims">
+              <option value="">—</option>
+              <option value="cylinder_100x200">cylinder_100x200</option>
+              <option value="cylinder_110x220">cylinder_110x220</option>
+              <option value="cylinder_150x300">cylinder_150x300</option>
+              <option value="cylinder_160x320">cylinder_160x320</option>
+              <option value="cube_100">cube_100</option>
+              <option value="cube_150">cube_150</option>
+              <option value="cube_200">cube_200</option>
+              <option value="prism_40x40x160">prism_40x40x160</option>
+              <option value="prism_70x70x280">prism_70x70x280</option>
+              <option value="prism_100x100x400">prism_100x100x400</option>
+              <option value="powder">powder</option>
+              <option value="other">other</option>
+            </select>
           </div>
-          <div id="form-test" style="display:none;">
+          <div class="form-field"><label>Masse (g)</label><input type="number" id="f-meas-mass" step="0.1" min="0" placeholder="500"></div>
+          <div class="form-field"><label>Date préparation</label><input type="date" id="f-meas-prep-date"></div>
+          <div class="form-field"><label>Date résultat</label><input type="date" id="f-meas-result-date"></div>
+          <div class="form-field"><label>Opérateur</label><input type="text" id="f-meas-operator" placeholder="Nom, labo…"></div>
+        </div>
+
+        <!-- Création rapide de test inline -->
+        <div class="collapsible">
+          <div class="collapsible-header" onclick="toggleCollapsible('new-test')">
+            Créer un nouveau test
+            <span class="collapsible-toggle" id="toggle-new-test">▶</span>
+          </div>
+          <div class="collapsible-body" id="body-new-test">
             <div class="form-grid">
               <div class="form-field">
                 <label>Propriété <span class="req">*</span></label>
@@ -558,37 +570,74 @@
               <div class="form-field"><label>Durée essai (jours)</label><input type="number" id="f-test-dur" step="1" min="0" placeholder="90"></div>
             </div>
             <div class="form-actions">
-              <button class="btn btn-secondary" onclick="toggleForm('test')">Annuler</button>
-              <button class="btn btn-primary" onclick="saveTest()">Enregistrer le test</button>
+              <button class="btn btn-primary" onclick="saveTestAndSelect()">Créer le test et sélectionner</button>
             </div>
           </div>
         </div>
 
-        <!-- Result type selector -->
-        <div style="display:flex; gap:8px; margin-bottom:12px;">
-          <button class="btn btn-secondary" id="result-type-scalar" onclick="setResultType('scalar')" style="flex:1;">🔢 Scalaire</button>
-          <button class="btn btn-primary"   id="result-type-curve"  onclick="setResultType('curve')"  style="flex:1;">📈 Courbe</button>
+        <div class="form-actions" style="margin-top:12px;">
+          <button class="btn btn-secondary" onclick="toggleForm('measurement')">Annuler</button>
+          <button class="btn btn-primary" onclick="saveMeasurement()">Enregistrer la campagne</button>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- Scalar -->
-        <div id="scalar-entry" style="display:none;">
+  <!-- ============================================================ -->
+  <!-- TAB: RESULTS (SCALAR + CURVE)                                -->
+  <!-- Chaque MEASUREMENT peut avoir 0..n scalaires et 0..n courbes -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="panel-results">
+    <div class="card">
+      <div class="card-title">Résultats (SCALAR / CURVE)</div>
+      <div id="results-empty" class="empty-state" style="padding:24px;">
+        <h3>Sélectionnez d'abord une mesure</h3>
+        <p>Créez ou choisissez une campagne de mesure dans l'onglet précédent.</p>
+      </div>
+      <div id="results-content" style="display:none;">
+        <div class="context-bar" id="results-context-bar" style="margin-bottom:12px;"></div>
+
+        <!-- Scalaires -->
+        <div class="result-section">
+          <div class="result-section-title">🔢 Scalaires (SCALAR)</div>
           <div class="form-grid">
-            <div class="form-field"><label>Opérateur (nom param.)</label><input type="text" id="f-res-operator" placeholder="Dapp, K_carb, Rc…"></div>
-            <div class="form-field"><label>Valeur</label><input type="number" id="f-res-value" step="any" placeholder="1.2e-12"></div>
-            <div class="form-field"><label>Unité</label><input type="text" id="f-res-unit" placeholder="m2/s, MPa…"></div>
+            <div class="form-field">
+              <label>Nom paramètre <span class="req">*</span></label>
+              <input type="text" id="f-sc-name" placeholder="D, Cs, mean_depth, depth_1, Rc…">
+            </div>
+            <div class="form-field">
+              <label>Valeur <span class="req">*</span></label>
+              <input type="number" id="f-sc-value" step="any" placeholder="1.2e-12">
+            </div>
+            <div class="form-field">
+              <label>Unité</label>
+              <input type="text" id="f-sc-unit" placeholder="m²/s, %, mm, MPa…">
+            </div>
+            <div class="form-field">
+              <label>Dérivé (calculé)</label>
+              <select id="f-sc-derived">
+                <option value="0">Non (mesuré directement)</option>
+                <option value="1">Oui (calculé depuis une courbe)</option>
+              </select>
+            </div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Notes</label>
+              <input type="text" id="f-sc-notes" placeholder="Méthode de calcul, conditions…">
+            </div>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" onclick="saveScalarResult()">💾 Enregistrer le scalaire</button>
+            <button class="btn btn-primary" onclick="saveScalar()">💾 Enregistrer le scalaire</button>
           </div>
         </div>
 
-        <!-- Curve -->
-        <div id="curve-entry" style="display:none;">
+        <!-- Courbes -->
+        <div class="result-section">
+          <div class="result-section-title">📈 Courbe (CURVE + DATA_CURVE)</div>
           <div class="form-grid" style="margin-bottom:8px;">
-            <div class="form-field"><label>Axe X (nom)</label><input type="text" id="f-cur-xname" placeholder="depth_mm"></div>
-            <div class="form-field"><label>Axe X (unité)</label><input type="text" id="f-cur-xunit" placeholder="mm"></div>
-            <div class="form-field"><label>Axe Y (nom)</label><input type="text" id="f-cur-yname" placeholder="chloride_pct_binder"></div>
-            <div class="form-field"><label>Axe Y (unité)</label><input type="text" id="f-cur-yunit" placeholder="%"></div>
+            <div class="form-field"><label>Axe X (nom)</label><input type="text" id="f-cv-xname" placeholder="depth"></div>
+            <div class="form-field"><label>Axe X (unité)</label><input type="text" id="f-cv-xunit" placeholder="mm"></div>
+            <div class="form-field"><label>Axe Y (nom)</label><input type="text" id="f-cv-yname" placeholder="chloride_content"></div>
+            <div class="form-field"><label>Axe Y (unité)</label><input type="text" id="f-cv-yunit" placeholder="% binder"></div>
           </div>
           <table class="mini-table">
             <thead><tr><th>X</th><th>Y</th><th class="row-actions"></th></tr></thead>
@@ -596,7 +645,7 @@
           </table>
           <div style="display:flex; gap:8px; margin-top:8px;">
             <button class="btn btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="addCurveRow()">+ Point</button>
-            <button class="btn btn-primary"   style="font-size:11px; padding:4px 10px;" onclick="saveCurveResult()">💾 Enregistrer la courbe</button>
+            <button class="btn btn-primary"   style="font-size:11px; padding:4px 10px;" onclick="saveCurve()">💾 Enregistrer la courbe</button>
           </div>
         </div>
 
@@ -614,28 +663,17 @@
     // =========================================================================
     // STATE
     // =========================================================================
-    let activeTab = 'source';
-    let currentResultType = 'curve';
-    let _binderTarget = 'cement'; // which slot the binder form is filling
+    let activeTab      = 'source';
+    let _binderTarget  = 'cement';
 
-    // Loaded records
     let allSources = [], allBinders = [], allAggregates = [], allMixes = [];
     let allExposures = [], allCurings = [], allSites = [];
     let allMaterials = [], allMeasurements = [], allTests = [];
 
-    // Active selections
     const sel = {
-      source: null,
-      binder_cement: null,
-      binder_scm: null,
-      aggregate: null,
-      mix: null,
-      exposure: null,
-      curing: null,
-      site: null,
-      material: null,
-      measurement: null,
-      test: null,
+      source: null, binder_cement: null, binder_scm: null,
+      aggregate: null, mix: null, exposure: null, curing: null,
+      site: null, material: null, measurement: null, test: null,
     };
 
     // =========================================================================
@@ -671,16 +709,16 @@
     // =========================================================================
     function updateBreadcrumb() {
       const items = [
-        { key: 'source',   label: sel.source   ? (allSources.find(s => s.id === sel.source)?.fields.authors || `#${sel.source}`) : null },
-        { key: 'binder',   label: (sel.binder_cement || sel.binder_scm) ? labelBinder() : null },
-        { key: 'mix',      label: sel.mix       ? `Mix #${sel.mix}`      : null },
-        { key: 'material', label: sel.material  ? (allMaterials.find(m => m.id === sel.material)?.fields.name || `Mat. #${sel.material}`) : null },
-        { key: 'measurement', label: sel.measurement ? `Mesure #${sel.measurement}` : null },
+        { key: 'source',      label: sel.source      ? (allSources.find(s => s.id === sel.source)?.fields.authors || `#${sel.source}`) : null },
+        { key: 'binder',      label: (sel.binder_cement || sel.binder_scm) ? labelBinder() : null },
+        { key: 'mix',         label: sel.mix          ? `Mix #${sel.mix}`          : null },
+        { key: 'material',    label: sel.material     ? (allMaterials.find(m => m.id === sel.material)?.fields.name || `Mat. #${sel.material}`) : null },
+        { key: 'measurement', label: sel.measurement  ? `Mesure #${sel.measurement}` : null },
       ];
       document.getElementById('breadcrumb').innerHTML = items.map((item, i) => {
         const isSet    = !!item.label;
         const isActive = item.key === activeTab || (item.key === 'binder' && ['binder','aggregate'].includes(activeTab));
-        const cls = `crumb${isSet ? ' set' : ''}${isActive ? ' active' : ''}`;
+        const cls  = `crumb${isSet ? ' set' : ''}${isActive ? ' active' : ''}`;
         const text = item.label || `— ${item.key} —`;
         return (i > 0 ? '<span class="sep">→</span>' : '') +
           `<span class="${cls}" onclick="showTab('${item.key}')">${text}</span>`;
@@ -721,8 +759,7 @@
         ]);
         GristHelpers.log(
           `${allSources.length} sources, ${allBinders.length} liants, ` +
-          `${allAggregates.length} granulats, ${allMixes.length} formulations, ` +
-          `${allMaterials.length} matériaux`, 'ok'
+          `${allMaterials.length} matériaux, ${allMeasurements.length} mesures`, 'ok'
         );
         populateDropdowns();
         GristHelpers.setStatus('Prêt', 'ready');
@@ -736,30 +773,41 @@
     // DROPDOWNS
     // =========================================================================
     function populateDropdowns() {
-      fillDrop('sel-source',       allSources,      s => `${s.fields.authors || '?'} (${s.fields.year || '?'}) — ${(s.fields.title || '').substring(0, 40)}`);
+      fillDrop('sel-source',        allSources,     s => `${s.fields.authors || '?'} (${s.fields.year || '?'}) — ${(s.fields.title || '').substring(0, 40)}`);
       fillDrop('sel-binder-cement', allBinders,     b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
-      fillDrop('sel-binder-scm',   allBinders,      b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
-      fillDrop('sel-aggregate',    allAggregates,   a => `${a.fields.name || '?'} (${a.fields.aggregate_type || '?'}) ${a.fields.size_min_mm ?? ''}–${a.fields.size_max_mm ?? ''} mm`);
-      fillDrop('sel-mix',          allMixes,        m => `#${m.id} — E/C=${m.fields.wc_ratio ?? '?'} — ciment=${m.fields.cement_content_kg ?? '?'} kg/m³`);
-      fillDrop('sel-exposure',     allExposures,    e => `#${e.id} — ${e.fields.exposure_type || '?'} / ${e.fields.exposure_nature || '?'}`);
-      fillDrop('sel-curing',       allCurings,      c => `#${c.id} — ${c.fields.curing_method || '?'} ${c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : ''}`);
-      fillDrop('sel-site',         allSites,        s => `#${s.id} — ${s.fields.country_region || '?'}`);
-      fillDrop('sel-material',     allMaterials,    m => `${m.fields.name || '?'} (${m.fields.material_type || '?'})`);
-      const matMeasures = sel.material ? allMeasurements.filter(m => m.fields.id_material === sel.material) : allMeasurements;
-      fillDrop('sel-measurement',  matMeasures,     m => `#${m.id} — ${m.fields.sample_type || '?'} — ${m.fields.preparation_date || '?'}`);
-      fillDrop('sel-test',         allTests,        t => `${t.fields.name || '?'} (${t.fields.test_type || '?'})`);
+      fillDrop('sel-binder-scm',    allBinders,     b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
+      fillDrop('sel-aggregate',     allAggregates,  a => `${a.fields.name || '?'} (${a.fields.aggregate_type || '?'}) ${a.fields.size_min_mm ?? ''}–${a.fields.size_max_mm ?? ''} mm`);
+      fillDrop('sel-mix',           allMixes,       m => `#${m.id} — E/C=${m.fields.wc_ratio ?? '?'} — ciment=${m.fields.cement_content_kg ?? '?'} kg/m³`);
+      fillDrop('sel-exposure',      allExposures,   e => `#${e.id} — ${e.fields.exposure_type || '?'} / ${e.fields.exposure_nature || '?'}`);
+      fillDrop('sel-curing',        allCurings,     c => `#${c.id} — ${c.fields.curing_method || '?'} ${c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : ''}`);
+      fillDrop('sel-site',          allSites,       s => `#${s.id} — ${s.fields.country_region || '?'}`);
+      fillDrop('sel-material',      allMaterials,   m => `${m.fields.name || '?'} (${m.fields.material_type || '?'})`);
+
+      const matMeasures = sel.material
+        ? allMeasurements.filter(m => m.fields.id_material === sel.material)
+        : allMeasurements;
+      fillDrop('sel-measurement', matMeasures, m => {
+        const test = allTests.find(t => t.id === m.fields.id_test);
+        return `#${m.id} — ${test?.fields.name || '?'} — ${m.fields.sample_dimensions || m.fields.sample_type || '?'} — ${m.fields.preparation_date || '?'}`;
+      });
+
+      fillDrop('f-meas-test', allTests, t => `${t.fields.name || '?'} (${t.fields.test_type || '?'}) — ${t.fields.standard_name || 'sans norme'}`);
 
       // Restore selections
       const map = {
         'sel-source': 'source', 'sel-binder-cement': 'binder_cement', 'sel-binder-scm': 'binder_scm',
         'sel-aggregate': 'aggregate', 'sel-mix': 'mix', 'sel-exposure': 'exposure',
         'sel-curing': 'curing', 'sel-site': 'site', 'sel-material': 'material',
-        'sel-measurement': 'measurement', 'sel-test': 'test',
+        'sel-measurement': 'measurement',
       };
       Object.entries(map).forEach(([elId, key]) => {
         const el = document.getElementById(elId);
         if (el && sel[key]) el.value = sel[key];
       });
+      if (sel.test) {
+        const el = document.getElementById('f-meas-test');
+        if (el) el.value = sel.test;
+      }
     }
 
     function fillDrop(elId, records, labelFn) {
@@ -777,7 +825,7 @@
     }
 
     // =========================================================================
-    // SELECTION HANDLERS (generic)
+    // SELECTION HANDLERS
     // =========================================================================
     function onSel(key) {
       const elId = key === 'binder_cement' ? 'sel-binder-cement'
@@ -794,8 +842,8 @@
     // =========================================================================
     function openBinderForm(target) {
       _binderTarget = target;
-      const title = target === 'cement' ? 'Nouveau ciment / liant principal' : 'Nouvelle addition minérale (SCM)';
-      document.getElementById('form-binder-title').textContent = title;
+      document.getElementById('form-binder-title').textContent =
+        target === 'cement' ? 'Nouveau ciment / liant principal' : 'Nouvelle addition minérale (SCM)';
       document.getElementById('form-binder-card').style.display = '';
     }
     function cancelBinder() {
@@ -817,17 +865,15 @@
           density_kg_m3:    floatOrNull('f-b-density'),
           specific_surface: floatOrNull('f-b-surface'),
           loss_on_ignition: floatOrNull('f-b-loi'),
-          C3S:  floatOrNull('f-b-C3S'),  C2S:  floatOrNull('f-b-C2S'),
-          C3A:  floatOrNull('f-b-C3A'),  C4AF: floatOrNull('f-b-C4AF'),
+          C3S: floatOrNull('f-b-C3S'), C2S: floatOrNull('f-b-C2S'),
+          C3A: floatOrNull('f-b-C3A'), C4AF: floatOrNull('f-b-C4AF'),
           SiO2: floatOrNull('f-b-SiO2'), Al2O3: floatOrNull('f-b-Al2O3'),
           Fe2O3: floatOrNull('f-b-Fe2O3'), CaO: floatOrNull('f-b-CaO'),
-          MgO:  floatOrNull('f-b-MgO'),  SO3:  floatOrNull('f-b-SO3'),
-          K2O:  floatOrNull('f-b-K2O'),  Na2O: floatOrNull('f-b-Na2O'),
+          MgO: floatOrNull('f-b-MgO'), SO3: floatOrNull('f-b-SO3'),
+          K2O: floatOrNull('f-b-K2O'), Na2O: floatOrNull('f-b-Na2O'),
           notes: document.getElementById('f-b-notes').value.trim() || '',
         };
-        // Remove null fields to avoid Grist errors on optional columns
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
-
         const result = await GristHelpers.createRecord('BINDER', fields);
         GristHelpers.log(`Liant "${name}" créé (id=${result.id}) ✓`, 'ok');
         sel[_binderTarget === 'cement' ? 'binder_cement' : 'binder_scm'] = result.id;
@@ -865,8 +911,7 @@
     // CONTEXT BARS
     // =========================================================================
     function tagHTML(label, value) {
-      const cls = value ? 'context-tag set' : 'context-tag';
-      return `<span class="${cls}">${label}: <strong>${value || '—'}</strong></span>`;
+      return `<span class="context-tag${value ? ' set' : ''}">${label}: <strong>${value || '—'}</strong></span>`;
     }
 
     function updateMixContextBar() {
@@ -885,9 +930,9 @@
       const si  = allSites.find(s => s.id === sel.site);
       document.getElementById('material-context-bar').innerHTML =
         tagHTML('Formulation', mx ? `#${mx.id}` : null) +
-        tagHTML('Exposition', exp ? `${exp.fields.exposure_nature || '#' + exp.id}` : null) +
-        tagHTML('Site', si?.fields.country_region) +
-        tagHTML('Cure', sel.curing ? `#${sel.curing}` : null);
+        tagHTML('Exposition',  exp ? `${exp.fields.exposure_nature || '#' + exp.id}` : null) +
+        tagHTML('Site',        si?.fields.country_region) +
+        tagHTML('Cure',        sel.curing ? `#${sel.curing}` : null);
     }
 
     function updateMeasurementContextBar() {
@@ -895,7 +940,7 @@
       const src = allSources.find(s => s.id === sel.source);
       document.getElementById('measurement-context-bar').innerHTML =
         tagHTML('Matériau', mat?.fields.name) +
-        tagHTML('Source', src?.fields.authors);
+        tagHTML('Source',   src?.fields.authors);
     }
 
     // =========================================================================
@@ -1045,32 +1090,9 @@
     }
 
     // =========================================================================
-    // SAVE: MEASUREMENT
+    // SAVE: TEST (inline, depuis l'onglet Mesure)
     // =========================================================================
-    async function saveMeasurement() {
-      if (!sel.material) { GristHelpers.log('Sélectionnez un matériau', 'warn'); return; }
-      try {
-        const dateVal = document.getElementById('f-meas-date').value;
-        const result = await GristHelpers.createRecord('MEASUREMENT', {
-          id_material:       sel.material,
-          id_source:         sel.source || 0,
-          sample_type:       document.getElementById('f-meas-sample-type').value || '',
-          preparation_date:  dateVal ? Math.floor(new Date(dateVal).getTime() / 1000) : null,
-          sample_mass_g:     floatOrNull('f-meas-mass') ?? 0,
-          sample_dimensions: document.getElementById('f-meas-dims').value.trim() || '',
-        });
-        GristHelpers.log(`Mesure créée (id=${result.id}) ✓`, 'ok');
-        sel.measurement = result.id;
-        toggleForm('measurement');
-        await refreshAll();
-        showTab('results');
-      } catch (err) { GristHelpers.log('Erreur : ' + err.message, 'err'); }
-    }
-
-    // =========================================================================
-    // SAVE: TEST
-    // =========================================================================
-    async function saveTest() {
+    async function saveTestAndSelect() {
       const name = document.getElementById('f-test-name').value;
       const type = document.getElementById('f-test-type').value;
       if (!name || !type) { GristHelpers.log('Propriété et type requis', 'warn'); return; }
@@ -1082,40 +1104,67 @@
         });
         GristHelpers.log(`Test créé (id=${result.id}) ✓`, 'ok');
         sel.test = result.id;
-        toggleForm('test');
         await refreshAll();
+        // fermer le collapsible
+        document.getElementById('body-new-test').classList.remove('open');
+        document.getElementById('toggle-new-test').textContent = '▶';
       } catch (err) { GristHelpers.log('Erreur : ' + err.message, 'err'); }
     }
 
     // =========================================================================
-    // RESULT TYPE
+    // SAVE: MEASUREMENT
+    // id_test est maintenant requis dans MEASUREMENT
     // =========================================================================
-    function setResultType(type) {
-      currentResultType = type;
-      document.getElementById('scalar-entry').style.display = type === 'scalar' ? '' : 'none';
-      document.getElementById('curve-entry').style.display  = type === 'curve'  ? '' : 'none';
-      document.getElementById('result-type-scalar').className = type === 'scalar' ? 'btn btn-primary' : 'btn btn-secondary';
-      document.getElementById('result-type-curve').className  = type === 'curve'  ? 'btn btn-primary' : 'btn btn-secondary';
+    async function saveMeasurement() {
+      if (!sel.material) { GristHelpers.log('Sélectionnez un matériau', 'warn'); return; }
+      const testId = parseInt(document.getElementById('f-meas-test').value) || null;
+      if (!testId)  { GristHelpers.log('Sélectionnez ou créez un test', 'warn'); return; }
+      try {
+        const prepDate   = document.getElementById('f-meas-prep-date').value;
+        const resultDate = document.getElementById('f-meas-result-date').value;
+        const fields = {
+          id_material:       sel.material,
+          id_source:         sel.source || 0,
+          id_test:           testId,
+          sample_type:       document.getElementById('f-meas-sample-type').value || '',
+          sample_dimensions: document.getElementById('f-meas-dims').value || '',
+          sample_mass_g:     floatOrNull('f-meas-mass') ?? 0,
+          operator:          document.getElementById('f-meas-operator').value.trim() || '',
+          preparation_date:  prepDate   ? Math.floor(new Date(prepDate).getTime()   / 1000) : null,
+          result_date:       resultDate ? Math.floor(new Date(resultDate).getTime() / 1000) : null,
+        };
+        Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
+        const result = await GristHelpers.createRecord('MEASUREMENT', fields);
+        GristHelpers.log(`Mesure créée (id=${result.id}) ✓`, 'ok');
+        sel.measurement = result.id;
+        toggleForm('measurement');
+        await refreshAll();
+        showTab('results');
+      } catch (err) { GristHelpers.log('Erreur : ' + err.message, 'err'); }
     }
 
     // =========================================================================
-    // SAVE: SCALAR RESULT
+    // SAVE: SCALAR
     // =========================================================================
-    async function saveScalarResult() {
-      if (!sel.measurement || !sel.test) { GristHelpers.log('Sélectionnez une mesure et un test', 'warn'); return; }
-      const value = document.getElementById('f-res-value').value.trim();
-      if (!value) { GristHelpers.log('Valeur requise', 'warn'); return; }
+    async function saveScalar() {
+      if (!sel.measurement) { GristHelpers.log('Sélectionnez une mesure', 'warn'); return; }
+      const name  = document.getElementById('f-sc-name').value.trim();
+      const value = parseFloat(document.getElementById('f-sc-value').value);
+      if (!name)      { GristHelpers.log('Nom du paramètre requis', 'warn'); return; }
+      if (isNaN(value)) { GristHelpers.log('Valeur numérique requise', 'warn'); return; }
       try {
-        const result = await GristHelpers.createRecord('RESULT', {
+        const result = await GristHelpers.createRecord('SCALAR', {
           id_measurement: sel.measurement,
-          id_test:        sel.test,
-          result_type:    'scalar',
-          name:           value,
-          operator:       document.getElementById('f-res-operator').value.trim() || '',
-          unit:           document.getElementById('f-res-unit').value.trim() || '',
-          result_date:    Math.floor(Date.now() / 1000),
+          name,
+          value,
+          unit:       document.getElementById('f-sc-unit').value.trim() || '',
+          is_derived: document.getElementById('f-sc-derived').value === '1',
+          notes:      document.getElementById('f-sc-notes').value.trim() || '',
         });
-        GristHelpers.log(`Résultat scalaire créé (id=${result.id}) ✓`, 'ok');
+        GristHelpers.log(`Scalaire "${name}" = ${value} créé (id=${result.id}) ✓`, 'ok');
+        // Vider le formulaire pour permettre l'ajout d'un autre scalaire
+        document.getElementById('f-sc-name').value  = '';
+        document.getElementById('f-sc-value').value = '';
       } catch (err) { GristHelpers.log('Erreur : ' + err.message, 'err'); }
     }
 
@@ -1133,21 +1182,18 @@
       tbody.appendChild(row);
     }
 
-    async function saveCurveResult() {
-      if (!sel.measurement || !sel.test) { GristHelpers.log('Sélectionnez une mesure et un test', 'warn'); return; }
+    async function saveCurve() {
+      if (!sel.measurement) { GristHelpers.log('Sélectionnez une mesure', 'warn'); return; }
       const rows = document.getElementById('curve-rows').querySelectorAll('tr');
       if (rows.length === 0) { GristHelpers.log('Ajoutez au moins un point', 'warn'); return; }
       try {
-        const resultRec = await GristHelpers.createRecord('RESULT', {
-          id_measurement: sel.measurement, id_test: sel.test,
-          result_type: 'curve', result_date: Math.floor(Date.now() / 1000),
-        });
+        // CURVE directement liée à MEASUREMENT (plus de table RESULT intermédiaire)
         const curveRec = await GristHelpers.createRecord('CURVE', {
-          id_result: resultRec.id,
-          x_name: document.getElementById('f-cur-xname').value.trim() || 'x',
-          x_unit: document.getElementById('f-cur-xunit').value.trim() || '',
-          y_name: document.getElementById('f-cur-yname').value.trim() || 'y',
-          y_unit: document.getElementById('f-cur-yunit').value.trim() || '',
+          id_measurement: sel.measurement,
+          x_name: document.getElementById('f-cv-xname').value.trim() || 'x',
+          x_unit: document.getElementById('f-cv-xunit').value.trim() || '',
+          y_name: document.getElementById('f-cv-yname').value.trim() || 'y',
+          y_unit: document.getElementById('f-cv-yunit').value.trim() || '',
         });
         const points = [];
         rows.forEach(row => {
@@ -1156,7 +1202,7 @@
           if (!isNaN(x) && !isNaN(y)) points.push({ id_curve: curveRec.id, x, y });
         });
         if (points.length > 0) await GristHelpers.bulkCreateRecords('DATA_CURVE', points);
-        GristHelpers.log(`Courbe créée : RESULT #${resultRec.id}, ${points.length} points ✓`, 'ok');
+        GristHelpers.log(`Courbe créée : CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
         document.getElementById('curve-rows').innerHTML = '';
       } catch (err) { GristHelpers.log('Erreur : ' + err.message, 'err'); }
     }
@@ -1168,7 +1214,16 @@
       const hasM = !!sel.measurement;
       document.getElementById('results-empty').style.display   = hasM ? 'none' : '';
       document.getElementById('results-content').style.display = hasM ? '' : 'none';
-      if (hasM) setResultType(currentResultType);
+
+      if (hasM) {
+        const meas = allMeasurements.find(m => m.id === sel.measurement);
+        const test = allTests.find(t => t.id === meas?.fields.id_test);
+        const mat  = allMaterials.find(m => m.id === meas?.fields.id_material);
+        document.getElementById('results-context-bar').innerHTML =
+          tagHTML('Mesure',  `#${sel.measurement}`) +
+          tagHTML('Matériau', mat?.fields.name) +
+          tagHTML('Test',     test ? `${test.fields.name} (${test.fields.test_type})` : null);
+      }
     }
 
     // =========================================================================

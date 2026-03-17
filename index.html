@@ -8,41 +8,41 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: #0f172a; color: #e2e8f0; min-height: 100vh;
+      background: #f1f5f9; color: #0f172a; min-height: 100vh;
       display: flex; align-items: center; justify-content: center; padding: 40px 20px;
     }
     .container { max-width: 640px; width: 100%; }
     .badge {
       display: inline-block; font-size: 11px; letter-spacing: 2px;
-      text-transform: uppercase; color: #64748b; background: #1e293b;
+      text-transform: uppercase; color: #64748b; background: #e2e8f0;
       padding: 6px 14px; border-radius: 20px; margin-bottom: 20px;
     }
     h1 { font-size: 32px; font-weight: 300; line-height: 1.3; margin-bottom: 12px; }
     h1 strong { font-weight: 600; }
-    .subtitle { font-size: 15px; color: #94a3b8; line-height: 1.6; margin-bottom: 36px; }
+    .subtitle { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 36px; }
     .widget-card {
-      background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 16px;
+      background: #ffffff; border-radius: 12px; padding: 24px; margin-bottom: 16px;
       transition: transform 0.15s, box-shadow 0.15s; text-decoration: none;
-      color: inherit; display: block; border: 1px solid #334155;
+      color: inherit; display: block; border: 1px solid #e2e8f0;
     }
-    .widget-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); border-color: #3b82f6; }
+    .widget-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-color: #3b82f6; }
     .widget-card .top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
     .widget-card .icon { font-size: 28px; }
     .widget-card .name { font-size: 17px; font-weight: 600; }
     .widget-card .tag {
       margin-left: auto; font-size: 10px; padding: 3px 10px; border-radius: 12px;
-      background: #0f172a; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;
+      background: #f1f5f9; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;
     }
-    .widget-card .tag.ready { color: #22c55e; }
-    .widget-card .desc { font-size: 13px; color: #94a3b8; line-height: 1.6; margin-bottom: 12px; }
+    .widget-card .tag.ready { color: #16a34a; }
+    .widget-card .desc { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 12px; }
     .widget-card .tech { display: flex; gap: 6px; flex-wrap: wrap; }
     .widget-card .tech span {
       font-size: 10px; padding: 3px 8px; border-radius: 6px;
-      background: #0f172a; color: #64748b; font-family: 'SF Mono', monospace;
+      background: #f1f5f9; color: #64748b; font-family: 'SF Mono', monospace;
     }
     .footer {
-      margin-top: 36px; padding-top: 20px; border-top: 1px solid #1e293b;
-      font-size: 12px; color: #475569; text-align: center; line-height: 1.8;
+      margin-top: 36px; padding-top: 20px; border-top: 1px solid #e2e8f0;
+      font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.8;
     }
     .footer a { color: #3b82f6; text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
@@ -55,7 +55,7 @@
     <p class="subtitle">
       Collection de widgets custom pour l'analyse de durabilité des bétons en milieu marin.
       Utilisables directement dans <a href="https://grist.numerique.gouv.fr" style="color:#3b82f6;">Grist</a> comme widgets personnalisés.
-      Schéma v2.0 — 11 tables auto-provisionnées.
+      Schéma v2.2 — 13 tables auto-provisionnées.
     </p>
 
     <a href="data-entry.html" class="widget-card">
@@ -70,7 +70,7 @@
         protocole et mesures. Chaînage automatique des références.
       </div>
       <div class="tech">
-        <span>13 tables</span><span>Formulaires</span><span>Batch insert</span>
+        <span>13 tables</span><span>SCALAR</span><span>CURVE</span><span>Formulaires</span>
       </div>
     </a>
 

@@ -1,11 +1,13 @@
 // =========================================================================
 // GristHelpers — Utilitaires partagés pour les widgets durabilité
-// Schéma v2.0 — 11 tables (architecture générique)
+// Schéma v2.2 — 13 tables, 11 enums (architecture générique)
+// Résultats : SCALAR (scalaires 0..n) + CURVE+DATA_CURVE (courbes 0..n)
+//             directement liés à MEASUREMENT (plus de table RESULT)
 // =========================================================================
 const GristHelpers = {
 
   // =========================================================================
-  // SCHEMA — Définition complète des 11 tables
+  // SCHEMA — Définition complète des 13 tables
   // =========================================================================
   SCHEMA: {
 
@@ -13,7 +15,7 @@ const GristHelpers = {
     SITE: {
       columns: [
         { id: 'latitude',       fields: { type: 'Numeric', label: 'Latitude' } },
-        { id: 'longitude',      fields: { type: 'Numeric', label: 'Longitude' } },
+        { id: 'longitude',      fields: { type: 'Numeric',    label: 'Longitude' } },
         { id: 'country_region', fields: { type: 'Text',    label: 'Pays / Région' } },
       ]
     },
@@ -21,7 +23,7 @@ const GristHelpers = {
     // --- Conditions d'exposition ---
     EXPOSURE: {
       columns: [
-        { id: 'exposure_type',        fields: { type: 'Choice',  label: "Type d'exposition",  widgetOptions: '{"choices":["laboratory","in-situ"]}' } },
+        { id: 'exposure_type',        fields: { type: 'Choice',  label: "Type d'exposition",   widgetOptions: '{"choices":["laboratory","in-situ"]}' } },
         { id: 'exposure_nature',      fields: { type: 'Choice',  label: "Nature d'exposition", widgetOptions: '{"choices":["atmospheric","spray","splash","tidal","submerged"]}' } },
         { id: 'wetting_duration_pct', fields: { type: 'Numeric', label: 'Mouillage (%)' } },
         { id: 'drying_duration_pct',  fields: { type: 'Numeric', label: 'Séchage (%)' } },
@@ -136,39 +138,43 @@ const GristHelpers = {
       ]
     },
 
-    // --- Campagne de mesure sur un matériau ---
+    // --- Campagne de mesure (qui/quoi/quand) ---
+    // id_test : le type de test est fixé à la création de la campagne
     MEASUREMENT: {
       columns: [
         { id: 'id_material',       fields: { type: 'Ref:MATERIAL', label: 'Matériau' } },
-        { id: 'sample_type',       fields: { type: 'Choice',       label: "Type d'échantillon", widgetOptions: '{"choices":["laboratory_sample","bridge_pier"]}' } },
         { id: 'id_source',         fields: { type: 'Ref:SOURCE',   label: 'Source' } },
+        { id: 'id_test',           fields: { type: 'Ref:TEST',     label: 'Test' } },
+        { id: 'sample_type',       fields: { type: 'Choice',       label: "Type d'échantillon", widgetOptions: '{"choices":["laboratory_sample","bridge_pier"]}' } },
+        { id: 'sample_dimensions', fields: { type: 'Choice',       label: 'Dimensions échantillon', widgetOptions: '{"choices":["cylinder_100x200","cylinder_110x220","cylinder_150x300","cylinder_160x320","cube_100","cube_150","cube_200","prism_40x40x160","prism_70x70x280","prism_100x100x400","powder","other"]}' } },
         { id: 'preparation_date',  fields: { type: 'Date',         label: 'Date préparation' } },
+        { id: 'result_date',       fields: { type: 'Date',         label: 'Date résultat' } },
         { id: 'sample_mass_g',     fields: { type: 'Numeric',      label: 'Masse (g)' } },
-        { id: 'sample_dimensions', fields: { type: 'Text',         label: 'Dimensions' } },
+        { id: 'operator',          fields: { type: 'Text',         label: 'Opérateur' } },
       ]
     },
 
-    // --- Résultat d'un test (scalaire ou courbe) ---
-    RESULT: {
+    // --- Résultats scalaires (0..n par MEASUREMENT) ---
+    // Exemples : name='D' (m²/s), name='Cs' (%), name='mean_depth' (mm), name='depth_1' (mm)
+    SCALAR: {
       columns: [
         { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Mesure' } },
-        { id: 'id_test',        fields: { type: 'Ref:TEST',        label: 'Test' } },
-        { id: 'result_date',    fields: { type: 'Date',            label: 'Date résultat' } },
-        { id: 'result_type',    fields: { type: 'Choice',          label: 'Type résultat', widgetOptions: '{"choices":["scalar","curve"]}' } },
-        { id: 'name',           fields: { type: 'Text',            label: 'Valeur / Nom' } },
+        { id: 'name',           fields: { type: 'Text',            label: 'Nom paramètre' } },
+        { id: 'value',          fields: { type: 'Numeric',         label: 'Valeur' } },
         { id: 'unit',           fields: { type: 'Text',            label: 'Unité' } },
-        { id: 'operator',       fields: { type: 'Text',            label: 'Opérateur' } },
+        { id: 'is_derived',     fields: { type: 'Bool',            label: 'Dérivé (calculé)' } },
+        { id: 'notes',          fields: { type: 'Text',            label: 'Notes' } },
       ]
     },
 
-    // --- Métadonnées d'une courbe ---
+    // --- Résultats sous forme de courbe (0..n par MEASUREMENT) ---
     CURVE: {
       columns: [
-        { id: 'id_result', fields: { type: 'Ref:RESULT', label: 'Résultat' } },
-        { id: 'x_name',    fields: { type: 'Text',       label: 'Axe X' } },
-        { id: 'y_name',    fields: { type: 'Text',       label: 'Axe Y' } },
-        { id: 'x_unit',    fields: { type: 'Text',       label: 'Unité X' } },
-        { id: 'y_unit',    fields: { type: 'Text',       label: 'Unité Y' } },
+        { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Mesure' } },
+        { id: 'x_name',         fields: { type: 'Text',            label: 'Axe X' } },
+        { id: 'y_name',         fields: { type: 'Text',            label: 'Axe Y' } },
+        { id: 'x_unit',         fields: { type: 'Text',            label: 'Unité X' } },
+        { id: 'y_unit',         fields: { type: 'Text',            label: 'Unité Y' } },
       ]
     },
 
@@ -183,43 +189,39 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // ENUMS — Valeurs autorisées pour les colonnes Choice (miroir des ENUMs SQL)
+  // ENUMS — Valeurs autorisées pour les colonnes Choice
   // =========================================================================
   ENUMS: {
-    exposure_type:   ['laboratory', 'in-situ'],
-    exposure_nature: ['atmospheric', 'spray', 'splash', 'tidal', 'submerged'],
-    material_type:   ['cement_paste', 'mortar', 'concrete'],
-    water_type:      ['tap_water', 'pure_water', 'sea_water'],
-    curing_method:   ['water_spraying', 'wet_covering', 'curing_compounds', 'forms_left_in_place', 'wet_curing', 'water_immersion'],
-    sample_type:     ['laboratory_sample', 'bridge_pier'],
-    test_name:       ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density'],
-    test_type:       ['natural', 'accelerated', 'total_cl', 'free_cl'],
-    result_type:     ['scalar', 'curve'],
-    binder_type:     ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'other'],
-    aggregate_type:  ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],
+    exposure_type:      ['laboratory', 'in-situ'],
+    exposure_nature:    ['atmospheric', 'spray', 'splash', 'tidal', 'submerged'],
+    material_type:      ['cement_paste', 'mortar', 'concrete'],
+    water_type:         ['tap_water', 'pure_water', 'sea_water'],
+    curing_method:      ['water_spraying', 'wet_covering', 'curing_compounds', 'forms_left_in_place', 'wet_curing', 'water_immersion'],
+    sample_type:        ['laboratory_sample', 'bridge_pier'],
+    sample_dimensions:  ['cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320','cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'],
+    test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density'],
+    test_type:          ['natural', 'accelerated', 'total_cl', 'free_cl'],
+    binder_type:        ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'other'],
+    aggregate_type:     ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],
   },
 
   // =========================================================================
   // ENSURE SCHEMA — Crée tables + colonnes manquantes à l'initialisation
-  // Utilise l'API postMessage (pas de CORS, pas de REST API)
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
-    log('Vérification du schéma Grist (11 tables)…');
+    log('Vérification du schéma Grist (13 tables)…');
 
     try {
-      // Lire les métadonnées en parallèle
       const [metaTables, metaCols] = await Promise.all([
         grist.docApi.fetchTable('_grist_Tables'),
         grist.docApi.fetchTable('_grist_Tables_column'),
       ]);
       const existingTables = new Set(metaTables.tableId);
 
-      // Index rowId → nom de table pour les colonnes
       const tableRowIdToName = {};
-      metaTables.id.forEach((rowId, i) => {
-        tableRowIdToName[rowId] = metaTables.tableId[i];
-      });
+      metaTables.id.forEach((rowId, i) => { tableRowIdToName[rowId] = metaTables.tableId[i]; });
+
       const existingColumns = {};
       metaCols.parentId.forEach((parentRowId, i) => {
         const tableName = tableRowIdToName[parentRowId];
@@ -232,20 +234,15 @@ const GristHelpers = {
       let created = 0, updated = 0;
 
       for (const [tableName, tableDef] of Object.entries(GristHelpers.SCHEMA)) {
-
         if (!existingTables.has(tableName)) {
-          // Créer la table avec toutes ses colonnes via applyUserActions
           log(`Création de la table ${tableName}…`);
           const cols = tableDef.columns.map(c => ({ id: c.id, ...c.fields }));
           await grist.docApi.applyUserActions([['AddTable', tableName, cols]]);
           log(`Table ${tableName} créée ✓ (${cols.length} colonnes)`, 'ok');
           created++;
-
         } else {
-          // Table existe — vérifier les colonnes manquantes
           const existingColSet = existingColumns[tableName] || new Set();
           const missingCols = tableDef.columns.filter(c => !existingColSet.has(c.id));
-
           if (missingCols.length > 0) {
             log(`Ajout de ${missingCols.length} colonne(s) à ${tableName}…`);
             const actions = missingCols.map(c => ['AddColumn', tableName, c.id, c.fields]);
@@ -280,14 +277,14 @@ const GristHelpers = {
   // STATUS INDICATOR
   // =========================================================================
   setStatus(text, state = '') {
-    const textEl = document.getElementById('status-text');
+    const textEl  = document.getElementById('status-text');
     const statusEl = document.getElementById('status');
-    if (textEl) textEl.textContent = text;
+    if (textEl)   textEl.textContent = text;
     if (statusEl) statusEl.className = 'status ' + state;
   },
 
   // =========================================================================
-  // GRIST API — Lecture (postMessage, pas de CORS)
+  // GRIST API — Lecture
   // =========================================================================
   async fetchAllRecords(tableName) {
     const tableData = await grist.docApi.fetchTable(tableName);
@@ -302,7 +299,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // GRIST API — Écriture (postMessage, pas de CORS)
+  // GRIST API — Écriture
   // =========================================================================
   async createRecord(tableName, fields) {
     const result = await grist.docApi.applyUserActions([
@@ -324,62 +321,76 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // JOINTURES — result ← measurement ← material + test
-  // Retourne chaque résultat enrichi de sa mesure, son matériau et son test.
+  // JOINTURES — scalar ← measurement ← material + test + source
+  // Retourne chaque scalaire enrichi de sa mesure, son matériau, son test
+  // et sa source bibliographique.
   // =========================================================================
-  joinResultData(results, measurements, materials, tests) {
+  joinScalarData(scalars, measurements, materials, tests, sources, mixes, exposures) {
     const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
     const materialMap = new Map(materials.map(m => [m.id, m.fields]));
     const testMap     = new Map(tests.map(t => [t.id, t.fields]));
-    return results
-      .filter(r => measureMap.has(r.fields.id_measurement))
-      .map(r => {
-        const measure  = measureMap.get(r.fields.id_measurement);
-        const material = measure ? materialMap.get(measure.id_material) : null;
-        const test     = testMap.get(r.fields.id_test);
+    const sourceMap   = new Map(sources.map(s => [s.id, s.fields]));
+    const mixMap      = new Map((mixes || []).map(m => [m.id, m.fields]));
+    const exposureMap = new Map((exposures || []).map(e => [e.id, e.fields]));
+
+    return scalars
+      .filter(s => measureMap.has(s.fields.id_measurement))
+      .map(s => {
+        const measure  = measureMap.get(s.fields.id_measurement) || {};
+        const material = materialMap.get(measure.id_material)    || {};
+        const test     = testMap.get(measure.id_test)            || {};
+        const source   = sourceMap.get(measure.id_source)        || {};
+        const mix      = mixMap.get(material.id_mix_design)      || {};
+        const exposure = exposureMap.get(material.id_exposure)   || {};
         return {
-          ...r.fields,
-          _id:         r.id,
-          measurement: measure  || {},
-          material:    material || {},
-          test:        test     || {},
+          ...s.fields,
+          _id:         s.id,
+          measurement: measure,
+          material,
+          test,
+          source,
+          mix,
+          exposure,
         };
       });
   },
 
   // =========================================================================
-  // JOINTURES — data_curve ← curve ← result
-  // Retourne chaque point enrichi des métadonnées de sa courbe et son résultat.
+  // JOINTURES — data_curve ← curve ← measurement ← material
   // =========================================================================
-  joinCurvePoints(dataPoints, curves, results) {
-    const curveMap  = new Map(curves.map(c => [c.id, c.fields]));
-    const resultMap = new Map(results.map(r => [r.id, r.fields]));
+  joinCurvePoints(dataPoints, curves, measurements, materials) {
+    const curveMap    = new Map(curves.map(c => [c.id, c.fields]));
+    const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
+    const materialMap = new Map(materials.map(m => [m.id, m.fields]));
+
     return dataPoints
       .filter(p => curveMap.has(p.fields.id_curve))
       .map(p => {
-        const curve  = curveMap.get(p.fields.id_curve);
-        const result = curve ? resultMap.get(curve.id_result) : null;
+        const curve    = curveMap.get(p.fields.id_curve)           || {};
+        const measure  = measureMap.get(curve.id_measurement)      || {};
+        const material = materialMap.get(measure.id_material)      || {};
         return {
           ...p.fields,
-          _id:    p.id,
-          curve:  curve  || {},
-          result: result || {},
+          _id:      p.id,
+          curve,
+          measurement: measure,
+          material,
         };
       });
   },
 
   // =========================================================================
-  // PLOTLY — Thème sombre
+  // PLOTLY — Thème clair
   // =========================================================================
   plotlyDarkLayout(overrides = {}) {
     return Object.assign({
       paper_bgcolor: 'rgba(0,0,0,0)',
-      plot_bgcolor: '#0f172a',
-      font: { color: '#94a3b8', family: '-apple-system, sans-serif', size: 12 },
+      plot_bgcolor:  '#f8fafc',
+      font:   { color: '#475569', family: '-apple-system, sans-serif', size: 12 },
       margin: { t: 30, r: 20, b: 50, l: 60 },
       legend: {
-        bgcolor: 'rgba(30,41,59,0.9)',
-        bordercolor: '#334155',
+        bgcolor:     'rgba(255,255,255,0.9)',
+        bordercolor: '#e2e8f0',
         borderwidth: 1,
         font: { size: 11 }
       },
@@ -389,10 +400,10 @@ const GristHelpers = {
 
   plotlyDarkAxis(title) {
     return {
-      title: title,
-      gridcolor: '#1e293b',
-      zerolinecolor: '#334155',
-      titlefont: { size: 13 }
+      title,
+      gridcolor:     '#e2e8f0',
+      zerolinecolor: '#cbd5e1',
+      titlefont:     { size: 13 }
     };
   },
 
@@ -405,7 +416,6 @@ const GristHelpers = {
 
   formatKcarb(kcarb) {
     if (kcarb == null) return '—';
-    // Conversion mm/√jour → mm/√an pour affichage
     const kAn = kcarb * Math.sqrt(365.25);
     return kAn.toFixed(2) + ' mm/√an';
   },
