@@ -212,6 +212,13 @@
   <!-- EDITOR CONTENT -->
   <div id="editor-content" style="display:none;">
 
+    <!-- TABLEAU PIVOT (toujours visible, au-dessus des sections d'édition) -->
+    <div class="card" id="pivot-panel" style="display:none;">
+      <div class="card-title" style="margin-bottom:10px;">MESURES — Vue d'ensemble</div>
+      <div id="meas-summary"></div>
+      <p class="pivot-hint">↓ Cliquez une ligne pour éditer dans la section ci-dessous</p>
+    </div>
+
     <!-- SECTION : MATÉRIAU -->
     <div class="card" id="card-material">
       <div class="card-header">
@@ -469,17 +476,12 @@
       </div>
     </div>
 
-    <!-- SECTION : MESURES -->
+    <!-- SECTION : MESURES (accordion détail) -->
     <div class="card" id="card-meas">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-meas" onclick="toggleSection('meas')">MESURES</div>
+        <div class="card-title section-toggle collapsed" id="toggle-meas" onclick="toggleSection('meas')">MESURES — Détail</div>
       </div>
       <div class="section-body collapsed" id="body-meas">
-        <!-- Tableau pivot (vue d'ensemble) -->
-        <div id="meas-summary"></div>
-        <p class="pivot-hint" id="pivot-hint" style="display:none;">↓ Cliquez une ligne pour éditer</p>
-        <hr class="pivot-sep" id="pivot-sep" style="display:none;">
-        <!-- Accordion (détail éditable) -->
         <div id="meas-list">
           <div class="no-binders">Aucune mesure.</div>
         </div>
@@ -645,6 +647,8 @@ async function loadMaterial(record) {
 
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('editor-content').style.display = '';
+  document.getElementById('pivot-panel').style.display = 'none';
+  document.getElementById('meas-summary').innerHTML = '';
   pendingChanges = new Map();
   pendingBinders = { toAdd: [], toDelete: [] };
   pendingScalars = { toAdd: [], toDelete: [] };
@@ -916,8 +920,7 @@ async function loadMeasurementsAccordion() {
 
     // ---- Tableau pivot ----
     buildPivotTable(linked, scalarsByMeas, curvesByMeas);
-    document.getElementById('pivot-hint').style.display = '';
-    document.getElementById('pivot-sep').style.display  = '';
+    document.getElementById('pivot-panel').style.display = '';
 
     // ---- Accordion ----
     linked.forEach(m => {
@@ -1055,6 +1058,15 @@ function formatPivotVal(val) {
 
 // Ouvre l'accordion d'une mesure et synchronise la sélection dans le pivot
 function openAccordionItem(measId) {
+  // 1. Ouvrir la section MESURES si repliée
+  const sectionBody   = document.getElementById('body-meas');
+  const sectionToggle = document.getElementById('toggle-meas');
+  if (sectionBody && sectionBody.classList.contains('collapsed')) {
+    sectionBody.classList.remove('collapsed');
+    if (sectionToggle) sectionToggle.classList.remove('collapsed');
+  }
+
+  // 2. Ouvrir l'item accordion correspondant
   const accItem = document.querySelector(`.acc-item[data-meas-id="${measId}"]`);
   if (!accItem) return;
 
@@ -1067,6 +1079,7 @@ function openAccordionItem(measId) {
     syncPivotSelection(measId, true);
   }
 
+  // 3. Scroller vers l'item
   accItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
