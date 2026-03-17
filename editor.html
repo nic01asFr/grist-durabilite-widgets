@@ -98,6 +98,65 @@
     .section-body { margin-top: 12px; }
 
     .no-binders { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 4px 0; }
+
+    /* === ACCORDION MESURES === */
+    .acc-item { border: 1px solid var(--surface2); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+    .acc-header {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      cursor: pointer; background: var(--surface); user-select: none; transition: background 0.1s;
+    }
+    .acc-header:hover { background: var(--surface2); }
+    .acc-arrow { font-size: 11px; color: var(--text-dim); width: 12px; flex-shrink: 0; }
+    .acc-sample { font-size: 12px; color: var(--text-muted); }
+    .acc-dates { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+    .acc-nresults {
+      font-size: 10px; color: var(--text-dim); padding: 2px 8px;
+      background: var(--surface2); border-radius: 10px; white-space: nowrap;
+    }
+    .acc-body { padding: 14px; border-top: 1px solid var(--surface2); }
+    .acc-body.collapsed { display: none; }
+
+    .sub-section-title {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;
+    }
+
+    /* Scalaires */
+    .scalar-cols-header {
+      display: grid; grid-template-columns: 1fr 130px 80px 32px;
+      gap: 6px; font-size: 10px; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px;
+    }
+    .scalar-row {
+      display: grid; grid-template-columns: 1fr 130px 80px 32px;
+      gap: 6px; align-items: center; margin-bottom: 4px;
+    }
+    .scalar-row input {
+      padding: 4px 7px; background: var(--bg);
+      border: 1px solid var(--surface2); border-radius: 5px;
+      color: var(--text); font-size: 12px;
+    }
+    .scalar-row input:focus { outline: none; border-color: var(--accent); }
+    .scalar-row input.changed { border-color: #f59e0b; background: rgba(245,158,11,0.07); }
+
+    .add-scalar-row {
+      display: grid; grid-template-columns: 1fr 130px 80px auto;
+      gap: 6px; align-items: center; margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed var(--surface2);
+    }
+    .add-scalar-row input {
+      padding: 5px 7px; background: var(--bg);
+      border: 1px solid var(--surface2); border-radius: 5px;
+      color: var(--text); font-size: 12px;
+    }
+    .add-scalar-row input:focus { outline: none; border-color: var(--accent); }
+
+    /* Courbes */
+    .curve-row {
+      font-size: 11px; color: var(--text-dim); padding: 4px 0;
+      border-bottom: 1px solid var(--surface2); display: flex; gap: 12px; align-items: center;
+    }
+    .curve-row:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -424,11 +483,15 @@ let currentSourceId = null;   // source de la 1ère mesure
 let pendingChanges = new Map();
 // pendingBinders
 let pendingBinders = { toAdd: [], toDelete: [] };
+// pendingScalars
+let pendingScalars = { toAdd: [], toDelete: [] };
 
 // Cache global
 let allBinders       = [];  // [{id, fields}]
 let allMixBinders    = [];  // [{id, fields}] MIX_DESIGN_BINDER
 let allMeasurements  = [];  // [{id, fields}]
+let allScalars       = [];  // [{id, fields}]
+let allCurves        = [];  // [{id, fields}]
 let allTests         = new Map(); // id → fields
 let allSources       = new Map(); // id → fields
 
@@ -470,7 +533,8 @@ function markChanged(tableName, rowId, fieldId, value) {
 }
 
 function countChanges() {
-  let n = pendingBinders.toAdd.length + pendingBinders.toDelete.length;
+  let n = pendingBinders.toAdd.length + pendingBinders.toDelete.length
+        + pendingScalars.toAdd.length + pendingScalars.toDelete.length;
   for (const [, rowMap] of pendingChanges) n += rowMap.size;
   return n;
 }
@@ -546,6 +610,7 @@ async function loadMaterial(record) {
   document.getElementById('editor-content').style.display = '';
   pendingChanges = new Map();
   pendingBinders = { toAdd: [], toDelete: [] };
+  pendingScalars = { toAdd: [], toDelete: [] };
   updateSaveBar();
 
   currentRecord = record;
@@ -612,7 +677,7 @@ async function loadMaterial(record) {
     ]);
 
     // ---- MESURES ----
-    await loadMeasurements();
+    await loadMeasurementsAccordion();
 
     // ---- SOURCE (1ère mesure) ----
     await loadSource();
@@ -772,20 +837,24 @@ function confirmAddBinder() {
 }
 
 // =========================================================================
-// Mesures (lecture seule)
+// Mesures — Accordion (éditable)
 // =========================================================================
-async function loadMeasurements() {
+async function loadMeasurementsAccordion() {
   const listEl = document.getElementById('meas-list');
   listEl.innerHTML = '';
 
   try {
-    const [measurements, tests] = await Promise.all([
+    const [measurements, tests, scalars, curves] = await Promise.all([
       GristHelpers.fetchAllRecords('MEASUREMENT'),
       GristHelpers.fetchAllRecords('TEST'),
+      GristHelpers.fetchAllRecords('SCALAR'),
+      GristHelpers.fetchAllRecords('CURVE'),
     ]);
 
     allMeasurements = measurements;
-    allTests  = new Map(tests.map(t => [t.id, t.fields]));
+    allTests   = new Map(tests.map(t => [t.id, t.fields]));
+    allScalars = scalars;
+    allCurves  = curves;
 
     const linked = measurements.filter(m => m.fields.id_material === currentRecord.id);
 
@@ -794,23 +863,247 @@ async function loadMeasurements() {
       return;
     }
 
+    // Indexer scalaires et courbes par measurement id
+    const scalarsByMeas = new Map();
+    scalars.forEach(s => {
+      const mid = s.fields.id_measurement;
+      if (!scalarsByMeas.has(mid)) scalarsByMeas.set(mid, []);
+      scalarsByMeas.get(mid).push(s);
+    });
+    const curvesByMeas = new Map();
+    curves.forEach(c => {
+      const mid = c.fields.id_measurement;
+      if (!curvesByMeas.has(mid)) curvesByMeas.set(mid, []);
+      curvesByMeas.get(mid).push(c);
+    });
+
     linked.forEach(m => {
-      const test = allTests.get(m.fields.id_test) || {};
-      const row  = document.createElement('div');
-      row.className = 'meas-row';
+      const test     = allTests.get(m.fields.id_test) || {};
+      const mScalars = scalarsByMeas.get(m.id) || [];
+      const mCurves  = curvesByMeas.get(m.id)  || [];
+
       const prepDate   = tsToDateInput(m.fields.preparation_date) || '—';
       const resultDate = tsToDateInput(m.fields.result_date)      || '—';
-      row.innerHTML = `
+      const nInfo = [
+        mScalars.length ? mScalars.length + ' scal.' : null,
+        mCurves.length  ? mCurves.length + ' courbe' + (mCurves.length > 1 ? 's' : '') : null,
+      ].filter(Boolean).join(' · ') || 'pas de résultats';
+
+      const item = document.createElement('div');
+      item.className = 'acc-item';
+
+      const header = document.createElement('div');
+      header.className = 'acc-header';
+      header.innerHTML = `
+        <span class="acc-arrow">▸</span>
         <span class="meas-badge">${test.name || '?'}</span>
-        <span class="meas-badge" style="background:var(--bg);">${m.fields.sample_type || '—'}</span>
-        <span class="meas-detail">Préparation : ${prepDate}</span>
-        <span class="meas-detail">Résultat : ${resultDate}</span>
+        <span class="acc-sample">${m.fields.sample_type || '—'}</span>
+        <span class="acc-dates">${prepDate} → ${resultDate}</span>
+        <span class="acc-nresults">${nInfo}</span>
       `;
-      listEl.appendChild(row);
+
+      const body = document.createElement('div');
+      body.className = 'acc-body collapsed';
+      body.innerHTML = buildMeasBody(m, mScalars, mCurves);
+
+      header.addEventListener('click', () => {
+        const isOpen = !body.classList.contains('collapsed');
+        if (isOpen) {
+          body.classList.add('collapsed');
+          header.querySelector('.acc-arrow').textContent = '▸';
+        } else {
+          body.classList.remove('collapsed');
+          header.querySelector('.acc-arrow').textContent = '▾';
+          if (!body.dataset.listenersAttached) {
+            attachMeasBodyListeners(body, m, mScalars);
+            body.dataset.listenersAttached = 'true';
+          }
+        }
+      });
+
+      item.appendChild(header);
+      item.appendChild(body);
+      listEl.appendChild(item);
     });
   } catch(err) {
     GristHelpers.log('Erreur chargement mesures : ' + err.message, 'err');
   }
+}
+
+// -------------------------------------------------------------------------
+// Construit le HTML du corps d'un item accordion
+// -------------------------------------------------------------------------
+function buildMeasBody(m, mScalars, mCurves) {
+  const f = m.fields;
+
+  const sampleTypeOpts = ['', 'laboratory_sample', 'bridge_pier'].map(v =>
+    `<option value="${v}" ${f.sample_type === v ? 'selected' : ''}>${v || '— choisir —'}</option>`
+  ).join('');
+
+  const dimValues = ['','cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320',
+    'cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'];
+  const dimOpts = dimValues.map(v =>
+    `<option value="${v}" ${f.sample_dimensions === v ? 'selected' : ''}>${v || '— choisir —'}</option>`
+  ).join('');
+
+  const scalarsHtml = mScalars.length > 0
+    ? `<div class="scalar-cols-header"><span>Paramètre</span><span>Valeur</span><span>Unité</span><span></span></div>`
+      + mScalars.map(s => `
+        <div class="scalar-row" data-scalar-id="${s.id}">
+          <input type="text" value="${s.fields.name || ''}" placeholder="Paramètre"
+            data-table="SCALAR" data-field="name" data-scalar-id="${s.id}">
+          <input type="number" step="any" value="${s.fields.value != null ? s.fields.value : ''}" placeholder="Valeur"
+            data-table="SCALAR" data-field="value" data-scalar-id="${s.id}">
+          <input type="text" value="${s.fields.unit || ''}" placeholder="Unité"
+            data-table="SCALAR" data-field="unit" data-scalar-id="${s.id}">
+          <button class="btn-del" data-scalar-del="${s.id}" title="Supprimer">✕</button>
+        </div>
+      `).join('')
+    : '<div class="no-binders" style="margin-bottom:6px;">Aucun scalaire.</div>';
+
+  const curvesHtml = mCurves.length > 0
+    ? mCurves.map(c => `
+        <div class="curve-row">
+          <span class="meas-badge" style="font-size:9px;">#${c.id}</span>
+          <span>${c.fields.x_name || 'X'} (${c.fields.x_unit || '?'}) → ${c.fields.y_name || 'Y'} (${c.fields.y_unit || '?'})</span>
+        </div>
+      `).join('')
+    : '<div class="no-binders">Aucune courbe.</div>';
+
+  return `
+    <div class="sub-section-title">Mesure</div>
+    <div class="field-grid cols-3">
+      <div class="field-item">
+        <label>Type échantillon</label>
+        <select data-table="MEASUREMENT" data-field="sample_type">${sampleTypeOpts}</select>
+      </div>
+      <div class="field-item">
+        <label>Dimensions</label>
+        <select data-table="MEASUREMENT" data-field="sample_dimensions">${dimOpts}</select>
+      </div>
+      <div class="field-item">
+        <label>Opérateur</label>
+        <input type="text" value="${f.operator || ''}" data-table="MEASUREMENT" data-field="operator">
+      </div>
+      <div class="field-item">
+        <label>Date préparation</label>
+        <input type="date" value="${tsToDateInput(f.preparation_date)}"
+          data-table="MEASUREMENT" data-field="preparation_date" data-date="true">
+      </div>
+      <div class="field-item">
+        <label>Date résultat</label>
+        <input type="date" value="${tsToDateInput(f.result_date)}"
+          data-table="MEASUREMENT" data-field="result_date" data-date="true">
+      </div>
+      <div class="field-item">
+        <label>Masse (g)</label>
+        <input type="number" step="any" value="${f.sample_mass_g != null ? f.sample_mass_g : ''}"
+          data-table="MEASUREMENT" data-field="sample_mass_g">
+      </div>
+    </div>
+
+    <div class="sub-section-title" style="margin-top:14px;">Scalaires</div>
+    <div id="scalars-list-${m.id}">${scalarsHtml}</div>
+    <button class="btn-add-inline" onclick="toggleAddScalarRow(${m.id})">+ Scalaire</button>
+    <div class="add-scalar-row" id="add-scalar-row-${m.id}" style="display:none;">
+      <input type="text" id="new-scal-name-${m.id}" placeholder="Nom (ex: D, Cs, Rc)">
+      <input type="number" step="any" id="new-scal-val-${m.id}" placeholder="Valeur">
+      <input type="text" id="new-scal-unit-${m.id}" placeholder="Unité">
+      <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;"
+        onclick="confirmAddScalar(${m.id})">Ajouter</button>
+    </div>
+
+    <div class="sub-section-title" style="margin-top:14px;">
+      Courbes <span style="font-weight:400;font-size:10px;color:var(--text-dim);">(lecture seule)</span>
+    </div>
+    <div>${curvesHtml}</div>
+  `;
+}
+
+// -------------------------------------------------------------------------
+// Attache les listeners après ouverture d'un item accordion
+// -------------------------------------------------------------------------
+function attachMeasBodyListeners(body, m, mScalars) {
+  // MEASUREMENT fields
+  body.querySelectorAll('[data-table="MEASUREMENT"]').forEach(el => {
+    const field   = el.dataset.field;
+    const isDate  = el.dataset.date === 'true';
+    const evtName = (el.tagName === 'SELECT') ? 'change' : 'input';
+    el.addEventListener(evtName, () => {
+      el.classList.add('changed');
+      let val;
+      if (isDate) {
+        val = dateInputToTs(el.value);
+      } else if (el.type === 'number') {
+        val = el.value === '' ? null : parseFloat(el.value);
+      } else {
+        val = el.value;
+      }
+      markChanged('MEASUREMENT', m.id, field, val);
+    });
+  });
+
+  // SCALAR fields
+  body.querySelectorAll('[data-table="SCALAR"]').forEach(el => {
+    const field    = el.dataset.field;
+    const scalarId = parseInt(el.dataset.scalarId);
+    el.addEventListener('input', () => {
+      if (pendingScalars.toDelete.includes(scalarId)) return;
+      el.classList.add('changed');
+      const val = el.type === 'number'
+        ? (el.value === '' ? null : parseFloat(el.value))
+        : el.value;
+      markChanged('SCALAR', scalarId, field, val);
+    });
+  });
+
+  // SCALAR delete buttons
+  body.querySelectorAll('[data-scalar-del]').forEach(btn => {
+    const scalarId = parseInt(btn.dataset.scalarDel);
+    btn.addEventListener('click', () => {
+      if (!pendingScalars.toDelete.includes(scalarId))
+        pendingScalars.toDelete.push(scalarId);
+      const row = btn.closest('.scalar-row');
+      if (row) { row.style.opacity = '0.4'; row.style.textDecoration = 'line-through'; }
+      btn.disabled = true;
+      updateSaveBar();
+    });
+  });
+}
+
+function toggleAddScalarRow(measId) {
+  const el = document.getElementById('add-scalar-row-' + measId);
+  if (el) el.style.display = el.style.display === 'none' ? 'grid' : 'none';
+}
+
+function confirmAddScalar(measId) {
+  const nameEl = document.getElementById('new-scal-name-' + measId);
+  const valEl  = document.getElementById('new-scal-val-'  + measId);
+  const unitEl = document.getElementById('new-scal-unit-' + measId);
+  const name = nameEl.value.trim();
+  const val  = valEl.value === '' ? null : parseFloat(valEl.value);
+  const unit = unitEl.value.trim() || null;
+
+  if (!name) { alert('Le nom du paramètre est requis.'); return; }
+
+  pendingScalars.toAdd.push({ id_measurement: measId, name, value: val, unit, is_derived: false });
+
+  const listEl = document.getElementById('scalars-list-' + measId);
+  if (listEl) {
+    const tempRow = document.createElement('div');
+    tempRow.className = 'scalar-row';
+    tempRow.style.cssText = 'opacity:0.6;font-style:italic;';
+    tempRow.innerHTML = `
+      <span>${name} <span style="color:var(--accent);font-size:10px;">●</span></span>
+      <span>${val != null ? val : '—'}</span>
+      <span>${unit || '—'}</span>
+      <span></span>
+    `;
+    listEl.appendChild(tempRow);
+  }
+  nameEl.value = ''; valEl.value = ''; unitEl.value = '';
+  document.getElementById('add-scalar-row-' + measId).style.display = 'none';
+  updateSaveBar();
 }
 
 // =========================================================================
@@ -891,6 +1184,16 @@ async function saveAll() {
     actions.push(['AddRecord', 'MIX_DESIGN_BINDER', null, fields]);
   }
 
+  // 4. Suppressions de scalaires
+  for (const sId of pendingScalars.toDelete) {
+    actions.push(['RemoveRecord', 'SCALAR', sId]);
+  }
+
+  // 5. Ajouts de scalaires
+  for (const fields of pendingScalars.toAdd) {
+    actions.push(['AddRecord', 'SCALAR', null, fields]);
+  }
+
   if (actions.length === 0) {
     GristHelpers.log('Aucune modification à enregistrer.', 'warn');
     return;
@@ -906,6 +1209,7 @@ async function saveAll() {
     // Recharger
     pendingChanges = new Map();
     pendingBinders = { toAdd: [], toDelete: [] };
+    pendingScalars = { toAdd: [], toDelete: [] };
     updateSaveBar();
     await loadMaterial(currentRecord);
   } catch(err) {
@@ -918,6 +1222,7 @@ async function saveAll() {
 function resetChanges() {
   pendingChanges = new Map();
   pendingBinders = { toAdd: [], toDelete: [] };
+  pendingScalars = { toAdd: [], toDelete: [] };
   updateSaveBar();
   loadMaterial(currentRecord);
 }
