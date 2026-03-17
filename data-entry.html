@@ -203,6 +203,8 @@
             <option value="silica_fume">silica_fume</option>
             <option value="limestone_filler">limestone_filler</option>
             <option value="natural_pozzolan">natural_pozzolan</option>
+            <option value="metakaolin">metakaolin</option>
+            <option value="zeolite">zeolite</option>
             <option value="other">other</option>
           </select>
         </div>
@@ -221,6 +223,7 @@
             <div class="form-field"><label>C₂S (%)</label><input type="number" id="f-b-C2S"  step="0.1" placeholder="15"></div>
             <div class="form-field"><label>C₃A (%)</label><input type="number" id="f-b-C3A"  step="0.1" placeholder="8"></div>
             <div class="form-field"><label>C₄AF (%)</label><input type="number" id="f-b-C4AF" step="0.1" placeholder="9"></div>
+            <div class="form-field"><label>Gypse — Gp (%)</label><input type="number" id="f-b-Gp" step="0.1" placeholder="4"></div>
           </div>
         </div>
       </div>
@@ -777,7 +780,7 @@
       fillDrop('sel-binder-cement', allBinders,     b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
       fillDrop('sel-binder-scm',    allBinders,     b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
       fillDrop('sel-aggregate',     allAggregates,  a => `${a.fields.name || '?'} (${a.fields.aggregate_type || '?'}) ${a.fields.size_min_mm ?? ''}–${a.fields.size_max_mm ?? ''} mm`);
-      fillDrop('sel-mix',           allMixes,       m => `#${m.id} — E/C=${m.fields.wc_ratio ?? '?'} — ciment=${m.fields.cement_content_kg ?? '?'} kg/m³`);
+      fillDrop('sel-mix',           allMixes,       m => `#${m.id} — E/C=${m.fields.wc_ratio ?? '?'}`);
       fillDrop('sel-exposure',      allExposures,   e => `#${e.id} — ${e.fields.exposure_type || '?'} / ${e.fields.exposure_nature || '?'}`);
       fillDrop('sel-curing',        allCurings,     c => `#${c.id} — ${c.fields.curing_method || '?'} ${c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : ''}`);
       fillDrop('sel-site',          allSites,       s => `#${s.id} — ${s.fields.country_region || '?'}`);
@@ -867,6 +870,7 @@
           loss_on_ignition: floatOrNull('f-b-loi'),
           C3S: floatOrNull('f-b-C3S'), C2S: floatOrNull('f-b-C2S'),
           C3A: floatOrNull('f-b-C3A'), C4AF: floatOrNull('f-b-C4AF'),
+          Gp:  floatOrNull('f-b-Gp'),
           SiO2: floatOrNull('f-b-SiO2'), Al2O3: floatOrNull('f-b-Al2O3'),
           Fe2O3: floatOrNull('f-b-Fe2O3'), CaO: floatOrNull('f-b-CaO'),
           MgO: floatOrNull('f-b-MgO'), SO3: floatOrNull('f-b-SO3'),
@@ -972,24 +976,39 @@
     // SAVE: MIX_DESIGN
     // =========================================================================
     async function saveMix() {
+      if (!sel.binder_cement) { GristHelpers.log('Sélectionnez un ciment dans l\'onglet Liants', 'warn'); return; }
       try {
-        const fields = {
-          id_binder_cement:                    sel.binder_cement || 0,
-          cement_content_kg:                   floatOrNull('f-mix-cement-kg') ?? 0,
-          id_binder_scm:                       sel.binder_scm    || 0,
-          scm_content_kg:                      floatOrNull('f-mix-scm-kg')    ?? 0,
-          water_content_kg:                    floatOrNull('f-mix-water-kg')  ?? 0,
+        const mixFields = {
+          water_content_kg:                    floatOrNull('f-mix-water-kg')      ?? 0,
           water_type:                          document.getElementById('f-mix-water-type').value || '',
-          id_aggregate:                        sel.aggregate     || 0,
-          aggregate_content_kg:                floatOrNull('f-mix-agg-kg')    ?? 0,
-          wc_ratio:                            floatOrNull('f-mix-wc')        ?? 0,
-          global_warming_performance_kg_eq_m3: floatOrNull('f-mix-gwp')       ?? 0,
+          id_aggregate:                        sel.aggregate                      || 0,
+          aggregate_content_kg:                floatOrNull('f-mix-agg-kg')        ?? 0,
+          wc_ratio:                            floatOrNull('f-mix-wc')            ?? 0,
+          global_warming_performance_kg_eq_m3: floatOrNull('f-mix-gwp')           ?? 0,
           admix_type:                          document.getElementById('f-mix-admix').value.trim() || '',
           adjuvant_content:                    floatOrNull('f-mix-admix-content') ?? 0,
-          entrained_air:                       floatOrNull('f-mix-air')       ?? 0,
+          entrained_air:                       floatOrNull('f-mix-air')           ?? 0,
         };
-        const result = await GristHelpers.createRecord('MIX_DESIGN', fields);
+        const result = await GristHelpers.createRecord('MIX_DESIGN', mixFields);
         GristHelpers.log(`Formulation créée (id=${result.id}) ✓`, 'ok');
+
+        // Ciment principal → MIX_DESIGN_BINDER
+        await GristHelpers.createRecord('MIX_DESIGN_BINDER', {
+          id_mix_design: result.id,
+          id_binder:     sel.binder_cement,
+          content_kg_m3: floatOrNull('f-mix-cement-kg') ?? 0,
+        });
+
+        // SCM (facultatif) → MIX_DESIGN_BINDER
+        const scmKg = floatOrNull('f-mix-scm-kg') ?? 0;
+        if (sel.binder_scm && scmKg > 0) {
+          await GristHelpers.createRecord('MIX_DESIGN_BINDER', {
+            id_mix_design: result.id,
+            id_binder:     sel.binder_scm,
+            content_kg_m3: scmKg,
+          });
+        }
+
         sel.mix = result.id;
         toggleForm('mix');
         await refreshAll();

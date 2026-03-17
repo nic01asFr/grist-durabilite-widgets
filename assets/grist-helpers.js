@@ -1,6 +1,6 @@
 // =========================================================================
 // GristHelpers — Utilitaires partagés pour les widgets durabilité
-// Schéma v2.2 — 13 tables, 11 enums (architecture générique)
+// Schéma v2.3 — 14 tables, 11 enums (architecture générique)
 // Résultats : SCALAR (scalaires 0..n) + CURVE+DATA_CURVE (courbes 0..n)
 //             directement liés à MEASUREMENT (plus de table RESULT)
 // =========================================================================
@@ -57,6 +57,7 @@ const GristHelpers = {
         { id: 'C2S',              fields: { type: 'Numeric', label: 'C₂S (%)' } },
         { id: 'C3A',              fields: { type: 'Numeric', label: 'C₃A (%)' } },
         { id: 'C4AF',             fields: { type: 'Numeric', label: 'C₄AF (%)' } },
+        { id: 'Gp',               fields: { type: 'Numeric', label: 'Gypse (%)' } },
         // Composition oxyde
         { id: 'SiO2',             fields: { type: 'Numeric', label: 'SiO₂ (%)' } },
         { id: 'Al2O3',            fields: { type: 'Numeric', label: 'Al₂O₃ (%)' } },
@@ -86,10 +87,6 @@ const GristHelpers = {
     // --- Formulation du béton ---
     MIX_DESIGN: {
       columns: [
-        { id: 'id_binder_cement',                    fields: { type: 'Ref:BINDER',    label: 'Ciment' } },
-        { id: 'cement_content_kg',                   fields: { type: 'Numeric',       label: 'Ciment (kg/m³)' } },
-        { id: 'id_binder_scm',                       fields: { type: 'Ref:BINDER',    label: 'Addition minérale' } },
-        { id: 'scm_content_kg',                      fields: { type: 'Numeric',       label: 'Addition (kg/m³)' } },
         { id: 'water_type',                          fields: { type: 'Choice',        label: "Type d'eau", widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
         { id: 'water_content_kg',                    fields: { type: 'Numeric',       label: 'Eau (kg/m³)' } },
         { id: 'id_aggregate',                        fields: { type: 'Ref:AGGREGATE', label: 'Granulat' } },
@@ -99,6 +96,15 @@ const GristHelpers = {
         { id: 'admix_type',                          fields: { type: 'Text',          label: 'Type adjuvant' } },
         { id: 'adjuvant_content',                    fields: { type: 'Numeric',       label: 'Adjuvant (kg/m³)' } },
         { id: 'entrained_air',                       fields: { type: 'Numeric',       label: 'Air entraîné (%)' } },
+      ]
+    },
+
+    // --- Liaisons liant ↔ formulation (1 liant = 1 ligne) ---
+    MIX_DESIGN_BINDER: {
+      columns: [
+        { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN', label: 'Formulation' } },
+        { id: 'id_binder',     fields: { type: 'Ref:BINDER',     label: 'Liant' } },
+        { id: 'content_kg_m3', fields: { type: 'Numeric',        label: 'Dosage (kg/m³)' } },
       ]
     },
 
@@ -201,7 +207,7 @@ const GristHelpers = {
     sample_dimensions:  ['cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320','cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'],
     test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density'],
     test_type:          ['natural', 'accelerated', 'total_cl', 'free_cl'],
-    binder_type:        ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'other'],
+    binder_type:        ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'metakaolin', 'zeolite', 'other'],
     aggregate_type:     ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],
   },
 
@@ -210,7 +216,7 @@ const GristHelpers = {
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
-    log('Vérification du schéma Grist (13 tables)…');
+    log('Vérification du schéma Grist (14 tables)…');
 
     try {
       const [metaTables, metaCols] = await Promise.all([
