@@ -116,7 +116,8 @@
           <option value="cl_type">Type Cl⁻ (total / libre)</option>
           <option value="cement">Ciment principal</option>
           <option value="source">Source</option>
-          <option value="wc_ratio">E/L (continu)</option>
+          <option value="wl_ratio">E/L (continu)</option>
+          <option value="wc_ratio">E/C (continu)</option>
           <option value="duration">Durée exposition (continu)</option>
           <option value="latitude">Latitude (continu)</option>
           <option value="cure_duration">Durée de cure (continu)</option>
@@ -135,9 +136,9 @@
     <div class="filt-block">
       <div class="filt-row">
         <span class="filt-lbl">E/L</span>
-        <input type="number" id="f-wc-min" placeholder="min" min="0" max="2" step="0.05" oninput="render()">
+        <input type="number" id="f-wl-min" placeholder="min" min="0" max="2" step="0.05" oninput="render()">
         <span class="dash">—</span>
-        <input type="number" id="f-wc-max" placeholder="max" min="0" max="2" step="0.05" oninput="render()">
+        <input type="number" id="f-wl-max" placeholder="max" min="0" max="2" step="0.05" oninput="render()">
         <div class="filt-sep"></div>
         <span class="filt-lbl">Durée (ans)</span>
         <input type="number" id="f-dur-min" placeholder="min" min="0" step="1" oninput="render()">
@@ -367,7 +368,9 @@
         .filter(Boolean).join(' / ');
       const dur = p.scalars.exposure_duration != null
         ? p.scalars.exposure_duration.toFixed(1) + ' ans' : '?';
-      const ec  = p.mix.wc_ratio   != null ? p.mix.wc_ratio.toFixed(2) : '?';
+      const ec  = p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?';
+      const el  = (p.mix.wl_ratio ?? p.mix.wc_ratio) != null
+        ? (p.mix.wl_ratio ?? p.mix.wc_ratio).toFixed(2) : '?';
       const D   = p.scalars.D      != null ? GristHelpers.formatDapp(p.scalars.D) : '?';
       const Cs  = p.scalars.Cs     != null ? p.scalars.Cs.toFixed(3) + ' %' : '?';
       const lat  = p.site.latitude  != null ? p.site.latitude.toFixed(2) + '°N' : '?';
@@ -380,7 +383,7 @@
              `Durée : ${dur} · Latitude : ${lat} · Cure : ${cure}<br>` +
              `Liants : ${cem}<br>` +
              `Addition : ${getBinderSignature(p)}<br>` +
-             `E/L : ${ec} · Dapp : ${D} · Cs : ${Cs}`;
+             `E/C : ${ec} · E/L : ${el} · Dapp : ${D} · Cs : ${Cs}`;
     }
 
     // =========================================================================
@@ -395,6 +398,10 @@
         case 'source':          return catColor(
           p.source.designation ||
           (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu'));
+        case 'wl_ratio': {
+          const v = p.mix.wl_ratio ?? p.mix.wc_ratio;
+          return contScale(v, contVals);
+        }
         case 'wc_ratio': {
           const v = p.mix.wc_ratio;
           return contScale(v, contVals);
@@ -423,8 +430,12 @@
         case 'cement':          return primaryCementName(p) || 'Inconnu';
         case 'source':          return p.source.designation ||
           (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu');
+        case 'wl_ratio': {
+          const v = p.mix.wl_ratio ?? p.mix.wc_ratio;
+          return v != null ? `E/L = ${v.toFixed(2)}` : '?';
+        }
         case 'wc_ratio':
-          return p.mix.wc_ratio   != null ? `E/L = ${p.mix.wc_ratio.toFixed(2)}`  : '?';
+          return p.mix.wc_ratio != null ? `E/C = ${p.mix.wc_ratio.toFixed(2)}` : '?';
         case 'duration':
           return p.scalars.exposure_duration != null
             ? `${p.scalars.exposure_duration.toFixed(0)} ans` : '?';
@@ -465,8 +476,8 @@
 
       const colorBy   = document.getElementById('f-colorby').value;
       const clType    = document.getElementById('f-cltype').value;
-      const wcMin     = parseFloat(document.getElementById('f-wc-min').value)  || null;
-      const wcMax     = parseFloat(document.getElementById('f-wc-max').value)  || null;
+      const wlMin     = parseFloat(document.getElementById('f-wl-min').value)  || null;
+      const wlMax     = parseFloat(document.getElementById('f-wl-max').value)  || null;
       const durMin    = parseFloat(document.getElementById('f-dur-min').value) || null;
       const durMax    = parseFloat(document.getElementById('f-dur-max').value) || null;
       const latMin    = parseFloat(document.getElementById('f-lat-min').value);
@@ -486,9 +497,9 @@
         if (natures   && !natures.has(p.exposure.exposure_nature))     return false;
         if (expoTypes && !expoTypes.has(p.exposure.exposure_type))     return false;
         if (binderSel && !binderSel.has(getBinderSignature(p)))        return false;
-        const wc  = p.mix.wc_ratio;
-        if (wcMin  != null && (wc  == null || wc  < wcMin))            return false;
-        if (wcMax  != null && (wc  == null || wc  > wcMax))            return false;
+        const wl  = p.mix.wl_ratio ?? p.mix.wc_ratio;
+        if (wlMin  != null && (wl  == null || wl  < wlMin))            return false;
+        if (wlMax  != null && (wl  == null || wl  > wlMax))            return false;
         const dur = p.scalars.exposure_duration;
         if (durMin != null && (dur == null || dur < durMin))           return false;
         if (durMax != null && (dur == null || dur > durMax))           return false;
@@ -517,6 +528,8 @@
 
       // Plage pour couleurs continues (calculée sur les profils filtrés)
       const contVals = (() => {
+        if (colorBy === 'wl_ratio')
+          return contRange(filtered.map(p => p.mix.wl_ratio ?? p.mix.wc_ratio));
         if (colorBy === 'wc_ratio')
           return contRange(filtered.map(p => p.mix.wc_ratio));
         if (colorBy === 'duration')

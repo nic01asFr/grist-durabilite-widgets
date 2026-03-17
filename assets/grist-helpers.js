@@ -93,6 +93,7 @@ const GristHelpers = {
         { id: 'aggregate_content_kg',                fields: { type: 'Numeric',       label: 'Granulats (kg/m³)' } },
         { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric',       label: 'GWP (kg éq. CO₂/m³)' } },
         { id: 'wc_ratio',                            fields: { type: 'Numeric',       label: 'E/C' } },
+        { id: 'wl_ratio',                            fields: { type: 'Numeric',       label: 'E/L' } },
         { id: 'admix_type',                          fields: { type: 'Text',          label: 'Type adjuvant' } },
         { id: 'adjuvant_content',                    fields: { type: 'Numeric',       label: 'Adjuvant (kg/m³)' } },
         { id: 'entrained_air',                       fields: { type: 'Numeric',       label: 'Air entraîné (%)' } },

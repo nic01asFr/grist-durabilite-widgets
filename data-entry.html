@@ -311,10 +311,14 @@
       </div>
       <div id="form-mix" style="display:none;">
         <div class="form-grid">
-          <div class="form-field"><label>Ciment (kg/m³)</label><input type="number" id="f-mix-cement-kg" step="1" min="0" placeholder="350"></div>
-          <div class="form-field"><label>Addition SCM (kg/m³)</label><input type="number" id="f-mix-scm-kg" step="1" min="0" placeholder="0"></div>
+          <div class="form-field"><label>Ciment (kg/m³)</label><input type="number" id="f-mix-cement-kg" step="1" min="0" placeholder="350" oninput="calcWlRatio()"></div>
+          <div class="form-field"><label>Addition SCM (kg/m³)</label><input type="number" id="f-mix-scm-kg" step="1" min="0" placeholder="0" oninput="calcWlRatio()"></div>
           <div class="form-field"><label>E/C (ratio)</label><input type="number" id="f-mix-wc" step="0.01" min="0" max="1" placeholder="0.45"></div>
-          <div class="form-field"><label>Eau (kg/m³)</label><input type="number" id="f-mix-water-kg" step="1" min="0" placeholder="175"></div>
+          <div class="form-field"><label>Eau (kg/m³)</label><input type="number" id="f-mix-water-kg" step="1" min="0" placeholder="175" oninput="calcWlRatio()"></div>
+          <div class="form-field">
+            <label>E/L (ratio) <span style="font-size:10px; color:var(--text-dim);">auto si vide</span></label>
+            <input type="number" id="f-mix-wl" step="0.01" min="0" max="1" placeholder="calculé">
+          </div>
           <div class="form-field">
             <label>Type d'eau</label>
             <select id="f-mix-water-type">
@@ -795,8 +799,10 @@
       });
       fillDrop('sel-mix', allMixes, m => {
         const ec  = m.fields.wc_ratio != null ? `E/C=${m.fields.wc_ratio}` : '';
-        const eau = m.fields.water_content_kg != null ? ` · eau=${m.fields.water_content_kg} kg` : '';
-        return `#${m.id}${ec ? ' — ' + ec : ''}${eau}`;
+        const el  = m.fields.wl_ratio != null ? `E/L=${m.fields.wl_ratio}` : '';
+        const eau = m.fields.water_content_kg != null ? `eau=${m.fields.water_content_kg} kg` : '';
+        const parts = [ec, el, eau].filter(Boolean).join(' · ');
+        return `#${m.id}${parts ? ' — ' + parts : ''}`;
       });
       fillDrop('sel-exposure', allExposures, e => {
         const type = e.fields.exposure_type   || '';
@@ -882,6 +888,18 @@
     }
     function cancelBinder() {
       document.getElementById('form-binder-card').style.display = 'none';
+    }
+
+    function calcWlRatio() {
+      const water  = parseFloat(document.getElementById('f-mix-water-kg').value);
+      const cement = parseFloat(document.getElementById('f-mix-cement-kg').value) || 0;
+      const scm    = parseFloat(document.getElementById('f-mix-scm-kg').value)    || 0;
+      const wlEl   = document.getElementById('f-mix-wl');
+      if (!isNaN(water) && (cement + scm) > 0) {
+        wlEl.placeholder = (water / (cement + scm)).toFixed(3);
+      } else {
+        wlEl.placeholder = 'calculé';
+      }
     }
 
     function floatOrNull(id) {
@@ -1009,12 +1027,22 @@
     async function saveMix() {
       if (!sel.binder_cement) { GristHelpers.log('Sélectionnez un ciment dans l\'onglet Liants', 'warn'); return; }
       try {
+        // E/L : valeur saisie ou calculée depuis eau / (ciment + SCM)
+        const wlSaisie = floatOrNull('f-mix-wl');
+        const wlCalc   = (() => {
+          const w = floatOrNull('f-mix-water-kg');
+          const c = floatOrNull('f-mix-cement-kg') ?? 0;
+          const s = floatOrNull('f-mix-scm-kg')    ?? 0;
+          return (w != null && (c + s) > 0) ? Math.round(w / (c + s) * 1000) / 1000 : null;
+        })();
+
         const mixFields = {
           water_content_kg:                    floatOrNull('f-mix-water-kg')      ?? 0,
           water_type:                          document.getElementById('f-mix-water-type').value || '',
           id_aggregate:                        sel.aggregate                      || 0,
           aggregate_content_kg:                floatOrNull('f-mix-agg-kg')        ?? 0,
           wc_ratio:                            floatOrNull('f-mix-wc')            ?? 0,
+          wl_ratio:                            wlSaisie ?? wlCalc,
           global_warming_performance_kg_eq_m3: floatOrNull('f-mix-gwp')           ?? 0,
           admix_type:                          document.getElementById('f-mix-admix').value.trim() || '',
           adjuvant_content:                    floatOrNull('f-mix-admix-content') ?? 0,
