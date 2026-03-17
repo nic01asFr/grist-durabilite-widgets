@@ -991,6 +991,12 @@
       currentExposure  = profile.exposure;
       currentProfilePoints = profile.points;
 
+      // Infill age depuis exposure_duration (années → jours)
+      if (profile.scalars.exposure_duration != null) {
+        document.getElementById('age-jours').value =
+          Math.round(profile.scalars.exposure_duration * 365.25);
+      }
+
       const matName = profile.material.name || `id=${measurementId}`;
       GristHelpers.log(`Mesure sélectionnée : id=${measurementId}`);
       GristHelpers.log(`Matériau : ${matName}`, 'ok');
@@ -1080,19 +1086,21 @@
     async function fetchFickProfile(measurementId) {
       currentProfilePoints = null;
       try {
-        const [tests, curves, dataPoints] = await Promise.all([
-          GristHelpers.fetchAllRecords('TEST'),
+        const [curves, dataPoints] = await Promise.all([
           GristHelpers.fetchAllRecords('CURVE'),
           GristHelpers.fetchAllRecords('DATA_CURVE'),
         ]);
 
-        // Infill age from test if available
-        const matchTest = tests.find(t =>
-          t.fields.name === 'cl_profil' &&
-          (t.fields.test_type === 'total_cl' || t.fields.test_type === 'free_cl')
+        // Infill age depuis le scalaire exposure_duration (années → jours)
+        const scalSrc = rawData ? rawData.scalars
+                                : await GristHelpers.fetchAllRecords('SCALAR');
+        const durScalar = scalSrc.find(
+          s => s.fields.id_measurement === measurementId &&
+               s.fields.name === 'exposure_duration'
         );
-        if (matchTest && matchTest.fields.experiment_duration) {
-          document.getElementById('age-jours').value = matchTest.fields.experiment_duration;
+        if (durScalar && durScalar.fields.value != null) {
+          document.getElementById('age-jours').value =
+            Math.round(durScalar.fields.value * 365.25);
         }
 
         // Trouver la courbe liée à ce measurement
