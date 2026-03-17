@@ -875,9 +875,6 @@ function confirmAddBinder() {
 // Mesures — Tableau + formulaire de détail
 // =========================================================================
 async function loadMeasurementsTable() {
-  const listEl = document.getElementById('meas-list');
-  listEl.innerHTML = '';
-
   try {
     const [measurements, tests, scalars, curves] = await Promise.all([
       GristHelpers.fetchAllRecords('MEASUREMENT'),
