@@ -405,6 +405,7 @@
               <option value="water_immersion">water_immersion</option>
             </select>
           </div>
+          <div class="form-field"><label>Durée de cure (jours)</label><input type="number" id="f-cur-duration" step="1" min="0" placeholder="28"></div>
           <div class="form-field"><label>Norme</label><input type="text" id="f-cur-std" placeholder="EN 12390-2"></div>
           <div class="form-field"><label>Protection vent</label><select id="f-cur-wind"><option value="">—</option><option value="1">Oui</option><option value="0">Non</option></select></div>
           <div class="form-field"><label>Protection solaire</label><select id="f-cur-solar"><option value="">—</option><option value="1">Oui</option><option value="0">Non</option></select></div>
@@ -782,7 +783,7 @@
       fillDrop('sel-aggregate',     allAggregates,  a => `${a.fields.name || '?'} (${a.fields.aggregate_type || '?'}) ${a.fields.size_min_mm ?? ''}–${a.fields.size_max_mm ?? ''} mm`);
       fillDrop('sel-mix',           allMixes,       m => `#${m.id} — E/C=${m.fields.wc_ratio ?? '?'}`);
       fillDrop('sel-exposure',      allExposures,   e => `#${e.id} — ${e.fields.exposure_type || '?'} / ${e.fields.exposure_nature || '?'}`);
-      fillDrop('sel-curing',        allCurings,     c => `#${c.id} — ${c.fields.curing_method || '?'} ${c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : ''}`);
+      fillDrop('sel-curing',        allCurings,     c => `#${c.id} — ${c.fields.curing_method || '?'} ${c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : ''}${c.fields.curing_duration_days != null ? ' · ' + c.fields.curing_duration_days + 'j' : ''}`);
       fillDrop('sel-site',          allSites,       s => `#${s.id} — ${s.fields.country_region || '?'}`);
       fillDrop('sel-material',      allMaterials,   m => `${m.fields.name || '?'} (${m.fields.material_type || '?'})`);
 
@@ -1044,12 +1045,13 @@
         const windVal  = document.getElementById('f-cur-wind').value;
         const solarVal = document.getElementById('f-cur-solar').value;
         const fields = {
-          temperature_c:    floatOrNull('f-cur-temp') ?? 0,
-          humidity_pct:     floatOrNull('f-cur-hum')  ?? 0,
-          curing_method:    document.getElementById('f-cur-method').value || '',
-          standard_name:    document.getElementById('f-cur-std').value.trim() || '',
-          wind_protection:  windVal  === '1' ? true : windVal  === '0' ? false : null,
-          solar_protection: solarVal === '1' ? true : solarVal === '0' ? false : null,
+          temperature_c:        floatOrNull('f-cur-temp')     ?? 0,
+          humidity_pct:         floatOrNull('f-cur-hum')      ?? 0,
+          curing_method:        document.getElementById('f-cur-method').value || '',
+          curing_duration_days: floatOrNull('f-cur-duration'),
+          standard_name:        document.getElementById('f-cur-std').value.trim() || '',
+          wind_protection:      windVal  === '1' ? true : windVal  === '0' ? false : null,
+          solar_protection:     solarVal === '1' ? true : solarVal === '0' ? false : null,
         };
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('CURING_CONDITION', fields);

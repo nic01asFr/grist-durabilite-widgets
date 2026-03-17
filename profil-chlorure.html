@@ -119,6 +119,7 @@
           <option value="wc_ratio">E/L (continu)</option>
           <option value="duration">Durée exposition (continu)</option>
           <option value="latitude">Latitude (continu)</option>
+          <option value="cure_duration">Durée de cure (continu)</option>
         </select>
         <div class="filt-sep"></div>
         <span class="filt-lbl">Type Cl⁻</span>
@@ -147,6 +148,11 @@
         <input type="number" id="f-lat-min" placeholder="min" step="1" oninput="render()">
         <span class="dash">—</span>
         <input type="number" id="f-lat-max" placeholder="max" step="1" oninput="render()">
+        <div class="filt-sep"></div>
+        <span class="filt-lbl">Cure (jours)</span>
+        <input type="number" id="f-cure-min" placeholder="min" min="0" step="1" oninput="render()">
+        <span class="dash">—</span>
+        <input type="number" id="f-cure-max" placeholder="max" min="0" step="1" oninput="render()">
       </div>
     </div>
 
@@ -254,7 +260,7 @@
       try {
         const [dataPoints, curves, measurements, materials,
                mixDesigns, mixBinders, binders,
-               exposures, sites, sources, scalars, tests] = await Promise.all([
+               exposures, sites, sources, scalars, tests, curings] = await Promise.all([
           GristHelpers.fetchAllRecords('DATA_CURVE'),
           GristHelpers.fetchAllRecords('CURVE'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
@@ -267,6 +273,7 @@
           GristHelpers.fetchAllRecords('SOURCE'),
           GristHelpers.fetchAllRecords('SCALAR'),
           GristHelpers.fetchAllRecords('TEST'),
+          GristHelpers.fetchAllRecords('CURING_CONDITION'),
         ]);
 
         GristHelpers.log(
@@ -282,7 +289,7 @@
         const allProfiles = GristHelpers.joinChlorideProfiles(
           dataPoints, curves, measurements, materials,
           mixDesigns, mixBinders, binders,
-          exposures, sites, sources, scalars
+          exposures, sites, sources, scalars, curings
         );
 
         profiles = allProfiles.filter(p => clTestIds.has(p.measurement.id_test));
@@ -363,13 +370,14 @@
       const ec  = p.mix.wc_ratio   != null ? p.mix.wc_ratio.toFixed(2) : '?';
       const D   = p.scalars.D      != null ? GristHelpers.formatDapp(p.scalars.D) : '?';
       const Cs  = p.scalars.Cs     != null ? p.scalars.Cs.toFixed(3) + ' %' : '?';
-      const lat = p.site.latitude  != null ? p.site.latitude.toFixed(2) + '°N' : '?';
-      const cem = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
+      const lat  = p.site.latitude  != null ? p.site.latitude.toFixed(2) + '°N' : '?';
+      const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' j' : '?';
+      const cem  = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
       const cltype = getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
       return `<b>${p.material.name || 'Matériau'}</b> — ${cltype}<br>` +
              `Source : ${src}<br>` +
              `Exposition : ${expo}<br>` +
-             `Durée : ${dur} · Latitude : ${lat}<br>` +
+             `Durée : ${dur} · Latitude : ${lat} · Cure : ${cure}<br>` +
              `Liants : ${cem}<br>` +
              `Addition : ${getBinderSignature(p)}<br>` +
              `E/L : ${ec} · Dapp : ${D} · Cs : ${Cs}`;
@@ -399,6 +407,10 @@
           const v = p.site.latitude;
           return contScale(v, contVals);
         }
+        case 'cure_duration': {
+          const v = p.curing.curing_duration_days;
+          return contScale(v, contVals);
+        }
       }
       return '#94a3b8';
     }
@@ -418,6 +430,9 @@
             ? `${p.scalars.exposure_duration.toFixed(0)} ans` : '?';
         case 'latitude':
           return p.site.latitude != null ? `${p.site.latitude.toFixed(1)}°N` : '?';
+        case 'cure_duration':
+          return p.curing.curing_duration_days != null
+            ? `${p.curing.curing_duration_days} j` : '?';
       }
       return 'Inconnu';
     }
@@ -456,6 +471,8 @@
       const durMax    = parseFloat(document.getElementById('f-dur-max').value) || null;
       const latMin    = parseFloat(document.getElementById('f-lat-min').value);
       const latMax    = parseFloat(document.getElementById('f-lat-max').value);
+      const cureMin   = parseFloat(document.getElementById('f-cure-min').value) || null;
+      const cureMax   = parseFloat(document.getElementById('f-cure-max').value) || null;
       const natures   = getChecked('nature');
       const expoTypes = getChecked('expotype');
       const binderSel = getMultiSelect('f-binder');
@@ -478,6 +495,9 @@
         const lat = p.site.latitude;
         if (latMinF != null && (lat == null || lat < latMinF))         return false;
         if (latMaxF != null && (lat == null || lat > latMaxF))         return false;
+        const cure = p.curing.curing_duration_days;
+        if (cureMin != null && (cure == null || cure < cureMin))       return false;
+        if (cureMax != null && (cure == null || cure > cureMax))       return false;
         return true;
       });
 
@@ -503,6 +523,8 @@
           return contRange(filtered.map(p => p.scalars.exposure_duration));
         if (colorBy === 'latitude')
           return contRange(filtered.map(p => p.site.latitude));
+        if (colorBy === 'cure_duration')
+          return contRange(filtered.map(p => p.curing.curing_duration_days));
         return { min: 0, max: 1 };
       })();
 

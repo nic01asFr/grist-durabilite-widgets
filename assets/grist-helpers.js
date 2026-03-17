@@ -111,12 +111,13 @@ const GristHelpers = {
     // --- Conditions de cure ---
     CURING_CONDITION: {
       columns: [
-        { id: 'temperature_c',    fields: { type: 'Numeric', label: 'Température (°C)' } },
-        { id: 'humidity_pct',     fields: { type: 'Numeric', label: 'Humidité (%)' } },
-        { id: 'wind_protection',  fields: { type: 'Bool',    label: 'Protection vent' } },
-        { id: 'solar_protection', fields: { type: 'Bool',    label: 'Protection solaire' } },
-        { id: 'curing_method',    fields: { type: 'Choice',  label: 'Méthode de cure', widgetOptions: '{"choices":["water_spraying","wet_covering","curing_compounds","forms_left_in_place","wet_curing","water_immersion"]}' } },
-        { id: 'standard_name',    fields: { type: 'Text',    label: 'Norme' } },
+        { id: 'temperature_c',        fields: { type: 'Numeric', label: 'Température (°C)' } },
+        { id: 'humidity_pct',         fields: { type: 'Numeric', label: 'Humidité (%)' } },
+        { id: 'wind_protection',      fields: { type: 'Bool',    label: 'Protection vent' } },
+        { id: 'solar_protection',     fields: { type: 'Bool',    label: 'Protection solaire' } },
+        { id: 'curing_method',        fields: { type: 'Choice',  label: 'Méthode de cure', widgetOptions: '{"choices":["water_spraying","wet_covering","curing_compounds","forms_left_in_place","wet_curing","water_immersion"]}' } },
+        { id: 'curing_duration_days', fields: { type: 'Numeric', label: 'Durée de cure (jours)' } },
+        { id: 'standard_name',        fields: { type: 'Text',    label: 'Norme' } },
       ]
     },
 
@@ -394,14 +395,16 @@ const GristHelpers = {
   // =========================================================================
   joinChlorideProfiles(dataPoints, curves, measurements, materials,
                        mixDesigns, mixBinders, binders,
-                       exposures, sites, sources, scalars) {
-    const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
-    const materialMap = new Map(materials.map(m    => [m.id, m.fields]));
-    const mixMap      = new Map(mixDesigns.map(m   => [m.id, m.fields]));
-    const exposureMap = new Map(exposures.map(e    => [e.id, e.fields]));
-    const siteMap     = new Map(sites.map(s        => [s.id, s.fields]));
-    const sourceMap   = new Map(sources.map(s      => [s.id, s.fields]));
-    const binderMap   = new Map(binders.map(b      => [b.id, b.fields]));
+                       exposures, sites, sources, scalars,
+                       curingConditions = []) {
+    const measureMap  = new Map(measurements.map(m     => [m.id, m.fields]));
+    const materialMap = new Map(materials.map(m        => [m.id, m.fields]));
+    const mixMap      = new Map(mixDesigns.map(m       => [m.id, m.fields]));
+    const exposureMap = new Map(exposures.map(e        => [e.id, e.fields]));
+    const siteMap     = new Map(sites.map(s            => [s.id, s.fields]));
+    const sourceMap   = new Map(sources.map(s          => [s.id, s.fields]));
+    const binderMap   = new Map(binders.map(b          => [b.id, b.fields]));
+    const curingMap   = new Map(curingConditions.map(c => [c.id, c.fields]));
 
     // Index scalaires par measurement_id → { name: value }
     const scalByMeas = new Map();
@@ -430,16 +433,17 @@ const GristHelpers = {
 
     return curves
       .map(c => {
-        const cf    = c.fields;
-        const meas  = measureMap.get(cf.id_measurement)      || {};
-        const mat   = materialMap.get(meas.id_material)       || {};
-        const mix   = mixMap.get(mat.id_mix_design)           || {};
-        const expo  = exposureMap.get(mat.id_exposure)        || {};
-        const site  = siteMap.get(mat.id_site)                || {};
-        const src   = sourceMap.get(meas.id_source)           || {};
-        const sc    = scalByMeas.get(cf.id_measurement)       || {};
-        const bList = bindersByMix.get(mat.id_mix_design)     || [];
-        const pts   = (ptsByCurve.get(c.id) || []).sort((a, b) => a.x - b.x);
+        const cf     = c.fields;
+        const meas   = measureMap.get(cf.id_measurement)       || {};
+        const mat    = materialMap.get(meas.id_material)        || {};
+        const mix    = mixMap.get(mat.id_mix_design)            || {};
+        const expo   = exposureMap.get(mat.id_exposure)         || {};
+        const site   = siteMap.get(mat.id_site)                 || {};
+        const src    = sourceMap.get(meas.id_source)            || {};
+        const sc     = scalByMeas.get(cf.id_measurement)        || {};
+        const bList  = bindersByMix.get(mat.id_mix_design)      || [];
+        const curing = curingMap.get(mat.id_curing_condition)   || {};
+        const pts    = (ptsByCurve.get(c.id) || []).sort((a, b) => a.x - b.x);
         if (pts.length === 0) return null;
         return {
           curve_id: c.id,
@@ -454,6 +458,7 @@ const GristHelpers = {
           source:      src,
           binders:     bList,
           scalars:     sc,
+          curing,
         };
       })
       .filter(Boolean);
