@@ -99,29 +99,44 @@
 
     .no-binders { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 4px 0; }
 
-    /* === ACCORDION MESURES === */
-    .acc-item { border: 1px solid var(--surface2); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
-    .acc-header {
-      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
-      cursor: pointer; background: var(--surface); user-select: none; transition: background 0.1s;
+    /* === TABLEAU MESURES === */
+    #meas-search {
+      width: 100%; padding: 7px 10px; margin-bottom: 8px;
+      background: var(--surface); border: 1px solid var(--surface2);
+      border-radius: 8px; color: var(--text); font-size: 13px;
     }
-    .acc-header:hover { background: var(--surface2); }
-    .acc-arrow { font-size: 11px; color: var(--text-dim); width: 12px; flex-shrink: 0; }
-    .acc-sample { font-size: 12px; color: var(--text-muted); }
-    .acc-dates { font-size: 11px; color: var(--text-dim); margin-left: auto; }
-    .acc-nresults {
-      font-size: 10px; color: var(--text-dim); padding: 2px 8px;
-      background: var(--surface2); border-radius: 10px; white-space: nowrap;
+    .meas-tbl-stats { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+    .meas-tbl-wrap {
+      overflow-x: auto; overflow-y: auto; max-height: 38vh;
+      border-radius: 8px; border: 1px solid var(--surface2); margin-bottom: 4px;
     }
-    .acc-body { padding: 14px; border-top: 1px solid var(--surface2); }
-    .acc-body.collapsed { display: none; }
+    #meas-data-table { width: 100%; border-collapse: collapse; font-size: 11px; color: var(--text); }
+    #meas-data-table thead th {
+      position: sticky; top: 0; z-index: 2;
+      background: var(--surface); padding: 7px 10px;
+      text-align: left; font-size: 10px; font-weight: 700;
+      color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px;
+      border-bottom: 2px solid var(--surface2); white-space: nowrap;
+      cursor: pointer; user-select: none;
+    }
+    #meas-data-table thead th:hover { color: var(--accent); }
+    #meas-data-table thead th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+    #meas-data-table thead th.sorted-asc  .sort-arrow::after { content: '▲'; opacity: 1; }
+    #meas-data-table thead th.sorted-desc .sort-arrow::after { content: '▼'; opacity: 1; }
+    #meas-data-table thead th .sort-arrow::after { content: '⇅'; }
+    #meas-data-table tbody tr { border-bottom: 1px solid var(--surface2); cursor: pointer; transition: background 0.1s; }
+    #meas-data-table tbody tr:hover { background: var(--surface); }
+    #meas-data-table tbody tr.meas-selected { background: rgba(59,130,246,0.12); }
+    #meas-data-table tbody tr.meas-selected td { color: var(--text); }
+    #meas-data-table tbody td { padding: 6px 10px; white-space: nowrap; color: var(--text-muted); }
+    .meas-scal-empty { color: var(--text-dim); }
+    .meas-scal-unit { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
 
+    /* === FORMULAIRE MESURE SÉLECTIONNÉE === */
     .sub-section-title {
       font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
       text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;
     }
-
-    /* Scalaires */
     .scalar-cols-header {
       display: grid; grid-template-columns: 1fr 130px 80px 32px;
       gap: 6px; font-size: 10px; color: var(--text-dim);
@@ -138,7 +153,6 @@
     }
     .scalar-row input:focus { outline: none; border-color: var(--accent); }
     .scalar-row input.changed { border-color: #f59e0b; background: rgba(245,158,11,0.07); }
-
     .add-scalar-row {
       display: grid; grid-template-columns: 1fr 130px 80px auto;
       gap: 6px; align-items: center; margin-top: 8px; padding-top: 8px;
@@ -150,45 +164,11 @@
       color: var(--text); font-size: 12px;
     }
     .add-scalar-row input:focus { outline: none; border-color: var(--accent); }
-
-    /* Courbes */
     .curve-row {
       font-size: 11px; color: var(--text-dim); padding: 4px 0;
       border-bottom: 1px solid var(--surface2); display: flex; gap: 12px; align-items: center;
     }
     .curve-row:last-child { border-bottom: none; }
-
-    /* === TABLEAU PIVOT MESURES === */
-    .pivot-wrap {
-      overflow-x: auto; margin-bottom: 12px;
-      border: 1px solid var(--surface2); border-radius: 8px;
-    }
-    .pivot-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .pivot-table thead { background: var(--surface); }
-    .pivot-table th {
-      padding: 7px 10px; text-align: left; white-space: nowrap;
-      font-size: 10px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--text-dim);
-      border-bottom: 1px solid var(--surface2);
-    }
-    .pivot-table td {
-      padding: 6px 10px; border-bottom: 1px solid var(--surface2);
-      color: var(--text-muted); white-space: nowrap;
-    }
-    .pivot-table tbody tr:last-child td { border-bottom: none; }
-    .pivot-row { cursor: pointer; transition: background 0.1s; }
-    .pivot-row:hover { background: var(--surface); }
-    .pivot-row.selected { background: rgba(59,130,246,0.1); }
-    .pivot-row.selected td { color: var(--text); }
-    .pivot-empty { color: var(--text-dim) !important; }
-    .pivot-unit { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
-    .pivot-hint {
-      font-size: 11px; color: var(--text-dim); text-align: center;
-      padding: 6px 0 10px; font-style: italic;
-    }
-    .pivot-sep {
-      border: none; border-top: 1px dashed var(--surface2); margin: 0 0 12px;
-    }
   </style>
 </head>
 <body>
@@ -212,11 +192,26 @@
   <!-- EDITOR CONTENT -->
   <div id="editor-content" style="display:none;">
 
-    <!-- TABLEAU PIVOT (toujours visible, au-dessus des sections d'édition) -->
-    <div class="card" id="pivot-panel" style="display:none;">
-      <div class="card-title" style="margin-bottom:10px;">MESURES — Vue d'ensemble</div>
-      <div id="meas-summary"></div>
-      <p class="pivot-hint">↓ Cliquez une ligne pour éditer dans la section ci-dessous</p>
+    <!-- TABLEAU MESURES (toujours visible) -->
+    <div class="card" id="meas-table-panel" style="display:none;">
+      <div class="card-title" style="margin-bottom:8px;">MESURES</div>
+      <input type="text" id="meas-search" placeholder="🔍 Rechercher une mesure…" oninput="renderMeasTable()">
+      <div class="meas-tbl-stats" id="meas-tbl-stats">—</div>
+      <div class="meas-tbl-wrap">
+        <table id="meas-data-table">
+          <thead id="meas-thead"><tr></tr></thead>
+          <tbody id="meas-tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FORMULAIRE MESURE SÉLECTIONNÉE -->
+    <div class="card" id="meas-detail-panel" style="display:none;">
+      <div class="card-title" style="margin-bottom:10px;">
+        MESURE SÉLECTIONNÉE
+        <span id="meas-detail-subtitle" style="font-weight:400;font-size:11px;color:var(--text-dim);margin-left:8px;"></span>
+      </div>
+      <div id="meas-detail-body"></div>
     </div>
 
     <!-- SECTION : MATÉRIAU -->
@@ -476,17 +471,6 @@
       </div>
     </div>
 
-    <!-- SECTION : MESURES (accordion détail) -->
-    <div class="card" id="card-meas">
-      <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-meas" onclick="toggleSection('meas')">MESURES — Détail</div>
-      </div>
-      <div class="section-body collapsed" id="body-meas">
-        <div id="meas-list">
-          <div class="no-binders">Aucune mesure.</div>
-        </div>
-      </div>
-    </div>
 
     <!-- JOURNAL -->
     <div class="card" id="card-log">
@@ -533,6 +517,15 @@ let allScalars       = [];  // [{id, fields}]
 let allCurves        = [];  // [{id, fields}]
 let allTests         = new Map(); // id → fields
 let allSources       = new Map(); // id → fields
+
+// État tableau mesures
+let measLinked       = [];          // mesures filtrées pour le matériau courant
+let measScalarsByMeas = new Map();
+let measCurvesByMeas  = new Map();
+let measScalarNames   = [];         // noms de colonnes dynamiques
+let measSortCol       = -1;
+let measSortAsc       = true;
+let selectedMeasId    = null;
 
 // =========================================================================
 // Helpers dates Grist (unix timestamp secondes ↔ input[type=date])
@@ -647,8 +640,9 @@ async function loadMaterial(record) {
 
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('editor-content').style.display = '';
-  document.getElementById('pivot-panel').style.display = 'none';
-  document.getElementById('meas-summary').innerHTML = '';
+  document.getElementById('meas-table-panel').style.display = 'none';
+  document.getElementById('meas-detail-panel').style.display = 'none';
+  selectedMeasId = null;
   pendingChanges = new Map();
   pendingBinders = { toAdd: [], toDelete: [] };
   pendingScalars = { toAdd: [], toDelete: [] };
@@ -718,7 +712,7 @@ async function loadMaterial(record) {
     ]);
 
     // ---- MESURES ----
-    await loadMeasurementsAccordion();
+    await loadMeasurementsTable();
 
     // ---- SOURCE (1ère mesure) ----
     await loadSource();
@@ -878,9 +872,9 @@ function confirmAddBinder() {
 }
 
 // =========================================================================
-// Mesures — Accordion (éditable)
+// Mesures — Tableau + formulaire de détail
 // =========================================================================
-async function loadMeasurementsAccordion() {
+async function loadMeasurementsTable() {
   const listEl = document.getElementById('meas-list');
   listEl.innerHTML = '';
 
@@ -897,205 +891,210 @@ async function loadMeasurementsAccordion() {
     allScalars = scalars;
     allCurves  = curves;
 
-    const linked = measurements.filter(m => m.fields.id_material === currentRecord.id);
-
-    if (linked.length === 0) {
-      listEl.innerHTML = '<div class="no-binders">Aucune mesure pour ce matériau.</div>';
-      return;
-    }
+    measLinked = measurements.filter(m => m.fields.id_material === currentRecord.id);
 
     // Indexer scalaires et courbes par measurement id
-    const scalarsByMeas = new Map();
+    measScalarsByMeas = new Map();
     scalars.forEach(s => {
       const mid = s.fields.id_measurement;
-      if (!scalarsByMeas.has(mid)) scalarsByMeas.set(mid, []);
-      scalarsByMeas.get(mid).push(s);
+      if (!measScalarsByMeas.has(mid)) measScalarsByMeas.set(mid, []);
+      measScalarsByMeas.get(mid).push(s);
     });
-    const curvesByMeas = new Map();
+    measCurvesByMeas = new Map();
     curves.forEach(c => {
       const mid = c.fields.id_measurement;
-      if (!curvesByMeas.has(mid)) curvesByMeas.set(mid, []);
-      curvesByMeas.get(mid).push(c);
+      if (!measCurvesByMeas.has(mid)) measCurvesByMeas.set(mid, []);
+      measCurvesByMeas.get(mid).push(c);
     });
 
-    // ---- Tableau pivot ----
-    buildPivotTable(linked, scalarsByMeas, curvesByMeas);
-    document.getElementById('pivot-panel').style.display = '';
-
-    // ---- Accordion ----
-    linked.forEach(m => {
-      const test     = allTests.get(m.fields.id_test) || {};
-      const mScalars = scalarsByMeas.get(m.id) || [];
-      const mCurves  = curvesByMeas.get(m.id)  || [];
-
-      const prepDate   = tsToDateInput(m.fields.preparation_date) || '—';
-      const resultDate = tsToDateInput(m.fields.result_date)      || '—';
-      const nInfo = [
-        mScalars.length ? mScalars.length + ' scal.' : null,
-        mCurves.length  ? mCurves.length + ' courbe' + (mCurves.length > 1 ? 's' : '') : null,
-      ].filter(Boolean).join(' · ') || 'pas de résultats';
-
-      const item = document.createElement('div');
-      item.className = 'acc-item';
-      item.dataset.measId = m.id;
-
-      const header = document.createElement('div');
-      header.className = 'acc-header';
-      header.innerHTML = `
-        <span class="acc-arrow">▸</span>
-        <span class="meas-badge">${test.name || '?'}</span>
-        <span class="acc-sample">${m.fields.sample_type || '—'}</span>
-        <span class="acc-dates">${prepDate} → ${resultDate}</span>
-        <span class="acc-nresults">${nInfo}</span>
-      `;
-
-      const body = document.createElement('div');
-      body.className = 'acc-body collapsed';
-      body.innerHTML = buildMeasBody(m, mScalars, mCurves);
-
-      header.addEventListener('click', () => {
-        const isOpen = !body.classList.contains('collapsed');
-        if (isOpen) {
-          body.classList.add('collapsed');
-          header.querySelector('.acc-arrow').textContent = '▸';
-        } else {
-          body.classList.remove('collapsed');
-          header.querySelector('.acc-arrow').textContent = '▾';
-          if (!body.dataset.listenersAttached) {
-            attachMeasBodyListeners(body, m, mScalars);
-            body.dataset.listenersAttached = 'true';
-          }
+    // Noms de scalaires dynamiques (ordre d'apparition)
+    measScalarNames = [];
+    const seenNames = new Set();
+    measLinked.forEach(m => {
+      (measScalarsByMeas.get(m.id) || []).forEach(s => {
+        if (s.fields.name && !seenNames.has(s.fields.name)) {
+          seenNames.add(s.fields.name);
+          measScalarNames.push(s.fields.name);
         }
-        // Synchroniser la sélection dans le tableau pivot
-        syncPivotSelection(m.id, !isOpen);
       });
-
-      item.appendChild(header);
-      item.appendChild(body);
-      listEl.appendChild(item);
     });
+
+    buildMeasTableHeader();
+    renderMeasTable();
+
+    if (measLinked.length > 0)
+      document.getElementById('meas-table-panel').style.display = '';
+
   } catch(err) {
     GristHelpers.log('Erreur chargement mesures : ' + err.message, 'err');
   }
 }
 
-// =========================================================================
-// Tableau pivot des mesures
-// =========================================================================
-function buildPivotTable(linked, scalarsByMeas, curvesByMeas) {
-  const summaryEl = document.getElementById('meas-summary');
+// -------------------------------------------------------------------------
+// Construit l'en-tête du tableau (colonnes fixes + dynamiques)
+// -------------------------------------------------------------------------
+function buildMeasTableHeader() {
+  const fixedCols = ['Test', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat'];
+  const allCols   = [...fixedCols, ...measScalarNames, 'Courbes'];
+  const tr = document.querySelector('#meas-thead tr');
+  tr.innerHTML = allCols.map((name, i) =>
+    `<th onclick="sortMeasTable(${i})" data-col="${i}">${name}<span class="sort-arrow"></span></th>`
+  ).join('');
+}
 
-  // Collecter les noms de scalaires uniques (ordre d'apparition)
-  const scalarNames = [];
-  const seenNames   = new Set();
-  linked.forEach(m => {
-    (scalarsByMeas.get(m.id) || []).forEach(s => {
-      if (s.fields.name && !seenNames.has(s.fields.name)) {
-        seenNames.add(s.fields.name);
-        scalarNames.push(s.fields.name);
-      }
-    });
-  });
+// -------------------------------------------------------------------------
+// Rendu du tableau (filtre + tri)
+// -------------------------------------------------------------------------
+function renderMeasTable() {
+  const query = (document.getElementById('meas-search').value || '').toLowerCase();
 
-  // En-tête
-  let html = `<div class="pivot-wrap"><table class="pivot-table"><thead><tr>
-    <th>Test</th>
-    <th>Type éch.</th>
-    <th>Dimensions</th>
-    <th>Préparation</th>
-    <th>Résultat</th>
-    ${scalarNames.map(n => `<th>${n}</th>`).join('')}
-    <th>Courbes</th>
-  </tr></thead><tbody>`;
-
-  linked.forEach(m => {
-    const f        = m.fields;
-    const test     = allTests.get(f.id_test) || {};
-    const mScalars = scalarsByMeas.get(m.id) || [];
-    const mCurves  = curvesByMeas.get(m.id)  || [];
+  // Construire les données de chaque ligne
+  let rows = measLinked.map(m => {
+    const f       = m.fields;
+    const test    = allTests.get(f.id_test) || {};
+    const mScalars = measScalarsByMeas.get(m.id) || [];
+    const mCurves  = measCurvesByMeas.get(m.id)  || [];
     const scMap    = new Map(mScalars.map(s => [s.fields.name, s.fields]));
-
-    const scalarCells = scalarNames.map(n => {
+    const scalarVals = measScalarNames.map(n => {
       const s = scMap.get(n);
-      if (!s || s.value == null) return '<td class="pivot-empty">—</td>';
-      const fv = formatPivotVal(s.value);
-      const u  = s.unit ? `<span class="pivot-unit">${s.unit}</span>` : '';
-      return `<td>${fv}${u}</td>`;
-    }).join('');
-
-    const nCurves = mCurves.length || '—';
-
-    html += `<tr class="pivot-row" data-meas-id="${m.id}">
-      <td><span class="meas-badge">${test.name || '?'}</span></td>
-      <td>${f.sample_type || '—'}</td>
-      <td>${f.sample_dimensions || '—'}</td>
-      <td>${tsToDateInput(f.preparation_date) || '—'}</td>
-      <td>${tsToDateInput(f.result_date)      || '—'}</td>
-      ${scalarCells}
-      <td>${nCurves}</td>
-    </tr>`;
-  });
-
-  html += '</tbody></table></div>';
-  summaryEl.innerHTML = html;
-
-  // Listeners clic sur les lignes du tableau
-  summaryEl.querySelectorAll('.pivot-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const measId = parseInt(row.dataset.measId);
-      openAccordionItem(measId);
+      return (s && s.value != null) ? s.value : null;
     });
+    return {
+      id:          m.id,
+      test:        test.name || '',
+      sample_type: f.sample_type || '',
+      dimensions:  f.sample_dimensions || '',
+      operator:    f.operator || '',
+      prep:        tsToDateInput(f.preparation_date) || '',
+      result:      tsToDateInput(f.result_date) || '',
+      scalars:     scalarVals,
+      scalarUnits: measScalarNames.map(n => { const s = scMap.get(n); return s ? (s.unit || '') : ''; }),
+      nCurves:     mCurves.length,
+    };
+  });
+
+  // Filtre texte
+  if (query) {
+    rows = rows.filter(r => {
+      const all = [r.test, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+                   ...r.scalars.map(v => v != null ? String(v) : ''),
+                   String(r.nCurves)].join(' ').toLowerCase();
+      return all.includes(query);
+    });
+  }
+
+  // Tri
+  if (measSortCol >= 0) {
+    const sign = measSortAsc ? 1 : -1;
+    rows.sort((a, b) => {
+      const av = measRowVal(a, measSortCol);
+      const bv = measRowVal(b, measSortCol);
+      if (typeof av === 'number' && typeof bv === 'number') return sign * (av - bv);
+      return sign * String(av ?? '').localeCompare(String(bv ?? ''), 'fr');
+    });
+  }
+
+  // Stats
+  document.getElementById('meas-tbl-stats').textContent =
+    `${rows.length} mesure${rows.length > 1 ? 's' : ''} sur ${measLinked.length}`;
+
+  // Rendu
+  function fmtScal(val, unit) {
+    if (val == null) return '<span class="meas-scal-empty">—</span>';
+    let s;
+    if (typeof val === 'number' && val !== 0 && (Math.abs(val) < 1e-3 || Math.abs(val) >= 1e6))
+      s = val.toExponential(2);
+    else
+      s = parseFloat(Number(val).toPrecision(4)).toString();
+    return unit ? `${s}<span class="meas-scal-unit">${unit}</span>` : s;
+  }
+
+  const html = rows.map(r => {
+    const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
+    const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
+    return `<tr${sel} data-meas-id="${r.id}">
+      <td><span class="meas-badge">${r.test || '?'}</span></td>
+      <td>${r.sample_type || '—'}</td>
+      <td>${r.dimensions  || '—'}</td>
+      <td>${r.operator    || '—'}</td>
+      <td>${r.prep        || '—'}</td>
+      <td>${r.result      || '—'}</td>
+      ${scCells}
+      <td>${r.nCurves || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const tbody = document.getElementById('meas-tbl-body');
+  tbody.innerHTML = html || '<tr><td colspan="20" style="text-align:center;padding:16px;color:var(--text-dim)">Aucune mesure.</td></tr>';
+
+  // Listeners clic
+  tbody.querySelectorAll('tr[data-meas-id]').forEach(tr => {
+    tr.addEventListener('click', () => selectMeasRow(parseInt(tr.dataset.measId)));
   });
 }
 
-function formatPivotVal(val) {
-  if (typeof val !== 'number') return String(val);
-  if (val !== 0 && (Math.abs(val) < 1e-3 || Math.abs(val) >= 1e6))
-    return val.toExponential(2);
-  const s = parseFloat(val.toPrecision(4)).toString();
-  return s;
+function measRowVal(r, col) {
+  const fixed = [r.test, r.sample_type, r.dimensions, r.operator, r.prep, r.result];
+  if (col < fixed.length) return fixed[col];
+  const scIdx = col - fixed.length;
+  if (scIdx < r.scalars.length) return r.scalars[scIdx] ?? -Infinity;
+  return r.nCurves;
 }
 
-// Ouvre l'accordion d'une mesure et synchronise la sélection dans le pivot
-function openAccordionItem(measId) {
-  // 1. Ouvrir la section MESURES si repliée
-  const sectionBody   = document.getElementById('body-meas');
-  const sectionToggle = document.getElementById('toggle-meas');
-  if (sectionBody && sectionBody.classList.contains('collapsed')) {
-    sectionBody.classList.remove('collapsed');
-    if (sectionToggle) sectionToggle.classList.remove('collapsed');
-  }
-
-  // 2. Ouvrir l'item accordion correspondant
-  const accItem = document.querySelector(`.acc-item[data-meas-id="${measId}"]`);
-  if (!accItem) return;
-
-  const header = accItem.querySelector('.acc-header');
-  const body   = accItem.querySelector('.acc-body');
-
-  if (body.classList.contains('collapsed')) {
-    header.click(); // ouvre (déclenche aussi syncPivotSelection)
+function sortMeasTable(colIdx) {
+  document.querySelectorAll('#meas-data-table thead th').forEach((th, i) => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+  });
+  if (measSortCol === colIdx) {
+    measSortAsc = !measSortAsc;
   } else {
-    syncPivotSelection(measId, true);
+    measSortCol = colIdx;
+    measSortAsc = true;
   }
-
-  // 3. Scroller vers l'item
-  accItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-// Met à jour la ligne sélectionnée dans le tableau pivot
-function syncPivotSelection(measId, isOpen) {
-  document.querySelectorAll('.pivot-row').forEach(r => r.classList.remove('selected'));
-  if (isOpen) {
-    const row = document.querySelector(`.pivot-row[data-meas-id="${measId}"]`);
-    if (row) row.classList.add('selected');
-  }
+  const th = document.querySelector(`#meas-data-table thead th[data-col="${colIdx}"]`);
+  if (th) th.classList.add(measSortAsc ? 'sorted-asc' : 'sorted-desc');
+  renderMeasTable();
 }
 
 // -------------------------------------------------------------------------
-// Construit le HTML du corps d'un item accordion
+// Sélectionner une mesure → afficher le formulaire de détail
 // -------------------------------------------------------------------------
-function buildMeasBody(m, mScalars, mCurves) {
+function selectMeasRow(measId) {
+  selectedMeasId = measId;
+
+  // Surbrillance
+  document.querySelectorAll('#meas-tbl-body tr').forEach(tr => {
+    tr.classList.toggle('meas-selected', parseInt(tr.dataset.measId) === measId);
+  });
+
+  const m       = measLinked.find(x => x.id === measId);
+  if (!m) return;
+  const mScalars = measScalarsByMeas.get(measId) || [];
+  const mCurves  = measCurvesByMeas.get(measId)  || [];
+  const test     = allTests.get(m.fields.id_test) || {};
+
+  // Titre du panneau détail
+  const prep   = tsToDateInput(m.fields.preparation_date) || '—';
+  const result = tsToDateInput(m.fields.result_date) || '—';
+  document.getElementById('meas-detail-subtitle').textContent =
+    `${test.name || '?'} · ${prep} → ${result}`;
+
+  // Corps du formulaire
+  const detailBody = document.getElementById('meas-detail-body');
+  detailBody.innerHTML = buildDetailForm(m, mScalars, mCurves);
+  document.getElementById('meas-detail-panel').style.display = '';
+
+  // Attacher les listeners
+  attachDetailListeners(detailBody, m, mScalars);
+
+  // Scroller vers le formulaire
+  document.getElementById('meas-detail-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// -------------------------------------------------------------------------
+// Construit le HTML du formulaire de détail d'une mesure
+// -------------------------------------------------------------------------
+function buildDetailForm(m, mScalars, mCurves) {
   const f = m.fields;
 
   const sampleTypeOpts = ['', 'laboratory_sample', 'bridge_pier'].map(v =>
@@ -1183,9 +1182,9 @@ function buildMeasBody(m, mScalars, mCurves) {
 }
 
 // -------------------------------------------------------------------------
-// Attache les listeners après ouverture d'un item accordion
+// Attache les listeners sur le formulaire de détail
 // -------------------------------------------------------------------------
-function attachMeasBodyListeners(body, m, mScalars) {
+function attachDetailListeners(body, m, mScalars) {
   // MEASUREMENT fields
   body.querySelectorAll('[data-table="MEASUREMENT"]').forEach(el => {
     const field   = el.dataset.field;
@@ -1266,6 +1265,7 @@ function confirmAddScalar(measId) {
   nameEl.value = ''; valEl.value = ''; unitEl.value = '';
   document.getElementById('add-scalar-row-' + measId).style.display = 'none';
   updateSaveBar();
+  renderMeasTable(); // rafraîchit les stats de la ligne dans le tableau
 }
 
 // =========================================================================
@@ -1368,12 +1368,14 @@ async function saveAll() {
     await grist.docApi.applyUserActions(actions);
     GristHelpers.log('Enregistré avec succès ✓', 'ok');
     GristHelpers.setStatus('Enregistré', 'ready');
-    // Recharger
+    const prevMeasId = selectedMeasId;
     pendingChanges = new Map();
     pendingBinders = { toAdd: [], toDelete: [] };
     pendingScalars = { toAdd: [], toDelete: [] };
     updateSaveBar();
     await loadMaterial(currentRecord);
+    // Re-sélectionner la mesure après rechargement
+    if (prevMeasId) selectMeasRow(prevMeasId);
   } catch(err) {
     GristHelpers.setStatus('Erreur', 'error');
     GristHelpers.log('Erreur enregistrement : ' + err.message, 'err');
