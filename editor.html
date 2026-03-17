@@ -107,9 +107,17 @@
     }
     .meas-tbl-stats { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
     .meas-tbl-wrap {
-      overflow-x: auto; overflow-y: auto; max-height: 38vh;
+      overflow-x: auto; overflow-y: auto; max-height: 60vh;
       border-radius: 8px; border: 1px solid var(--surface2); margin-bottom: 4px;
     }
+    .tag {
+      display: inline-block; padding: 2px 7px; border-radius: 10px;
+      font-size: 10px; font-weight: 600; background: var(--surface2); color: var(--text-muted);
+    }
+    .tag.total_cl   { background: #0ea5e920; color: #0ea5e9; }
+    .tag.free_cl    { background: #f9731620; color: #f97316; }
+    .tag.in-situ    { background: #22c55e20; color: #22c55e; }
+    .tag.laboratory { background: #a855f720; color: #a855f7; }
     #meas-data-table { width: 100%; border-collapse: collapse; font-size: 11px; color: var(--text); }
     #meas-data-table thead th {
       position: sticky; top: 0; z-index: 2;
@@ -518,6 +526,11 @@ let allCurves        = [];  // [{id, fields}]
 let allTests         = new Map(); // id → fields
 let allSources       = new Map(); // id → fields
 
+// Champs du matériau courant et de ses tables liées (pour le tableau des mesures)
+let currentMatFields  = {};
+let currentExpoFields = {};
+let currentMixFields  = {};
+
 // État tableau mesures
 let measLinked       = [];          // mesures filtrées pour le matériau courant
 let measScalarsByMeas = new Map();
@@ -661,6 +674,7 @@ async function loadMaterial(record) {
 
     // Normaliser : grist.onRecord peut livrer les champs à plat ou imbriqués
     const f = record.fields || record;
+    currentMatFields = f;
 
     // ---- MATÉRIAU ----
     setField('f-mat-name',    f.name);
@@ -677,15 +691,15 @@ async function loadMaterial(record) {
     }, 'card-site');
 
     // ---- EXPOSITION ----
-    await loadLinked('EXPOSURE', currentExpoId, {
+    currentExpoFields = await loadLinked('EXPOSURE', currentExpoId, {
       'f-expo-type':   'exposure_type',
       'f-expo-nature': 'exposure_nature',
       'f-expo-wet':    'wetting_duration_pct',
       'f-expo-dry':    'drying_duration_pct',
-    }, 'card-expo');
+    }, 'card-expo') || {};
 
     // ---- FORMULATION ----
-    await loadLinked('MIX_DESIGN', currentMixId, {
+    currentMixFields = await loadLinked('MIX_DESIGN', currentMixId, {
       'f-mix-wc':        'wc_ratio',
       'f-mix-wl':        'wl_ratio',
       'f-mix-water':     'water_content_kg',
@@ -694,7 +708,7 @@ async function loadMaterial(record) {
       'f-mix-admix':     'admix_type',
       'f-mix-adjuvant':  'adjuvant_content',
       'f-mix-air':       'entrained_air',
-    }, 'card-mix');
+    }, 'card-mix') || {};
 
     // ---- LIANTS ----
     await loadBinders();
@@ -730,11 +744,11 @@ async function loadMaterial(record) {
 // Charger une table liée par FK et remplir les champs
 // =========================================================================
 async function loadLinked(tableName, rowId, fieldMap, cardId, extraBools = []) {
-  if (!rowId) return;
+  if (!rowId) return null;
   try {
     const tableData = await grist.docApi.fetchTable(tableName);
     const idx = tableData.id.indexOf(rowId);
-    if (idx < 0) return;
+    if (idx < 0) return null;
     const fields = {};
     Object.keys(tableData).forEach(k => {
       if (k !== 'id' && k !== 'manualSort' && !k.startsWith('gristHelper_'))
@@ -748,8 +762,10 @@ async function loadLinked(tableName, rowId, fieldMap, cardId, extraBools = []) {
       setField(id, fields[field], false, bool);
     }
     attachListeners(document.getElementById(cardId), tableName, rowId);
+    return fields;
   } catch(err) {
     GristHelpers.log('Erreur chargement ' + tableName + ' : ' + err.message, 'err');
+    return null;
   }
 }
 
@@ -876,17 +892,19 @@ function confirmAddBinder() {
 // =========================================================================
 async function loadMeasurementsTable() {
   try {
-    const [measurements, tests, scalars, curves] = await Promise.all([
+    const [measurements, tests, scalars, curves, sources] = await Promise.all([
       GristHelpers.fetchAllRecords('MEASUREMENT'),
       GristHelpers.fetchAllRecords('TEST'),
       GristHelpers.fetchAllRecords('SCALAR'),
       GristHelpers.fetchAllRecords('CURVE'),
+      GristHelpers.fetchAllRecords('SOURCE'),
     ]);
 
     allMeasurements = measurements;
     allTests   = new Map(tests.map(t => [t.id, t.fields]));
     allScalars = scalars;
     allCurves  = curves;
+    allSources = new Map(sources.map(s => [s.id, s.fields]));
 
     measLinked = measurements.filter(m => m.fields.id_material === currentRecord.id);
 
@@ -931,7 +949,8 @@ async function loadMeasurementsTable() {
 // Construit l'en-tête du tableau (colonnes fixes + dynamiques)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat'];
+  const fixedCols = ['Test', 'Type Cl⁻', 'Source', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat',
+                     'Type mat.', 'Type expo.', 'Nature', 'E/C', 'E/L', 'Eau (kg/m³)'];
   const allCols   = [...fixedCols, ...measScalarNames, 'Courbes'];
   const tr = document.querySelector('#meas-thead tr');
   tr.innerHTML = allCols.map((name, i) =>
@@ -956,14 +975,27 @@ function renderMeasTable() {
       const s = scMap.get(n);
       return (s && s.value != null) ? s.value : null;
     });
+    const src = allSources.get(f.id_source);
+    const srcLabel = src
+      ? (src.designation || (src.authors ? src.authors.split(',')[0].trim() + (src.year ? ' ' + src.year : '') : '—'))
+      : '—';
     return {
       id:          m.id,
       test:        test.name || '',
+      testType:    test.test_type || '',
+      source:      srcLabel,
       sample_type: f.sample_type || '',
       dimensions:  f.sample_dimensions || '',
       operator:    f.operator || '',
       prep:        tsToDateInput(f.preparation_date) || '',
       result:      tsToDateInput(f.result_date) || '',
+      // Matériau / Exposition / Formulation (constants pour toutes les lignes du matériau courant)
+      mat_type:    currentMatFields.material_type    || '',
+      expo_type:   currentExpoFields.exposure_type   || '',
+      expo_nature: currentExpoFields.exposure_nature || '',
+      wc_ratio:    currentMixFields.wc_ratio          ?? null,
+      wl_ratio:    currentMixFields.wl_ratio          ?? null,
+      water_kg:    currentMixFields.water_content_kg  ?? null,
       scalars:     scalarVals,
       scalarUnits: measScalarNames.map(n => { const s = scMap.get(n); return s ? (s.unit || '') : ''; }),
       nCurves:     mCurves.length,
@@ -973,7 +1005,10 @@ function renderMeasTable() {
   // Filtre texte
   if (query) {
     rows = rows.filter(r => {
-      const all = [r.test, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+      const all = [r.test, r.testType, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+                   r.mat_type, r.expo_type, r.expo_nature,
+                   r.wc_ratio != null ? String(r.wc_ratio) : '',
+                   r.wl_ratio != null ? String(r.wl_ratio) : '',
                    ...r.scalars.map(v => v != null ? String(v) : ''),
                    String(r.nCurves)].join(' ').toLowerCase();
       return all.includes(query);
@@ -993,7 +1028,7 @@ function renderMeasTable() {
 
   // Stats
   document.getElementById('meas-tbl-stats').textContent =
-    `${rows.length} mesure${rows.length > 1 ? 's' : ''} sur ${measLinked.length}`;
+    `${rows.length} mesure${rows.length > 1 ? 's' : ''} affichée${rows.length > 1 ? 's' : ''} sur ${measLinked.length}`;
 
   // Rendu
   function fmtScal(val, unit) {
@@ -1006,16 +1041,37 @@ function renderMeasTable() {
     return unit ? `${s}<span class="meas-scal-unit">${unit}</span>` : s;
   }
 
+  function clTag(ct) {
+    const label = ct === 'free_cl' ? 'Cl libre' : ct === 'total_cl' ? 'Cl total' : ct || '';
+    return ct ? `<span class="tag ${ct}">${label}</span>` : '<span style="color:var(--text-dim)">—</span>';
+  }
+
+  function expoTag(et) {
+    return et ? `<span class="tag ${et}">${et}</span>` : '<span style="color:var(--text-dim)">—</span>';
+  }
+
+  function fmtNum(v, digits = 2) {
+    return v != null ? Number(v).toFixed(digits) : '<span style="color:var(--text-dim)">—</span>';
+  }
+
   const html = rows.map(r => {
     const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
     const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
     return `<tr${sel} data-meas-id="${r.id}">
       <td><span class="meas-badge">${r.test || '?'}</span></td>
+      <td>${clTag(r.testType)}</td>
+      <td>${r.source      || '—'}</td>
       <td>${r.sample_type || '—'}</td>
       <td>${r.dimensions  || '—'}</td>
       <td>${r.operator    || '—'}</td>
       <td>${r.prep        || '—'}</td>
       <td>${r.result      || '—'}</td>
+      <td>${r.mat_type    || '—'}</td>
+      <td>${expoTag(r.expo_type)}</td>
+      <td>${r.expo_nature || '—'}</td>
+      <td>${fmtNum(r.wc_ratio)}</td>
+      <td>${fmtNum(r.wl_ratio)}</td>
+      <td>${fmtNum(r.water_kg, 0)}</td>
       ${scCells}
       <td>${r.nCurves || '—'}</td>
     </tr>`;
@@ -1031,7 +1087,8 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.test, r.sample_type, r.dimensions, r.operator, r.prep, r.result];
+  const fixed = [r.test, r.testType, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+                 r.mat_type, r.expo_type, r.expo_nature, r.wc_ratio, r.wl_ratio, r.water_kg];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
   if (scIdx < r.scalars.length) return r.scalars[scIdx] ?? -Infinity;
