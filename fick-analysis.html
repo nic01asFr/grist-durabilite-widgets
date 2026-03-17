@@ -940,15 +940,7 @@
     // GRIST CONNECTION
     // =========================================================================
     function initGrist() {
-      grist.ready({
-        requiredAccess: 'full',
-        columns: [
-          { name: 'id_material',      title: 'Matériau' },
-          { name: 'sample_type',      title: "Type d'échantillon" },
-          { name: 'id_source',        title: 'Source' },
-          { name: 'preparation_date', title: 'Date préparation' },
-        ]
-      });
+      grist.ready({ requiredAccess: 'full' });
 
       grist.onRecord(async function(record) {
         GristHelpers.log(`Mesure sélectionnée : id=${record.id}`);
