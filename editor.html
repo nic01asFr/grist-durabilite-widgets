@@ -906,7 +906,8 @@ async function loadMeasurementsTable() {
     allCurves  = curves;
     allSources = new Map(sources.map(s => [s.id, s.fields]));
 
-    measLinked = measurements.filter(m => m.fields.id_material === currentRecord.id);
+    measLinked = measurements.filter(m => Number(m.fields.id_material) === Number(currentRecord.id));
+    GristHelpers.log(`${measurements.length} mesures au total → ${measLinked.length} pour id_material=${currentRecord.id}`, measLinked.length > 0 ? 'ok' : 'warn');
 
     // Indexer scalaires et courbes par measurement id
     measScalarsByMeas = new Map();
