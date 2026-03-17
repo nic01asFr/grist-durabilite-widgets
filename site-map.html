@@ -140,40 +140,27 @@
       GristHelpers.setStatus('Chargement…', '');
 
       try {
-        const [sites, materials, measurements, results] = await Promise.all([
+        const [sites, materials, measurements, scalars] = await Promise.all([
           GristHelpers.fetchAllRecords('SITE'),
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
-          GristHelpers.fetchAllRecords('RESULT'),
+          GristHelpers.fetchAllRecords('SCALAR'),
         ]);
 
-        GristHelpers.log(`${sites.length} sites, ${materials.length} matériaux, ${measurements.length} mesures, ${results.length} résultats`, 'ok');
+        GristHelpers.log(`${sites.length} sites, ${materials.length} matériaux, ${measurements.length} mesures, ${scalars.length} scalaires`, 'ok');
 
-        // Build lookup maps
-        const measureMap = new Map(measurements.map(m => [m.id, m.fields]));
+        // Index D (coefficient de diffusion) par measurement_id
+        // SCALAR.name === 'D', SCALAR.value est numérique
+        const dappByMeasurement = new Map();
+        scalars
+          .filter(r => r.fields.name === 'D' && r.fields.value != null && r.fields.value > 0)
+          .forEach(r => dappByMeasurement.set(r.fields.id_measurement, r.fields.value));
 
-        // Dapp results: operator='Dapp', result_type='scalar'
-        const dappResults = results.filter(r =>
-          r.fields.result_type === 'scalar' && r.fields.operator === 'Dapp' && r.fields.name
-        );
-
-        // duree_vie results
-        const dureeResults = results.filter(r =>
-          r.fields.result_type === 'scalar' && r.fields.operator === 'duree_vie_ans' && r.fields.name
-        );
-
-        // Index dapp by measurement_id
-        const dappByMeasurement  = new Map();
-        dappResults.forEach(r => {
-          const v = parseFloat(r.fields.name);
-          if (!isNaN(v) && v > 0) dappByMeasurement.set(r.fields.id_measurement, v);
-        });
-
+        // Index durée de vie par measurement_id (si calculée et stockée comme scalaire)
         const dureeByMeasurement = new Map();
-        dureeResults.forEach(r => {
-          const v = parseFloat(r.fields.name);
-          if (!isNaN(v) && v > 0) dureeByMeasurement.set(r.fields.id_measurement, v);
-        });
+        scalars
+          .filter(r => r.fields.name === 'duree_vie_ans' && r.fields.value != null && r.fields.value > 0)
+          .forEach(r => dureeByMeasurement.set(r.fields.id_measurement, r.fields.value));
 
         // Group materials by site_id
         const materialsBySite = new Map();
