@@ -190,35 +190,37 @@
     </div>
   </div>
 
+  <!-- TABLEAU MESURES (toujours visible, toutes les mesures) -->
+  <div class="card" id="meas-table-panel" style="display:none;">
+    <div class="card-title" style="margin-bottom:8px;">MESURES</div>
+    <input type="text" id="meas-search" placeholder="🔍 Rechercher une mesure…" oninput="renderMeasTable()">
+    <div class="meas-tbl-stats" id="meas-tbl-stats">—</div>
+    <div class="meas-tbl-wrap">
+      <table id="meas-data-table">
+        <thead id="meas-thead"><tr></tr></thead>
+        <tbody id="meas-tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FORMULAIRE MESURE SÉLECTIONNÉE -->
+  <div class="card" id="meas-detail-panel" style="display:none;">
+    <div class="card-title" style="margin-bottom:10px;">
+      MESURE SÉLECTIONNÉE
+      <span id="meas-detail-subtitle" style="font-weight:400;font-size:11px;color:var(--text-dim);margin-left:8px;"></span>
+    </div>
+
   <!-- EMPTY STATE -->
   <div id="empty-state" class="empty-state">
     <div class="icon">🧱</div>
     <h3>Aucun matériau sélectionné</h3>
-    <p>Sélectionnez une ligne dans la table MATERIAL pour éditer ses données.</p>
+    <p>Cliquez sur une mesure dans le tableau pour éditer ses données.</p>
   </div>
 
   <!-- EDITOR CONTENT -->
   <div id="editor-content" style="display:none;">
 
-    <!-- TABLEAU MESURES (toujours visible) -->
-    <div class="card" id="meas-table-panel" style="display:none;">
-      <div class="card-title" style="margin-bottom:8px;">MESURES</div>
-      <input type="text" id="meas-search" placeholder="🔍 Rechercher une mesure…" oninput="renderMeasTable()">
-      <div class="meas-tbl-stats" id="meas-tbl-stats">—</div>
-      <div class="meas-tbl-wrap">
-        <table id="meas-data-table">
-          <thead id="meas-thead"><tr></tr></thead>
-          <tbody id="meas-tbl-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- FORMULAIRE MESURE SÉLECTIONNÉE -->
-    <div class="card" id="meas-detail-panel" style="display:none;">
-      <div class="card-title" style="margin-bottom:10px;">
-        MESURE SÉLECTIONNÉE
-        <span id="meas-detail-subtitle" style="font-weight:400;font-size:11px;color:var(--text-dim);margin-left:8px;"></span>
-      </div>
+    <!-- FORMULAIRE MESURE SÉLECTIONNÉE (placeholder, déplacé plus haut) -->
       <div id="meas-detail-body"></div>
     </div>
 
@@ -526,10 +528,16 @@ let allCurves        = [];  // [{id, fields}]
 let allTests         = new Map(); // id → fields
 let allSources       = new Map(); // id → fields
 
-// Champs du matériau courant et de ses tables liées (pour le tableau des mesures)
+// Champs du matériau courant et de ses tables liées (pour les formulaires d'édition)
 let currentMatFields  = {};
 let currentExpoFields = {};
 let currentMixFields  = {};
+
+// Maps globales pour le tableau (toutes les mesures, toutes tables)
+let allMaterialsArr = [];        // [{id, fields}]
+let allMaterialsMap = new Map(); // id → fields
+let allExposuresMap = new Map(); // id → fields
+let allMixesMap     = new Map(); // id → fields
 
 // État tableau mesures
 let measLinked       = [];          // mesures filtrées pour le matériau courant
@@ -653,8 +661,6 @@ async function loadMaterial(record) {
 
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('editor-content').style.display = '';
-  document.getElementById('meas-table-panel').style.display = 'none';
-  document.getElementById('meas-detail-panel').style.display = 'none';
   selectedMeasId = null;
   pendingChanges = new Map();
   pendingBinders = { toAdd: [], toDelete: [] };
@@ -725,10 +731,7 @@ async function loadMaterial(record) {
       { id: 'f-cure-solar', field: 'solar_protection',  bool: true },
     ]);
 
-    // ---- MESURES ----
-    await loadMeasurementsTable();
-
-    // ---- SOURCE (1ère mesure) ----
+    // ---- SOURCE (1ère mesure du matériau) ----
     await loadSource();
 
     GristHelpers.setStatus('Prêt', 'ready');
@@ -892,22 +895,29 @@ function confirmAddBinder() {
 // =========================================================================
 async function loadMeasurementsTable() {
   try {
-    const [measurements, tests, scalars, curves, sources] = await Promise.all([
+    const [measurements, tests, scalars, curves, sources, materials, exposures, mixes] = await Promise.all([
       GristHelpers.fetchAllRecords('MEASUREMENT'),
       GristHelpers.fetchAllRecords('TEST'),
       GristHelpers.fetchAllRecords('SCALAR'),
       GristHelpers.fetchAllRecords('CURVE'),
       GristHelpers.fetchAllRecords('SOURCE'),
+      GristHelpers.fetchAllRecords('MATERIAL'),
+      GristHelpers.fetchAllRecords('EXPOSURE'),
+      GristHelpers.fetchAllRecords('MIX_DESIGN'),
     ]);
 
     allMeasurements = measurements;
-    allTests   = new Map(tests.map(t => [t.id, t.fields]));
-    allScalars = scalars;
-    allCurves  = curves;
-    allSources = new Map(sources.map(s => [s.id, s.fields]));
+    allTests        = new Map(tests.map(t => [t.id, t.fields]));
+    allScalars      = scalars;
+    allCurves       = curves;
+    allSources      = new Map(sources.map(s => [s.id, s.fields]));
+    allMaterialsArr = materials;
+    allMaterialsMap = new Map(materials.map(m => [m.id, m.fields]));
+    allExposuresMap = new Map(exposures.map(e => [e.id, e.fields]));
+    allMixesMap     = new Map(mixes.map(m => [m.id, m.fields]));
 
-    measLinked = measurements.filter(m => Number(m.fields.id_material) === Number(currentRecord.id));
-    GristHelpers.log(`${measurements.length} mesures au total → ${measLinked.length} pour id_material=${currentRecord.id}`, measLinked.length > 0 ? 'ok' : 'warn');
+    measLinked = measurements; // toutes les mesures, sans filtre matériau
+    GristHelpers.log(`${measurements.length} mesures chargées`, 'ok');
 
     // Indexer scalaires et courbes par measurement id
     measScalarsByMeas = new Map();
@@ -938,8 +948,7 @@ async function loadMeasurementsTable() {
     buildMeasTableHeader();
     renderMeasTable();
 
-    if (measLinked.length > 0)
-      document.getElementById('meas-table-panel').style.display = '';
+    document.getElementById('meas-table-panel').style.display = measLinked.length > 0 ? '' : 'none';
 
   } catch(err) {
     GristHelpers.log('Erreur chargement mesures : ' + err.message, 'err');
@@ -950,7 +959,7 @@ async function loadMeasurementsTable() {
 // Construit l'en-tête du tableau (colonnes fixes + dynamiques)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Type Cl⁻', 'Source', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat',
+  const fixedCols = ['Test', 'Type Cl⁻', 'Matériau', 'Source', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat',
                      'Type mat.', 'Type expo.', 'Nature', 'E/C', 'E/L', 'Eau (kg/m³)'];
   const allCols   = [...fixedCols, ...measScalarNames, 'Courbes'];
   const tr = document.querySelector('#meas-thead tr');
@@ -980,23 +989,26 @@ function renderMeasTable() {
     const srcLabel = src
       ? (src.designation || (src.authors ? src.authors.split(',')[0].trim() + (src.year ? ' ' + src.year : '') : '—'))
       : '—';
+    const matF  = allMaterialsMap.get(f.id_material) || {};
+    const expoF = allExposuresMap.get(matF.id_exposure) || {};
+    const mixF  = allMixesMap.get(matF.id_mix_design) || {};
     return {
       id:          m.id,
       test:        test.name || '',
       testType:    test.test_type || '',
+      mat_name:    matF.name            || '',
       source:      srcLabel,
       sample_type: f.sample_type || '',
       dimensions:  f.sample_dimensions || '',
       operator:    f.operator || '',
       prep:        tsToDateInput(f.preparation_date) || '',
       result:      tsToDateInput(f.result_date) || '',
-      // Matériau / Exposition / Formulation (constants pour toutes les lignes du matériau courant)
-      mat_type:    currentMatFields.material_type    || '',
-      expo_type:   currentExpoFields.exposure_type   || '',
-      expo_nature: currentExpoFields.exposure_nature || '',
-      wc_ratio:    currentMixFields.wc_ratio          ?? null,
-      wl_ratio:    currentMixFields.wl_ratio          ?? null,
-      water_kg:    currentMixFields.water_content_kg  ?? null,
+      mat_type:    matF.material_type    || '',
+      expo_type:   expoF.exposure_type   || '',
+      expo_nature: expoF.exposure_nature || '',
+      wc_ratio:    mixF.wc_ratio         ?? null,
+      wl_ratio:    mixF.wl_ratio         ?? null,
+      water_kg:    mixF.water_content_kg ?? null,
       scalars:     scalarVals,
       scalarUnits: measScalarNames.map(n => { const s = scMap.get(n); return s ? (s.unit || '') : ''; }),
       nCurves:     mCurves.length,
@@ -1006,7 +1018,7 @@ function renderMeasTable() {
   // Filtre texte
   if (query) {
     rows = rows.filter(r => {
-      const all = [r.test, r.testType, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+      const all = [r.test, r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
                    r.mat_type, r.expo_type, r.expo_nature,
                    r.wc_ratio != null ? String(r.wc_ratio) : '',
                    r.wl_ratio != null ? String(r.wl_ratio) : '',
@@ -1061,6 +1073,7 @@ function renderMeasTable() {
     return `<tr${sel} data-meas-id="${r.id}">
       <td><span class="meas-badge">${r.test || '?'}</span></td>
       <td>${clTag(r.testType)}</td>
+      <td>${r.mat_name    || '—'}</td>
       <td>${r.source      || '—'}</td>
       <td>${r.sample_type || '—'}</td>
       <td>${r.dimensions  || '—'}</td>
@@ -1088,7 +1101,7 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.test, r.testType, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+  const fixed = [r.test, r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
                  r.mat_type, r.expo_type, r.expo_nature, r.wc_ratio, r.wl_ratio, r.water_kg];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
@@ -1127,6 +1140,13 @@ function selectMeasRow(measId) {
   const mScalars = measScalarsByMeas.get(measId) || [];
   const mCurves  = measCurvesByMeas.get(measId)  || [];
   const test     = allTests.get(m.fields.id_test) || {};
+
+  // Charger le formulaire d'édition du matériau de cette mesure
+  const matRecord = allMaterialsArr.find(r => r.id === m.fields.id_material);
+  if (matRecord) {
+    currentRecord = matRecord;
+    loadMaterial(matRecord);
+  }
 
   // Titre du panneau détail
   const prep   = tsToDateInput(m.fields.preparation_date) || '—';
@@ -1456,6 +1476,7 @@ function resetChanges() {
     await loadMaterial(record);
   });
   await GristHelpers.ensureSchema();
+  await loadMeasurementsTable();
 })();
 </script>
 </body>
