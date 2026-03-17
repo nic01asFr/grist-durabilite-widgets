@@ -777,22 +777,52 @@
     // DROPDOWNS
     // =========================================================================
     function populateDropdowns() {
-      fillDrop('sel-source',        allSources,     s => `${s.fields.authors || '?'} (${s.fields.year || '?'}) — ${(s.fields.title || '').substring(0, 40)}`);
-      fillDrop('sel-binder-cement', allBinders,     b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
-      fillDrop('sel-binder-scm',    allBinders,     b => `${b.fields.name || '?'} (${b.fields.binder_type || '?'})`);
-      fillDrop('sel-aggregate',     allAggregates,  a => `${a.fields.name || '?'} (${a.fields.aggregate_type || '?'}) ${a.fields.size_min_mm ?? ''}–${a.fields.size_max_mm ?? ''} mm`);
-      fillDrop('sel-mix',           allMixes,       m => `#${m.id} — E/C=${m.fields.wc_ratio ?? '?'}`);
-      fillDrop('sel-exposure',      allExposures,   e => `#${e.id} — ${e.fields.exposure_type || '?'} / ${e.fields.exposure_nature || '?'}`);
-      fillDrop('sel-curing',        allCurings,     c => `#${c.id} — ${c.fields.curing_method || '?'} ${c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : ''}${c.fields.curing_duration_days != null ? ' · ' + c.fields.curing_duration_days + 'j' : ''}`);
-      fillDrop('sel-site',          allSites,       s => `#${s.id} — ${s.fields.country_region || '?'}`);
-      fillDrop('sel-material',      allMaterials,   m => `${m.fields.name || '?'} (${m.fields.material_type || '?'})`);
+      fillDrop('sel-source', allSources, s => {
+        const label = s.fields.designation
+          || (s.fields.authors ? `${s.fields.authors.split(',')[0].trim()}${s.fields.year ? ' ' + s.fields.year : ''}` : null)
+          || `Source #${s.id}`;
+        const suffix = s.fields.title ? ' — ' + s.fields.title.substring(0, 35) : '';
+        return label + suffix;
+      });
+      fillDrop('sel-binder-cement', allBinders,    b => `${b.fields.name || 'Liant #' + b.id} (${b.fields.binder_type || '?'})`);
+      fillDrop('sel-binder-scm',    allBinders,    b => `${b.fields.name || 'Liant #' + b.id} (${b.fields.binder_type || '?'})`);
+      fillDrop('sel-aggregate',     allAggregates, a => {
+        const name = a.fields.name || `Granulat #${a.id}`;
+        const type = a.fields.aggregate_type || '';
+        const size = (a.fields.size_min_mm != null || a.fields.size_max_mm != null)
+          ? ` ${a.fields.size_min_mm ?? '?'}–${a.fields.size_max_mm ?? '?'} mm` : '';
+        return `${name}${type ? ' (' + type + ')' : ''}${size}`;
+      });
+      fillDrop('sel-mix', allMixes, m => {
+        const ec  = m.fields.wc_ratio != null ? `E/C=${m.fields.wc_ratio}` : '';
+        const eau = m.fields.water_content_kg != null ? ` · eau=${m.fields.water_content_kg} kg` : '';
+        return `#${m.id}${ec ? ' — ' + ec : ''}${eau}`;
+      });
+      fillDrop('sel-exposure', allExposures, e => {
+        const type = e.fields.exposure_type   || '';
+        const nat  = e.fields.exposure_nature || '';
+        return `#${e.id} — ${[type, nat].filter(Boolean).join(' / ') || '?'}`;
+      });
+      fillDrop('sel-curing', allCurings, c => {
+        const method = c.fields.curing_method || '';
+        const temp   = c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : '';
+        const dur    = c.fields.curing_duration_days != null ? c.fields.curing_duration_days + 'j' : '';
+        return `#${c.id} — ${[method, temp, dur].filter(Boolean).join(' · ') || '?'}`;
+      });
+      fillDrop('sel-site', allSites, s => {
+        const region = s.fields.country_region || '';
+        const coords = s.fields.latitude != null
+          ? `${s.fields.latitude.toFixed(1)}°N ${s.fields.longitude != null ? s.fields.longitude.toFixed(1) + '°E' : ''}` : '';
+        return `#${s.id} — ${region || coords || '?'}`;
+      });
+      fillDrop('sel-material',  allMaterials,  m => `${m.fields.name || 'Matériau #' + m.id} (${m.fields.material_type || '?'})`);
 
       const matMeasures = sel.material
         ? allMeasurements.filter(m => m.fields.id_material === sel.material)
         : allMeasurements;
       fillDrop('sel-measurement', matMeasures, m => {
         const test = allTests.find(t => t.id === m.fields.id_test);
-        return `#${m.id} — ${test?.fields.name || '?'} — ${m.fields.sample_dimensions || m.fields.sample_type || '?'} — ${m.fields.preparation_date || '?'}`;
+        return `#${m.id} — ${test?.fields.name || '?'} (${test?.fields.test_type || '?'}) — ${m.fields.sample_dimensions || m.fields.sample_type || '?'}`;
       });
 
       fillDrop('f-meas-test', allTests, t => `${t.fields.name || '?'} (${t.fields.test_type || '?'}) — ${t.fields.standard_name || 'sans norme'}`);
