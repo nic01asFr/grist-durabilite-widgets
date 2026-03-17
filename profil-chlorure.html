@@ -11,22 +11,71 @@
   <script src="assets/grist-helpers.js"></script>
 
   <style>
-    #chart { width: 100%; height: 520px; border-radius: 8px; overflow: hidden; }
-    .filter-card { background: var(--surface); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; }
-    .filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
-    .filter-row:last-child { margin-bottom: 0; }
-    .filter-sep { width: 1px; height: 24px; background: var(--surface2); }
-    .filter-label { font-size: 11px; color: var(--text-dim); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.3px; }
-    .filter-row select, .filter-row input[type="number"] {
-      padding: 5px 8px; background: var(--bg); border: 1px solid var(--surface2);
+    #chart { width: 100%; height: 500px; border-radius: 8px; overflow: hidden; }
+
+    /* Carte de filtres */
+    .filter-card {
+      background: var(--surface); border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 10px;
+    }
+    .filt-block {
+      padding: 6px 0; border-bottom: 1px solid var(--surface2);
+    }
+    .filt-block:last-child { border-bottom: none; padding-bottom: 0; }
+    .filt-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .filt-lbl {
+      font-size: 10px; color: var(--text-dim); text-transform: uppercase;
+      letter-spacing: 0.4px; white-space: nowrap; min-width: 68px;
+    }
+    .filt-sep { width: 1px; height: 20px; background: var(--surface2); flex-shrink: 0; }
+    .filt-row select, .filt-row input[type="number"] {
+      padding: 4px 7px; background: var(--bg); border: 1px solid var(--surface2);
       border-radius: 6px; color: var(--text); font-size: 12px;
     }
-    .filter-row select:focus, .filter-row input[type="number"]:focus { outline: none; border-color: var(--accent); }
-    .filter-row input[type="number"] { width: 72px; }
-    .chart-card { background: var(--surface); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
-    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .chart-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .filt-row select:focus, .filt-row input[type="number"]:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .filt-row input[type="number"] { width: 68px; }
+    .dash { color: var(--text-dim); font-size: 12px; }
+
+    /* Chips (checkboxes stylisés) */
+    .chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
+    .chip {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 20px;
+      border: 1px solid var(--surface2); background: var(--bg);
+      font-size: 11px; cursor: pointer; user-select: none; transition: all 0.12s;
+      color: var(--text-muted);
+    }
+    .chip:has(input:checked) {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+    .chip input { display: none; }
+
+    /* Multi-select binders */
+    #f-binder {
+      min-width: 180px; max-width: 320px;
+      background: var(--bg); border: 1px solid var(--surface2);
+      border-radius: 6px; color: var(--text); font-size: 12px; padding: 3px 6px;
+    }
+    #f-binder:focus { outline: none; border-color: var(--accent); }
+    #f-binder option { padding: 2px 4px; }
+    .binder-hint { font-size: 10px; color: var(--text-dim); }
+
+    /* Carte graphique */
+    .chart-card {
+      background: var(--surface); border-radius: 10px; padding: 14px; margin-bottom: 10px;
+    }
+    .chart-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    }
+    .chart-title {
+      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
     .chart-stats { font-size: 12px; color: var(--text-dim); }
+
+    /* Journal */
     .log-overlay {
       position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
       z-index: 1000; width: 420px; max-width: 94vw;
@@ -34,9 +83,13 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.15); display: none;
     }
     .log-overlay.visible { display: block; }
-    .log-overlay-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-    .empty-chart { display: flex; align-items: center; justify-content: center;
-      height: 480px; color: var(--text-dim); font-size: 14px; }
+    .log-overlay-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    }
+    .empty-chart {
+      display: flex; align-items: center; justify-content: center;
+      height: 460px; color: var(--text-dim); font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -50,55 +103,88 @@
     </div>
   </div>
 
-  <!-- Filtres -->
+  <!-- ===== FILTRES ===== -->
   <div class="filter-card">
-    <div class="filter-row">
-      <span class="filter-label">Couleur :</span>
-      <select id="f-colorby" onchange="render()">
-        <option value="exposure_nature">Nature exposition</option>
-        <option value="cl_type">Type Cl⁻ (total / libre)</option>
-        <option value="cement">Ciment principal</option>
-        <option value="source">Source</option>
-        <option value="wc_ratio">E/C (continu)</option>
-        <option value="duration">Durée exposition (continu)</option>
-      </select>
-      <div class="filter-sep"></div>
-      <span class="filter-label">Type Cl⁻ :</span>
-      <select id="f-cltype" onchange="render()">
-        <option value="">Les deux</option>
-        <option value="total_cl">Total</option>
-        <option value="free_cl">Libre</option>
-      </select>
-      <div class="filter-sep"></div>
-      <span class="filter-label">Type exposition :</span>
-      <select id="f-expotype" onchange="render()">
-        <option value="">Tous</option>
-        <option value="laboratory">Laboratoire</option>
-        <option value="in-situ">In situ</option>
-      </select>
+
+    <!-- Affichage -->
+    <div class="filt-block">
+      <div class="filt-row">
+        <span class="filt-lbl">Couleur</span>
+        <select id="f-colorby" onchange="render()">
+          <option value="exposure_nature">Nature exposition</option>
+          <option value="binder_sig">Type d'addition</option>
+          <option value="cl_type">Type Cl⁻ (total / libre)</option>
+          <option value="cement">Ciment principal</option>
+          <option value="source">Source</option>
+          <option value="wc_ratio">E/L (continu)</option>
+          <option value="duration">Durée exposition (continu)</option>
+          <option value="latitude">Latitude (continu)</option>
+        </select>
+        <div class="filt-sep"></div>
+        <span class="filt-lbl">Type Cl⁻</span>
+        <select id="f-cltype" onchange="render()">
+          <option value="">Les deux</option>
+          <option value="total_cl">Total</option>
+          <option value="free_cl">Libre</option>
+        </select>
+      </div>
     </div>
-    <div class="filter-row">
-      <span class="filter-label">Nature :</span>
-      <select id="f-exponent" onchange="render()">
-        <option value="">Toutes</option>
-        <option value="atmospheric">Atmosphérique</option>
-        <option value="spray">Spray</option>
-        <option value="splash">Éclaboussures</option>
-        <option value="tidal">Marnage</option>
-        <option value="submerged">Immergé</option>
-      </select>
-      <div class="filter-sep"></div>
-      <span class="filter-label">Ciment :</span>
-      <select id="f-cement" onchange="render()"><option value="">Tous</option></select>
-      <div class="filter-sep"></div>
-      <span class="filter-label">Durée (ans) :</span>
-      <input type="number" id="f-dur-min" placeholder="min" min="0" step="1" oninput="render()">
-      <span style="color:var(--text-dim); font-size:12px;">—</span>
-      <input type="number" id="f-dur-max" placeholder="max" min="0" step="1" oninput="render()">
+
+    <!-- Plages numériques -->
+    <div class="filt-block">
+      <div class="filt-row">
+        <span class="filt-lbl">E/L</span>
+        <input type="number" id="f-wc-min" placeholder="min" min="0" max="2" step="0.05" oninput="render()">
+        <span class="dash">—</span>
+        <input type="number" id="f-wc-max" placeholder="max" min="0" max="2" step="0.05" oninput="render()">
+        <div class="filt-sep"></div>
+        <span class="filt-lbl">Durée (ans)</span>
+        <input type="number" id="f-dur-min" placeholder="min" min="0" step="1" oninput="render()">
+        <span class="dash">—</span>
+        <input type="number" id="f-dur-max" placeholder="max" min="0" step="1" oninput="render()">
+        <div class="filt-sep"></div>
+        <span class="filt-lbl">Latitude (°)</span>
+        <input type="number" id="f-lat-min" placeholder="min" step="1" oninput="render()">
+        <span class="dash">—</span>
+        <input type="number" id="f-lat-max" placeholder="max" step="1" oninput="render()">
+      </div>
     </div>
+
+    <!-- Type d'addition -->
+    <div class="filt-block">
+      <div class="filt-row" style="align-items:flex-start;">
+        <span class="filt-lbl" style="padding-top:4px;">Addition</span>
+        <div>
+          <select id="f-binder" multiple size="4" onchange="render()"></select>
+          <div class="binder-hint" style="margin-top:3px;">Ctrl+clic = multi · aucune sélection = tous</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nature et type d'exposition -->
+    <div class="filt-block">
+      <div class="filt-row" style="margin-bottom:5px;">
+        <span class="filt-lbl">Nature</span>
+        <div class="chip-group">
+          <label class="chip"><input type="checkbox" name="nature" value="atmospheric" onchange="render()">Atmosphérique</label>
+          <label class="chip"><input type="checkbox" name="nature" value="spray" onchange="render()">Spray</label>
+          <label class="chip"><input type="checkbox" name="nature" value="splash" onchange="render()">Éclaboussures</label>
+          <label class="chip"><input type="checkbox" name="nature" value="tidal" onchange="render()">Marnage</label>
+          <label class="chip"><input type="checkbox" name="nature" value="submerged" onchange="render()">Immergé</label>
+        </div>
+      </div>
+      <div class="filt-row">
+        <span class="filt-lbl">Type</span>
+        <div class="chip-group">
+          <label class="chip"><input type="checkbox" name="expotype" value="laboratory" onchange="render()">Laboratoire</label>
+          <label class="chip"><input type="checkbox" name="expotype" value="in-situ" onchange="render()">In situ</label>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Graphique -->
+  <!-- ===== GRAPHIQUE ===== -->
   <div class="chart-card">
     <div class="chart-header">
       <span class="chart-title">Profil en chlorures — Concentration vs Profondeur</span>
@@ -107,7 +193,7 @@
     <div id="chart"><div class="empty-chart">Chargement des données…</div></div>
   </div>
 
-  <!-- Journal -->
+  <!-- ===== JOURNAL ===== -->
   <div class="log-overlay" id="log-overlay">
     <div class="log-overlay-header">
       <span style="font-size:13px; font-weight:600; color:var(--text-muted);">Journal</span>
@@ -118,39 +204,38 @@
 
   <script>
     // =========================================================================
-    // COULEURS
+    // PALETTES
     // =========================================================================
     const COLORS_NATURE = {
-      atmospheric: '#3b82f6',
-      spray:       '#f59e0b',
-      splash:      '#22c55e',
-      tidal:       '#a855f7',
-      submerged:   '#ef4444',
+      atmospheric: '#3b82f6', spray: '#f59e0b', splash: '#22c55e',
+      tidal: '#a855f7', submerged: '#ef4444',
     };
-    const COLORS_CLTYPE = {
-      total_cl: '#0ea5e9',
-      free_cl:  '#f97316',
-    };
+    const COLORS_CLTYPE = { total_cl: '#0ea5e9', free_cl: '#f97316' };
     const CAT_PALETTE = [
       '#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7',
       '#06b6d4','#ec4899','#84cc16','#f97316','#6366f1',
       '#14b8a6','#78716c','#b45309','#1d4ed8','#be123c',
     ];
+    const SCM_LABELS = {
+      fly_ash: 'FA', silica_fume: 'SF', slag: 'Laitier',
+      metakaolin: 'MK', limestone_filler: 'Calcaire',
+      natural_pozzolan: 'Pouzzolane', zeolite: 'Zéolite', other: 'Autre',
+    };
 
-    // Interpolation continue bleu→rouge
+    // Interpolation continue bleu → rouge
     function contColor(t) {
-      const r = Math.round(59  + (239 - 59)  * t);
-      const g = Math.round(130 + (68  - 130) * t);
-      const b = Math.round(246 + (68  - 246) * t);
+      const r = Math.round(59  + (239 -  59) * t);
+      const g = Math.round(130 + ( 68 - 130) * t);
+      const b = Math.round(246 + ( 68 - 246) * t);
       return `rgb(${r},${g},${b})`;
     }
 
     // =========================================================================
     // STATE
     // =========================================================================
-    let profiles  = [];  // résultats joinChlorideProfiles filtrés par cl_profil
-    let testMap   = new Map();  // id → {name, test_type}
-    let catIndex  = new Map();  // key → palette index (pour couleurs catégorielles)
+    let profiles     = [];
+    let testMap      = new Map();
+    let catIndex     = new Map();
     let chartRendered = false;
 
     function toggleLog() {
@@ -185,32 +270,25 @@
         ]);
 
         GristHelpers.log(
-          `${dataPoints.length} pts, ${curves.length} courbes, ${measurements.length} mesures, ` +
-          `${materials.length} matériaux, ${binders.length} liants, ${tests.length} tests`, 'ok');
+          `${dataPoints.length} pts · ${curves.length} courbes · ` +
+          `${materials.length} matériaux · ${binders.length} liants`, 'ok');
 
-        // Index des tests
         testMap = new Map(tests.map(t => [t.id, t.fields]));
 
-        // IDs des tests cl_profil
         const clTestIds = new Set(
           tests.filter(t => t.fields.name === 'cl_profil').map(t => t.id)
         );
 
-        // Construire les profils enrichis via grist-helpers
         const allProfiles = GristHelpers.joinChlorideProfiles(
           dataPoints, curves, measurements, materials,
           mixDesigns, mixBinders, binders,
           exposures, sites, sources, scalars
         );
 
-        // Ne garder que les profils Cl⁻ (test = cl_profil)
         profiles = allProfiles.filter(p => clTestIds.has(p.measurement.id_test));
+        GristHelpers.log(`${profiles.length} profils Cl⁻ valides`, 'ok');
 
-        GristHelpers.log(`${profiles.length} profils chlorures valides`, 'ok');
-
-        // Construire la liste des ciments pour le filtre
-        buildCementFilter();
-
+        buildBinderFilter();
         catIndex.clear();
         render();
         GristHelpers.setStatus(`${profiles.length} profils`, 'ready');
@@ -221,22 +299,33 @@
     }
 
     // =========================================================================
-    // FILTRE CIMENT — construit dynamiquement
+    // FILTRE TYPE D'ADDITION — construit dynamiquement
     // =========================================================================
-    function buildCementFilter() {
-      const names = [...new Set(
-        profiles.map(p => primaryCementName(p)).filter(Boolean)
-      )].sort();
-      const sel = document.getElementById('f-cement');
-      const prev = sel.value;
-      sel.innerHTML = '<option value="">Tous</option>' +
-        names.map(n => `<option value="${n}">${n}</option>`).join('');
-      if (names.includes(prev)) sel.value = prev;
+    function buildBinderFilter() {
+      const sigs = [...new Set(profiles.map(getBinderSignature))].sort();
+      const sel  = document.getElementById('f-binder');
+      const prev = [...sel.selectedOptions].map(o => o.value);
+      sel.innerHTML = sigs.map(s => `<option value="${s}">${s}</option>`).join('');
+      // Restaurer la sélection précédente si possible
+      for (const opt of sel.options) {
+        if (prev.includes(opt.value)) opt.selected = true;
+      }
+      sel.size = Math.min(sigs.length || 1, 5);
     }
 
     // =========================================================================
     // UTILITAIRES
     // =========================================================================
+    function getBinderSignature(p) {
+      if (!p.binders || p.binders.length === 0) return 'Inconnu';
+      const scms = p.binders.filter(b =>
+        b.binder_type !== 'portland_cement' && b.binder_type !== 'blended_cement'
+      );
+      if (scms.length === 0) return 'Portland seul';
+      const labels = scms.map(b => SCM_LABELS[b.binder_type] || b.binder_type);
+      return 'Portland + ' + labels.join(' + ');
+    }
+
     function primaryCementName(p) {
       if (!p.binders || p.binders.length === 0) return null;
       const cem = p.binders.find(b =>
@@ -246,73 +335,90 @@
     }
 
     function getTestType(p) {
-      const t = testMap.get(p.measurement.id_test) || {};
-      return t.test_type || '';
+      return (testMap.get(p.measurement.id_test) || {}).test_type || '';
+    }
+
+    // Retourne un Set des valeurs cochées pour les checkboxes d'un name donné
+    // Si rien n'est coché, retourne null (= pas de filtre)
+    function getChecked(name) {
+      const vals = [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
+      return vals.length === 0 ? null : new Set(vals);
+    }
+
+    // Retourne un Set des options sélectionnées dans un <select multiple>
+    // Si rien n'est sélectionné, retourne null (= pas de filtre)
+    function getMultiSelect(id) {
+      const vals = [...document.getElementById(id).selectedOptions].map(o => o.value);
+      return vals.length === 0 ? null : new Set(vals);
     }
 
     function hoverText(p) {
       const src = p.source.designation ||
-        (p.source.authors ? p.source.authors.split(',')[0].trim() + (p.source.year ? ' ' + p.source.year : '') : '?');
-      const expo = [
-        p.exposure.exposure_nature || '',
-        p.exposure.exposure_type   || ''
-      ].filter(Boolean).join(' / ');
+        (p.source.authors ? p.source.authors.split(',')[0].trim() +
+          (p.source.year ? ' ' + p.source.year : '') : '?');
+      const expo = [p.exposure.exposure_nature, p.exposure.exposure_type]
+        .filter(Boolean).join(' / ');
       const dur = p.scalars.exposure_duration != null
         ? p.scalars.exposure_duration.toFixed(1) + ' ans' : '?';
-      const ec  = p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?';
-      const D   = p.scalars.D  != null ? GristHelpers.formatDapp(p.scalars.D)  : '?';
-      const Cs  = p.scalars.Cs != null ? p.scalars.Cs.toFixed(3) + ' %'        : '?';
+      const ec  = p.mix.wc_ratio   != null ? p.mix.wc_ratio.toFixed(2) : '?';
+      const D   = p.scalars.D      != null ? GristHelpers.formatDapp(p.scalars.D) : '?';
+      const Cs  = p.scalars.Cs     != null ? p.scalars.Cs.toFixed(3) + ' %' : '?';
+      const lat = p.site.latitude  != null ? p.site.latitude.toFixed(2) + '°N' : '?';
       const cem = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
       const cltype = getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
       return `<b>${p.material.name || 'Matériau'}</b> — ${cltype}<br>` +
              `Source : ${src}<br>` +
              `Exposition : ${expo}<br>` +
-             `Durée : ${dur}<br>` +
+             `Durée : ${dur} · Latitude : ${lat}<br>` +
              `Liants : ${cem}<br>` +
-             `E/C : ${ec}<br>` +
-             `Dapp : ${D} — Cs : ${Cs}`;
+             `Addition : ${getBinderSignature(p)}<br>` +
+             `E/L : ${ec} · Dapp : ${D} · Cs : ${Cs}`;
     }
 
     // =========================================================================
     // COULEUR PAR CRITÈRE
     // =========================================================================
-    function getColor(p, colorBy, allVals) {
-      if (colorBy === 'exposure_nature') {
-        return COLORS_NATURE[p.exposure.exposure_nature] || '#94a3b8';
-      }
-      if (colorBy === 'cl_type') {
-        return COLORS_CLTYPE[getTestType(p)] || '#94a3b8';
-      }
-      if (colorBy === 'cement') {
-        const key = primaryCementName(p) || 'Inconnu';
-        return catColor(key);
-      }
-      if (colorBy === 'source') {
-        const key = p.source.designation ||
-          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu');
-        return catColor(key);
-      }
-      if (colorBy === 'wc_ratio') {
-        const v = p.mix.wc_ratio;
-        if (v == null || allVals.min === allVals.max) return '#94a3b8';
-        return contColor((v - allVals.min) / (allVals.max - allVals.min));
-      }
-      if (colorBy === 'duration') {
-        const v = p.scalars.exposure_duration;
-        if (v == null || allVals.min === allVals.max) return '#94a3b8';
-        return contColor((v - allVals.min) / (allVals.max - allVals.min));
+    function getColor(p, colorBy, contVals) {
+      switch (colorBy) {
+        case 'exposure_nature': return COLORS_NATURE[p.exposure.exposure_nature] || '#94a3b8';
+        case 'cl_type':         return COLORS_CLTYPE[getTestType(p)] || '#94a3b8';
+        case 'binder_sig':      return catColor(getBinderSignature(p));
+        case 'cement':          return catColor(primaryCementName(p) || 'Inconnu');
+        case 'source':          return catColor(
+          p.source.designation ||
+          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu'));
+        case 'wc_ratio': {
+          const v = p.mix.wc_ratio;
+          return contScale(v, contVals);
+        }
+        case 'duration': {
+          const v = p.scalars.exposure_duration;
+          return contScale(v, contVals);
+        }
+        case 'latitude': {
+          const v = p.site.latitude;
+          return contScale(v, contVals);
+        }
       }
       return '#94a3b8';
     }
 
     function getLegendKey(p, colorBy) {
-      if (colorBy === 'exposure_nature') return p.exposure.exposure_nature || 'Inconnu';
-      if (colorBy === 'cl_type')         return getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
-      if (colorBy === 'cement')          return primaryCementName(p) || 'Inconnu';
-      if (colorBy === 'source')          return p.source.designation ||
-        (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu');
-      if (colorBy === 'wc_ratio')        return `E/C = ${p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?'}`;
-      if (colorBy === 'duration')        return `${p.scalars.exposure_duration != null ? p.scalars.exposure_duration.toFixed(0) + ' ans' : '?'}`;
+      switch (colorBy) {
+        case 'exposure_nature': return p.exposure.exposure_nature || 'Inconnu';
+        case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
+        case 'binder_sig':      return getBinderSignature(p);
+        case 'cement':          return primaryCementName(p) || 'Inconnu';
+        case 'source':          return p.source.designation ||
+          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu');
+        case 'wc_ratio':
+          return p.mix.wc_ratio   != null ? `E/L = ${p.mix.wc_ratio.toFixed(2)}`  : '?';
+        case 'duration':
+          return p.scalars.exposure_duration != null
+            ? `${p.scalars.exposure_duration.toFixed(0)} ans` : '?';
+        case 'latitude':
+          return p.site.latitude != null ? `${p.site.latitude.toFixed(1)}°N` : '?';
+      }
       return 'Inconnu';
     }
 
@@ -321,68 +427,98 @@
       return CAT_PALETTE[catIndex.get(key)];
     }
 
+    function contScale(v, { min, max }) {
+      if (v == null || min === max) return '#94a3b8';
+      return contColor((v - min) / (max - min));
+    }
+
+    function contRange(arr) {
+      const vals = arr.filter(v => v != null);
+      return { min: Math.min(...vals), max: Math.max(...vals) };
+    }
+
     // =========================================================================
     // RENDU PLOTLY
     // =========================================================================
     function render() {
-      if (profiles.length === 0) return;
+      if (profiles.length === 0) {
+        document.getElementById('chart').innerHTML =
+          '<div class="empty-chart">Aucune donnée — remplissez la base via le widget Saisie.</div>';
+        document.getElementById('chart-stats').textContent = '0 profil';
+        return;
+      }
 
       const colorBy   = document.getElementById('f-colorby').value;
       const clType    = document.getElementById('f-cltype').value;
-      const expoType  = document.getElementById('f-expotype').value;
-      const expoNat   = document.getElementById('f-exponent').value;
-      const cement    = document.getElementById('f-cement').value;
+      const wcMin     = parseFloat(document.getElementById('f-wc-min').value)  || null;
+      const wcMax     = parseFloat(document.getElementById('f-wc-max').value)  || null;
       const durMin    = parseFloat(document.getElementById('f-dur-min').value) || null;
       const durMax    = parseFloat(document.getElementById('f-dur-max').value) || null;
+      const latMin    = parseFloat(document.getElementById('f-lat-min').value);
+      const latMax    = parseFloat(document.getElementById('f-lat-max').value);
+      const natures   = getChecked('nature');
+      const expoTypes = getChecked('expotype');
+      const binderSel = getMultiSelect('f-binder');
+
+      const latMinF = isNaN(latMin) ? null : latMin;
+      const latMaxF = isNaN(latMax) ? null : latMax;
 
       // Filtrage
       const filtered = profiles.filter(p => {
-        if (clType   && getTestType(p) !== clType)                             return false;
-        if (expoType && p.exposure.exposure_type !== expoType)                 return false;
-        if (expoNat  && p.exposure.exposure_nature !== expoNat)                return false;
-        if (cement   && primaryCementName(p) !== cement)                       return false;
+        if (clType    && getTestType(p)                 !== clType)    return false;
+        if (natures   && !natures.has(p.exposure.exposure_nature))     return false;
+        if (expoTypes && !expoTypes.has(p.exposure.exposure_type))     return false;
+        if (binderSel && !binderSel.has(getBinderSignature(p)))        return false;
+        const wc  = p.mix.wc_ratio;
+        if (wcMin  != null && (wc  == null || wc  < wcMin))            return false;
+        if (wcMax  != null && (wc  == null || wc  > wcMax))            return false;
         const dur = p.scalars.exposure_duration;
-        if (durMin != null && (dur == null || dur < durMin))                   return false;
-        if (durMax != null && (dur == null || dur > durMax))                   return false;
+        if (durMin != null && (dur == null || dur < durMin))           return false;
+        if (durMax != null && (dur == null || dur > durMax))           return false;
+        const lat = p.site.latitude;
+        if (latMinF != null && (lat == null || lat < latMinF))         return false;
+        if (latMaxF != null && (lat == null || lat > latMaxF))         return false;
         return true;
       });
 
+      const nbSites   = new Set(filtered.map(p => p.site.country_region || '')).size;
+      const nbSources = new Set(filtered.map(p => p.source.designation || p.source.id)).size;
       document.getElementById('chart-stats').textContent =
         `${filtered.length} profil${filtered.length > 1 ? 's' : ''} · ` +
-        `${new Set(filtered.map(p => p.site.country_region || '')).size} site${filtered.length > 1 ? 's' : ''} · ` +
-        `${new Set(filtered.map(p => p.source.designation || p.source.id)).size} source${filtered.length > 1 ? 's' : ''}`;
+        `${nbSites} site${nbSites > 1 ? 's' : ''} · ` +
+        `${nbSources} source${nbSources > 1 ? 's' : ''}`;
 
       if (filtered.length === 0) {
-        document.getElementById('chart').innerHTML = '<div class="empty-chart">Aucun profil ne correspond aux filtres.</div>';
+        document.getElementById('chart').innerHTML =
+          '<div class="empty-chart">Aucun profil ne correspond aux filtres.</div>';
         chartRendered = false;
         return;
       }
 
-      // Plage pour couleurs continues
-      let allVals = { min: 0, max: 1 };
-      if (colorBy === 'wc_ratio') {
-        const vals = filtered.map(p => p.mix.wc_ratio).filter(v => v != null);
-        allVals = { min: Math.min(...vals), max: Math.max(...vals) };
-      } else if (colorBy === 'duration') {
-        const vals = filtered.map(p => p.scalars.exposure_duration).filter(v => v != null);
-        allVals = { min: Math.min(...vals), max: Math.max(...vals) };
-      }
+      // Plage pour couleurs continues (calculée sur les profils filtrés)
+      const contVals = (() => {
+        if (colorBy === 'wc_ratio')
+          return contRange(filtered.map(p => p.mix.wc_ratio));
+        if (colorBy === 'duration')
+          return contRange(filtered.map(p => p.scalars.exposure_duration));
+        if (colorBy === 'latitude')
+          return contRange(filtered.map(p => p.site.latitude));
+        return { min: 0, max: 1 };
+      })();
 
-      // Grouper par legendgroup (une trace par groupe = null-separated)
-      const groups = new Map(); // key → { color, x:[], y:[], hovertemplate:[] }
+      // Grouper les profils par legendgroup (null-separated dans la même trace)
+      const groups   = new Map();
       const seenKeys = new Set();
 
       for (const p of filtered) {
         const key   = getLegendKey(p, colorBy);
-        const color = getColor(p, colorBy, allVals);
+        const color = getColor(p, colorBy, contVals);
         if (!groups.has(key)) groups.set(key, { color, x: [], y: [], htext: [] });
         const g = groups.get(key);
         if (g.x.length > 0) { g.x.push(null); g.y.push(null); g.htext.push(''); }
         const ht = hoverText(p);
         for (const pt of p.points) {
-          g.x.push(pt.x);
-          g.y.push(pt.y);
-          g.htext.push(ht);
+          g.x.push(pt.x); g.y.push(pt.y); g.htext.push(ht);
         }
       }
 
@@ -392,13 +528,13 @@
           x: g.x, y: g.y,
           text: g.htext,
           hovertemplate: '%{text}<extra></extra>',
-          mode:  'lines+markers',
-          type:  'scatter',
-          name:  key,
+          mode: 'lines+markers',
+          type: 'scatter',
+          name: key,
           legendgroup: key,
           showlegend: !seenKeys.has(key),
-          line:    { color: g.color, width: 1.5 },
-          marker:  { color: g.color, size: 5, opacity: 0.8 },
+          line:   { color: g.color, width: 1.5 },
+          marker: { color: g.color, size: 5, opacity: 0.85 },
           opacity: 0.85,
           connectgaps: false,
         });
@@ -410,11 +546,8 @@
         yaxis: GristHelpers.plotlyDarkAxis('Teneur en Cl⁻ (% masse liants)'),
         margin: { t: 10, r: 20, b: 50, l: 65 },
         legend: {
-          bgcolor: 'rgba(255,255,255,0.92)',
-          bordercolor: '#e2e8f0',
-          borderwidth: 1,
-          font: { size: 11 },
-          orientation: 'v',
+          bgcolor: 'rgba(255,255,255,0.92)', bordercolor: '#e2e8f0',
+          borderwidth: 1, font: { size: 11 },
         },
         hovermode: 'closest',
       });
@@ -434,7 +567,6 @@
     (async function () {
       GristHelpers.log('Initialisation Profils Chlorure…');
       grist.ready({ requiredAccess: 'full' });
-      GristHelpers.log('Connecté à Grist ✓', 'ok');
       await GristHelpers.ensureSchema();
       loadAllData();
     })();
