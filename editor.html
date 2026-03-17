@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Éditeur — Durabilité</title>
+
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    body { padding-bottom: 70px; }
+
+    .section-toggle { cursor: pointer; user-select: none; }
+    .section-toggle::before { content: '▾ '; }
+    .section-toggle.collapsed::before { content: '▸ '; }
+    .section-body.collapsed { display: none; }
+
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 4px; }
+    .field-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .field-item label { display: block; font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+    .field-item input, .field-item select, .field-item textarea {
+      width: 100%; padding: 6px 8px; background: var(--bg);
+      border: 1px solid var(--surface2); border-radius: 6px;
+      color: var(--text); font-size: 12px; box-sizing: border-box;
+    }
+    .field-item input:focus, .field-item select:focus, .field-item textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .field-item input.changed, .field-item select.changed, .field-item textarea.changed {
+      border-color: #f59e0b; background: rgba(245,158,11,0.07);
+    }
+    .field-item textarea { min-height: 60px; resize: vertical; }
+
+    .binder-row {
+      display: grid; grid-template-columns: 1fr auto 100px 32px;
+      gap: 8px; align-items: center; margin-bottom: 5px; font-size: 12px;
+    }
+    .binder-row .b-name { color: var(--text-muted); font-weight: 500; }
+    .binder-row .b-type { color: var(--text-dim); font-size: 11px; }
+    .binder-row input[type=number] {
+      padding: 5px 8px; background: var(--bg); border: 1px solid var(--surface2);
+      border-radius: 6px; color: var(--text); font-size: 12px;
+    }
+    .binder-row input[type=number]:focus { outline: none; border-color: var(--accent); }
+    .btn-del {
+      padding: 3px 8px; font-size: 11px; color: #ef4444;
+      background: transparent; border: 1px solid #ef4444;
+      border-radius: 5px; cursor: pointer;
+    }
+    .btn-del:hover { background: rgba(239,68,68,0.08); }
+    .btn-add-inline {
+      padding: 5px 12px; font-size: 11px; cursor: pointer;
+      background: rgba(59,130,246,0.1); color: var(--accent);
+      border: 1px solid var(--accent); border-radius: 5px; margin-top: 6px;
+    }
+    .btn-add-inline:hover { background: rgba(59,130,246,0.18); }
+    .add-binder-row {
+      display: grid; grid-template-columns: 1fr 100px auto;
+      gap: 8px; align-items: center; margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed var(--surface2);
+    }
+    .add-binder-row select, .add-binder-row input {
+      padding: 5px 8px; background: var(--bg); border: 1px solid var(--surface2);
+      border-radius: 6px; color: var(--text); font-size: 12px;
+    }
+    .add-binder-row select:focus, .add-binder-row input:focus {
+      outline: none; border-color: var(--accent);
+    }
+
+    .save-bar {
+      position: sticky; bottom: 0; z-index: 10;
+      background: var(--bg); border-top: 2px solid var(--accent);
+      padding: 10px 14px; display: flex; gap: 8px;
+      justify-content: flex-end; align-items: center;
+    }
+    .nb-changes { font-size: 12px; color: var(--text-dim); flex: 1; }
+
+    .meas-row {
+      display: flex; gap: 12px; font-size: 12px;
+      padding: 5px 0; border-bottom: 1px solid var(--surface2);
+      align-items: center; flex-wrap: wrap;
+    }
+    .meas-row:last-child { border-bottom: none; }
+    .meas-badge {
+      padding: 2px 8px; border-radius: 10px; font-size: 10px;
+      font-weight: 600; background: var(--surface2); color: var(--text-muted);
+    }
+    .meas-detail { color: var(--text-dim); font-size: 11px; }
+
+    .card { border: 1px solid var(--surface2); }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0;
+    }
+    .card-header .card-title { margin-bottom: 0; }
+    .section-body { margin-top: 12px; }
+
+    .no-binders { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 4px 0; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1><span class="icon">✏️</span> Éditeur</h1>
+    <div id="status" class="status">
+      <div class="dot"></div>
+      <span id="status-text">Initialisation…</span>
+    </div>
+  </div>
+
+  <!-- EMPTY STATE -->
+  <div id="empty-state" class="empty-state">
+    <div class="icon">🧱</div>
+    <h3>Aucun matériau sélectionné</h3>
+    <p>Sélectionnez une ligne dans la table MATERIAL pour éditer ses données.</p>
+  </div>
+
+  <!-- EDITOR CONTENT -->
+  <div id="editor-content" style="display:none;">
+
+    <!-- SECTION : MATÉRIAU -->
+    <div class="card" id="card-material">
+      <div class="card-header">
+        <div class="card-title section-toggle" id="toggle-material" onclick="toggleSection('material')">MATÉRIAU</div>
+      </div>
+      <div class="section-body" id="body-material">
+        <div class="field-grid cols-3">
+          <div class="field-item">
+            <label>Nom</label>
+            <input type="text" id="f-mat-name" data-table="MATERIAL" data-field="name">
+          </div>
+          <div class="field-item">
+            <label>Type</label>
+            <select id="f-mat-type" data-table="MATERIAL" data-field="material_type">
+              <option value="">— choisir —</option>
+              <option value="cement_paste">Pâte de ciment</option>
+              <option value="mortar">Mortier</option>
+              <option value="concrete">Béton</option>
+            </select>
+          </div>
+          <div class="field-item"><!-- spacer --></div>
+          <div class="field-item">
+            <label>Date fabrication</label>
+            <input type="date" id="f-mat-manuf" data-table="MATERIAL" data-field="manufacturing_date" data-date="true">
+          </div>
+          <div class="field-item">
+            <label>Date décoffrage</label>
+            <input type="date" id="f-mat-demold" data-table="MATERIAL" data-field="demolding_date" data-date="true">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : SITE -->
+    <div class="card" id="card-site">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-site" onclick="toggleSection('site')">SITE</div>
+      </div>
+      <div class="section-body collapsed" id="body-site">
+        <div class="field-grid cols-3">
+          <div class="field-item">
+            <label>Pays / Région</label>
+            <input type="text" id="f-site-region" data-table="SITE" data-field="country_region">
+          </div>
+          <div class="field-item">
+            <label>Latitude</label>
+            <input type="number" step="any" id="f-site-lat" data-table="SITE" data-field="latitude">
+          </div>
+          <div class="field-item">
+            <label>Longitude</label>
+            <input type="number" step="any" id="f-site-lon" data-table="SITE" data-field="longitude">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : EXPOSITION -->
+    <div class="card" id="card-expo">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-expo" onclick="toggleSection('expo')">EXPOSITION</div>
+      </div>
+      <div class="section-body collapsed" id="body-expo">
+        <div class="field-grid">
+          <div class="field-item">
+            <label>Type d'exposition</label>
+            <select id="f-expo-type" data-table="EXPOSURE" data-field="exposure_type">
+              <option value="">— choisir —</option>
+              <option value="laboratory">Laboratoire</option>
+              <option value="in-situ">In situ</option>
+            </select>
+          </div>
+          <div class="field-item">
+            <label>Nature d'exposition</label>
+            <select id="f-expo-nature" data-table="EXPOSURE" data-field="exposure_nature">
+              <option value="">— choisir —</option>
+              <option value="atmospheric">Atmosphérique</option>
+              <option value="spray">Embruns</option>
+              <option value="splash">Éclaboussures</option>
+              <option value="tidal">Marnage</option>
+              <option value="submerged">Immergé</option>
+            </select>
+          </div>
+          <div class="field-item">
+            <label>Mouillage (%)</label>
+            <input type="number" step="any" min="0" max="100" id="f-expo-wet" data-table="EXPOSURE" data-field="wetting_duration_pct">
+          </div>
+          <div class="field-item">
+            <label>Séchage (%)</label>
+            <input type="number" step="any" min="0" max="100" id="f-expo-dry" data-table="EXPOSURE" data-field="drying_duration_pct">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : FORMULATION -->
+    <div class="card" id="card-mix">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-mix" onclick="toggleSection('mix')">FORMULATION</div>
+      </div>
+      <div class="section-body collapsed" id="body-mix">
+        <div class="field-grid cols-3">
+          <div class="field-item">
+            <label>Rapport E/C</label>
+            <input type="number" step="0.01" min="0" id="f-mix-wc" data-table="MIX_DESIGN" data-field="wc_ratio">
+          </div>
+          <div class="field-item">
+            <label>Rapport E/L</label>
+            <input type="number" step="0.01" min="0" id="f-mix-wl" data-table="MIX_DESIGN" data-field="wl_ratio">
+          </div>
+          <div class="field-item">
+            <label>Eau (kg/m³)</label>
+            <input type="number" step="any" min="0" id="f-mix-water" data-table="MIX_DESIGN" data-field="water_content_kg">
+          </div>
+          <div class="field-item">
+            <label>Type d'eau</label>
+            <select id="f-mix-watertype" data-table="MIX_DESIGN" data-field="water_type">
+              <option value="">— choisir —</option>
+              <option value="tap_water">Eau du robinet</option>
+              <option value="pure_water">Eau pure</option>
+              <option value="sea_water">Eau de mer</option>
+            </select>
+          </div>
+          <div class="field-item">
+            <label>Granulats (kg/m³)</label>
+            <input type="number" step="any" min="0" id="f-mix-aggr" data-table="MIX_DESIGN" data-field="aggregate_content_kg">
+          </div>
+          <div class="field-item">
+            <label>Type adjuvant</label>
+            <input type="text" id="f-mix-admix" data-table="MIX_DESIGN" data-field="admix_type">
+          </div>
+          <div class="field-item">
+            <label>Adjuvant (kg/m³)</label>
+            <input type="number" step="any" min="0" id="f-mix-adjuvant" data-table="MIX_DESIGN" data-field="adjuvant_content">
+          </div>
+          <div class="field-item">
+            <label>Air entraîné (%)</label>
+            <input type="number" step="any" min="0" id="f-mix-air" data-table="MIX_DESIGN" data-field="entrained_air">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : LIANTS -->
+    <div class="card" id="card-binders">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-binders" onclick="toggleSection('binders')">LIANTS</div>
+      </div>
+      <div class="section-body collapsed" id="body-binders">
+        <div id="binders-list"></div>
+        <button class="btn-add-inline" onclick="showAddBinderRow()">+ Ajouter un liant</button>
+        <div class="add-binder-row" id="add-binder-row" style="display:none;">
+          <select id="new-binder-select">
+            <option value="">— choisir un liant —</option>
+          </select>
+          <input type="number" step="any" min="0" id="new-binder-kg" placeholder="kg/m³">
+          <button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="confirmAddBinder()">Ajouter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : CURE -->
+    <div class="card" id="card-cure">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-cure" onclick="toggleSection('cure')">CURE</div>
+      </div>
+      <div class="section-body collapsed" id="body-cure">
+        <div class="field-grid cols-3">
+          <div class="field-item">
+            <label>Méthode de cure</label>
+            <select id="f-cure-method" data-table="CURING_CONDITION" data-field="curing_method">
+              <option value="">— choisir —</option>
+              <option value="water_spraying">Aspersion d'eau</option>
+              <option value="wet_covering">Couvercle humide</option>
+              <option value="curing_compounds">Produit de cure</option>
+              <option value="forms_left_in_place">Coffrage maintenu</option>
+              <option value="wet_curing">Cure humide</option>
+              <option value="water_immersion">Immersion dans l'eau</option>
+            </select>
+          </div>
+          <div class="field-item">
+            <label>Durée cure (jours)</label>
+            <input type="number" step="any" min="0" id="f-cure-days" data-table="CURING_CONDITION" data-field="curing_duration_days">
+          </div>
+          <div class="field-item">
+            <label>Température (°C)</label>
+            <input type="number" step="any" id="f-cure-temp" data-table="CURING_CONDITION" data-field="temperature_c">
+          </div>
+          <div class="field-item">
+            <label>Humidité (%)</label>
+            <input type="number" step="any" min="0" max="100" id="f-cure-humidity" data-table="CURING_CONDITION" data-field="humidity_pct">
+          </div>
+          <div class="field-item">
+            <label>Norme</label>
+            <input type="text" id="f-cure-std" data-table="CURING_CONDITION" data-field="standard_name">
+          </div>
+          <div class="field-item" style="display:flex;gap:16px;align-items:flex-end;padding-bottom:4px;">
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-muted);cursor:pointer;">
+              <input type="checkbox" id="f-cure-wind" data-table="CURING_CONDITION" data-field="wind_protection" data-bool="true">
+              Protection vent
+            </label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-muted);cursor:pointer;">
+              <input type="checkbox" id="f-cure-solar" data-table="CURING_CONDITION" data-field="solar_protection" data-bool="true">
+              Protection solaire
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : SOURCE -->
+    <div class="card" id="card-source">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-source" onclick="toggleSection('source')">SOURCE</div>
+      </div>
+      <div class="section-body collapsed" id="body-source">
+        <div id="no-source-msg" style="display:none;font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 0;">
+          Aucune mesure liée à ce matériau — impossible de charger la source.
+        </div>
+        <div id="source-fields">
+          <div class="field-grid">
+            <div class="field-item">
+              <label>Désignation</label>
+              <input type="text" id="f-src-desig" data-table="SOURCE" data-field="designation">
+            </div>
+            <div class="field-item">
+              <label>Auteurs</label>
+              <input type="text" id="f-src-authors" data-table="SOURCE" data-field="authors">
+            </div>
+            <div class="field-item">
+              <label>Titre</label>
+              <input type="text" id="f-src-title" data-table="SOURCE" data-field="title">
+            </div>
+            <div class="field-item">
+              <label>Année</label>
+              <input type="number" id="f-src-year" data-table="SOURCE" data-field="year">
+            </div>
+            <div class="field-item">
+              <label>DOI</label>
+              <input type="text" id="f-src-doi" data-table="SOURCE" data-field="doi">
+            </div>
+            <div class="field-item">
+              <label>URL</label>
+              <input type="text" id="f-src-url" data-table="SOURCE" data-field="url">
+            </div>
+            <div class="field-item">
+              <label>Revue</label>
+              <input type="text" id="f-src-journal" data-table="SOURCE" data-field="journal">
+            </div>
+          </div>
+          <div class="field-item" style="margin-top:4px;">
+            <label>Notes</label>
+            <textarea id="f-src-notes" data-table="SOURCE" data-field="notes"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION : MESURES (lecture seule) -->
+    <div class="card" id="card-meas">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-meas" onclick="toggleSection('meas')">MESURES <span style="font-weight:400;font-size:11px;color:var(--text-dim);">(lecture seule)</span></div>
+      </div>
+      <div class="section-body collapsed" id="body-meas">
+        <div id="meas-list">
+          <div class="no-binders">Aucune mesure.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOURNAL -->
+    <div class="card" id="card-log">
+      <div class="card-header">
+        <div class="card-title section-toggle collapsed" id="toggle-log" onclick="toggleSection('log')">JOURNAL</div>
+      </div>
+      <div class="section-body collapsed" id="body-log">
+        <pre id="log" class="log"></pre>
+      </div>
+    </div>
+
+  </div><!-- /editor-content -->
+
+  <!-- SAVE BAR (sticky) -->
+  <div class="save-bar" id="save-bar" style="display:none;">
+    <span class="nb-changes" id="nb-changes-text"></span>
+    <button class="btn btn-secondary" onclick="resetChanges()">Annuler</button>
+    <button class="btn btn-primary" onclick="saveAll()">💾 Enregistrer</button>
+  </div>
+
+<script>
+// =========================================================================
+// État global
+// =========================================================================
+let currentRecord   = null;   // MATERIAL record courant
+let currentSiteId   = null;
+let currentExpoId   = null;
+let currentMixId    = null;
+let currentCureId   = null;
+let currentSourceId = null;   // source de la 1ère mesure
+
+// pendingChanges : Map<tableName, Map<rowId, {field: newValue}>>
+let pendingChanges = new Map();
+// pendingBinders
+let pendingBinders = { toAdd: [], toDelete: [] };
+
+// Cache global
+let allBinders       = [];  // [{id, fields}]
+let allMixBinders    = [];  // [{id, fields}] MIX_DESIGN_BINDER
+let allMeasurements  = [];  // [{id, fields}]
+let allTests         = new Map(); // id → fields
+let allSources       = new Map(); // id → fields
+
+// =========================================================================
+// Helpers dates Grist (unix timestamp secondes ↔ input[type=date])
+// =========================================================================
+function tsToDateInput(ts) {
+  if (ts == null || ts === 0) return '';
+  try { return new Date(ts * 1000).toISOString().split('T')[0]; }
+  catch { return ''; }
+}
+
+function dateInputToTs(str) {
+  if (!str) return null;
+  const t = new Date(str).getTime();
+  return isNaN(t) ? null : t / 1000;
+}
+
+// =========================================================================
+// Toggle sections collapsibles
+// =========================================================================
+function toggleSection(key) {
+  const toggle = document.getElementById('toggle-' + key);
+  const body   = document.getElementById('body-'   + key);
+  if (!toggle || !body) return;
+  toggle.classList.toggle('collapsed');
+  body.classList.toggle('collapsed');
+}
+
+// =========================================================================
+// Change tracking
+// =========================================================================
+function markChanged(tableName, rowId, fieldId, value) {
+  if (!pendingChanges.has(tableName)) pendingChanges.set(tableName, new Map());
+  const tableMap = pendingChanges.get(tableName);
+  if (!tableMap.has(rowId)) tableMap.set(rowId, {});
+  tableMap.get(rowId)[fieldId] = value;
+  updateSaveBar();
+}
+
+function countChanges() {
+  let n = pendingBinders.toAdd.length + pendingBinders.toDelete.length;
+  for (const [, rowMap] of pendingChanges) n += rowMap.size;
+  return n;
+}
+
+function updateSaveBar() {
+  const n = countChanges();
+  const bar = document.getElementById('save-bar');
+  const txt = document.getElementById('nb-changes-text');
+  if (n > 0) {
+    bar.style.display = 'flex';
+    txt.textContent = n + ' modification' + (n > 1 ? 's' : '') + ' en attente';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+// =========================================================================
+// Attacher les listeners de changement à tous les champs d'un conteneur
+// =========================================================================
+function attachListeners(container, tableName, rowId) {
+  if (!rowId) return;
+  container.querySelectorAll('[data-table][data-field]').forEach(el => {
+    if (el.dataset.table !== tableName) return;
+    const field   = el.dataset.field;
+    const isDate  = el.dataset.date === 'true';
+    const isBool  = el.dataset.bool === 'true';
+    const evtName = isBool ? 'change' : 'input';
+    el.addEventListener(evtName, () => {
+      el.classList.add('changed');
+      let val;
+      if (isBool) {
+        val = el.checked ? true : false;
+      } else if (isDate) {
+        val = dateInputToTs(el.value);
+      } else if (el.type === 'number') {
+        val = el.value === '' ? null : parseFloat(el.value);
+      } else {
+        val = el.value;
+      }
+      markChanged(tableName, rowId, field, val);
+    });
+  });
+}
+
+// =========================================================================
+// Peupler un champ
+// =========================================================================
+function setField(id, val, isDate = false, isBool = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('changed');
+  if (isBool) {
+    el.checked = !!val;
+  } else if (isDate) {
+    el.value = tsToDateInput(val);
+  } else {
+    el.value = (val != null) ? val : '';
+  }
+}
+
+// =========================================================================
+// CHARGEMENT PRINCIPAL
+// =========================================================================
+async function loadMaterial(record) {
+  if (!record || !record.id) {
+    document.getElementById('empty-state').style.display = '';
+    document.getElementById('editor-content').style.display = 'none';
+    document.getElementById('save-bar').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('editor-content').style.display = '';
+  pendingChanges = new Map();
+  pendingBinders = { toAdd: [], toDelete: [] };
+  updateSaveBar();
+
+  currentRecord = record;
+  GristHelpers.setStatus('Chargement…', '');
+  GristHelpers.log('Chargement du matériau id=' + record.id);
+
+  try {
+    // IDs des tables liées
+    currentSiteId   = record.fields?.id_site             || record.id_site   || null;
+    currentExpoId   = record.fields?.id_exposure         || record.id_exposure || null;
+    currentMixId    = record.fields?.id_mix_design       || record.id_mix_design || null;
+    currentCureId   = record.fields?.id_curing_condition || record.id_curing_condition || null;
+
+    // Normaliser : grist.onRecord peut livrer les champs à plat ou imbriqués
+    const f = record.fields || record;
+
+    // ---- MATÉRIAU ----
+    setField('f-mat-name',    f.name);
+    setField('f-mat-type',    f.material_type);
+    setField('f-mat-manuf',   f.manufacturing_date,  true);
+    setField('f-mat-demold',  f.demolding_date,       true);
+    attachListeners(document.getElementById('card-material'), 'MATERIAL', record.id);
+
+    // ---- SITE ----
+    await loadLinked('SITE', currentSiteId, {
+      'f-site-region': 'country_region',
+      'f-site-lat':    'latitude',
+      'f-site-lon':    'longitude',
+    }, 'card-site');
+
+    // ---- EXPOSITION ----
+    await loadLinked('EXPOSURE', currentExpoId, {
+      'f-expo-type':   'exposure_type',
+      'f-expo-nature': 'exposure_nature',
+      'f-expo-wet':    'wetting_duration_pct',
+      'f-expo-dry':    'drying_duration_pct',
+    }, 'card-expo');
+
+    // ---- FORMULATION ----
+    await loadLinked('MIX_DESIGN', currentMixId, {
+      'f-mix-wc':        'wc_ratio',
+      'f-mix-wl':        'wl_ratio',
+      'f-mix-water':     'water_content_kg',
+      'f-mix-watertype': 'water_type',
+      'f-mix-aggr':      'aggregate_content_kg',
+      'f-mix-admix':     'admix_type',
+      'f-mix-adjuvant':  'adjuvant_content',
+      'f-mix-air':       'entrained_air',
+    }, 'card-mix');
+
+    // ---- LIANTS ----
+    await loadBinders();
+
+    // ---- CURE ----
+    await loadLinked('CURING_CONDITION', currentCureId, {
+      'f-cure-method':   'curing_method',
+      'f-cure-days':     'curing_duration_days',
+      'f-cure-temp':     'temperature_c',
+      'f-cure-humidity': 'humidity_pct',
+      'f-cure-std':      'standard_name',
+    }, 'card-cure', [
+      { id: 'f-cure-wind',  field: 'wind_protection',  bool: true },
+      { id: 'f-cure-solar', field: 'solar_protection',  bool: true },
+    ]);
+
+    // ---- MESURES ----
+    await loadMeasurements();
+
+    // ---- SOURCE (1ère mesure) ----
+    await loadSource();
+
+    GristHelpers.setStatus('Prêt', 'ready');
+    GristHelpers.log('Matériau chargé ✓', 'ok');
+  } catch(err) {
+    GristHelpers.setStatus('Erreur', 'error');
+    GristHelpers.log('Erreur chargement : ' + err.message, 'err');
+    console.error(err);
+  }
+}
+
+// =========================================================================
+// Charger une table liée par FK et remplir les champs
+// =========================================================================
+async function loadLinked(tableName, rowId, fieldMap, cardId, extraBools = []) {
+  if (!rowId) return;
+  try {
+    const tableData = await grist.docApi.fetchTable(tableName);
+    const idx = tableData.id.indexOf(rowId);
+    if (idx < 0) return;
+    const fields = {};
+    Object.keys(tableData).forEach(k => {
+      if (k !== 'id' && k !== 'manualSort' && !k.startsWith('gristHelper_'))
+        fields[k] = tableData[k][idx];
+    });
+
+    for (const [elId, fieldName] of Object.entries(fieldMap)) {
+      setField(elId, fields[fieldName]);
+    }
+    for (const { id, field, bool } of extraBools) {
+      setField(id, fields[field], false, bool);
+    }
+    attachListeners(document.getElementById(cardId), tableName, rowId);
+  } catch(err) {
+    GristHelpers.log('Erreur chargement ' + tableName + ' : ' + err.message, 'err');
+  }
+}
+
+// =========================================================================
+// Liants : MIX_DESIGN_BINDER + BINDER
+// =========================================================================
+async function loadBinders() {
+  const listEl = document.getElementById('binders-list');
+  listEl.innerHTML = '';
+
+  if (!currentMixId) {
+    listEl.innerHTML = '<div class="no-binders">Aucune formulation liée.</div>';
+    return;
+  }
+
+  try {
+    [allMixBinders, allBinders] = await Promise.all([
+      GristHelpers.fetchAllRecords('MIX_DESIGN_BINDER'),
+      GristHelpers.fetchAllRecords('BINDER'),
+    ]);
+
+    const binderMap = new Map(allBinders.map(b => [b.id, b.fields]));
+
+    // Remplir le select de création
+    const sel = document.getElementById('new-binder-select');
+    sel.innerHTML = '<option value="">— choisir un liant —</option>';
+    allBinders.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = (b.fields.name || 'Liant #' + b.id) + ' (' + (b.fields.binder_type || '') + ')';
+      sel.appendChild(opt);
+    });
+
+    const rows = allMixBinders.filter(mb => mb.fields.id_mix_design === currentMixId);
+
+    if (rows.length === 0) {
+      listEl.innerHTML = '<div class="no-binders">Aucun liant dans cette formulation.</div>';
+      return;
+    }
+
+    rows.forEach(mb => {
+      const binder = binderMap.get(mb.fields.id_binder) || {};
+      const row = document.createElement('div');
+      row.className = 'binder-row';
+      row.dataset.mbId = mb.id;
+      row.innerHTML = `
+        <span class="b-name">${binder.name || '(sans nom)'}</span>
+        <span class="b-type">${binder.binder_type || '—'}</span>
+        <input type="number" step="any" min="0" value="${mb.fields.content_kg_m3 != null ? mb.fields.content_kg_m3 : ''}" placeholder="kg/m³" data-mb-id="${mb.id}">
+        <button class="btn-del" data-mb-id="${mb.id}" title="Supprimer">✕</button>
+      `;
+      listEl.appendChild(row);
+
+      // Listener dosage
+      const inp = row.querySelector('input[type=number]');
+      inp.addEventListener('input', () => {
+        const val = inp.value === '' ? null : parseFloat(inp.value);
+        // Chercher si déjà en toDelete
+        if (pendingBinders.toDelete.includes(mb.id)) return;
+        // Stocker comme UpdateRecord
+        markChanged('MIX_DESIGN_BINDER', mb.id, 'content_kg_m3', val);
+      });
+
+      // Listener suppression
+      const delBtn = row.querySelector('.btn-del');
+      delBtn.addEventListener('click', () => {
+        if (!pendingBinders.toDelete.includes(mb.id)) {
+          pendingBinders.toDelete.push(mb.id);
+        }
+        row.style.opacity = '0.4';
+        row.style.textDecoration = 'line-through';
+        delBtn.disabled = true;
+        updateSaveBar();
+      });
+    });
+  } catch(err) {
+    GristHelpers.log('Erreur chargement liants : ' + err.message, 'err');
+  }
+}
+
+function showAddBinderRow() {
+  const el = document.getElementById('add-binder-row');
+  el.style.display = el.style.display === 'none' ? 'grid' : 'none';
+}
+
+function confirmAddBinder() {
+  const sel  = document.getElementById('new-binder-select');
+  const inp  = document.getElementById('new-binder-kg');
+  const binderId = parseInt(sel.value);
+  const kg   = inp.value === '' ? null : parseFloat(inp.value);
+
+  if (!binderId) { alert('Veuillez choisir un liant.'); return; }
+  if (!currentMixId) { alert('Aucune formulation liée à ce matériau.'); return; }
+
+  pendingBinders.toAdd.push({
+    id_mix_design: currentMixId,
+    id_binder:     binderId,
+    content_kg_m3: kg,
+  });
+
+  // Affichage visuel temporaire
+  const binder = allBinders.find(b => b.id === binderId);
+  const listEl = document.getElementById('binders-list');
+  const tempRow = document.createElement('div');
+  tempRow.className = 'binder-row';
+  tempRow.style.opacity = '0.6';
+  tempRow.style.fontStyle = 'italic';
+  tempRow.innerHTML = `
+    <span class="b-name">${binder?.fields?.name || '(nouveau)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
+    <span class="b-type">${binder?.fields?.binder_type || ''}</span>
+    <span>${kg != null ? kg + ' kg/m³' : '—'}</span>
+    <span></span>
+  `;
+  listEl.appendChild(tempRow);
+
+  sel.value  = '';
+  inp.value  = '';
+  document.getElementById('add-binder-row').style.display = 'none';
+  updateSaveBar();
+}
+
+// =========================================================================
+// Mesures (lecture seule)
+// =========================================================================
+async function loadMeasurements() {
+  const listEl = document.getElementById('meas-list');
+  listEl.innerHTML = '';
+
+  try {
+    const [measurements, tests] = await Promise.all([
+      GristHelpers.fetchAllRecords('MEASUREMENT'),
+      GristHelpers.fetchAllRecords('TEST'),
+    ]);
+
+    allMeasurements = measurements;
+    allTests  = new Map(tests.map(t => [t.id, t.fields]));
+
+    const linked = measurements.filter(m => m.fields.id_material === currentRecord.id);
+
+    if (linked.length === 0) {
+      listEl.innerHTML = '<div class="no-binders">Aucune mesure pour ce matériau.</div>';
+      return;
+    }
+
+    linked.forEach(m => {
+      const test = allTests.get(m.fields.id_test) || {};
+      const row  = document.createElement('div');
+      row.className = 'meas-row';
+      const prepDate   = tsToDateInput(m.fields.preparation_date) || '—';
+      const resultDate = tsToDateInput(m.fields.result_date)      || '—';
+      row.innerHTML = `
+        <span class="meas-badge">${test.name || '?'}</span>
+        <span class="meas-badge" style="background:var(--bg);">${m.fields.sample_type || '—'}</span>
+        <span class="meas-detail">Préparation : ${prepDate}</span>
+        <span class="meas-detail">Résultat : ${resultDate}</span>
+      `;
+      listEl.appendChild(row);
+    });
+  } catch(err) {
+    GristHelpers.log('Erreur chargement mesures : ' + err.message, 'err');
+  }
+}
+
+// =========================================================================
+// Source (1ère mesure)
+// =========================================================================
+async function loadSource() {
+  const noSrcMsg   = document.getElementById('no-source-msg');
+  const srcFields  = document.getElementById('source-fields');
+  currentSourceId  = null;
+
+  const linked = allMeasurements.filter(m => m.fields.id_material === currentRecord.id);
+
+  if (linked.length === 0) {
+    noSrcMsg.style.display = '';
+    srcFields.style.display = 'none';
+    return;
+  }
+
+  noSrcMsg.style.display = 'none';
+  srcFields.style.display = '';
+
+  const firstMeas = linked[0];
+  const srcId = firstMeas.fields.id_source;
+  if (!srcId) {
+    noSrcMsg.style.display = '';
+    srcFields.style.display = 'none';
+    return;
+  }
+
+  currentSourceId = srcId;
+
+  try {
+    const tableData = await grist.docApi.fetchTable('SOURCE');
+    const idx = tableData.id.indexOf(srcId);
+    if (idx < 0) return;
+
+    const fields = {};
+    Object.keys(tableData).forEach(k => {
+      if (k !== 'id' && k !== 'manualSort' && !k.startsWith('gristHelper_'))
+        fields[k] = tableData[k][idx];
+    });
+
+    setField('f-src-desig',   fields.designation);
+    setField('f-src-authors', fields.authors);
+    setField('f-src-title',   fields.title);
+    setField('f-src-year',    fields.year);
+    setField('f-src-doi',     fields.doi);
+    setField('f-src-url',     fields.url);
+    setField('f-src-journal', fields.journal);
+    setField('f-src-notes',   fields.notes);
+
+    attachListeners(document.getElementById('card-source'), 'SOURCE', srcId);
+  } catch(err) {
+    GristHelpers.log('Erreur chargement source : ' + err.message, 'err');
+  }
+}
+
+// =========================================================================
+// SAUVEGARDE
+// =========================================================================
+async function saveAll() {
+  const actions = [];
+
+  // 1. UpdateRecord pour chaque table/ligne modifiée
+  for (const [tableName, rowMap] of pendingChanges) {
+    for (const [rowId, fields] of rowMap) {
+      actions.push(['UpdateRecord', tableName, parseInt(rowId), fields]);
+    }
+  }
+
+  // 2. Suppressions de liants
+  for (const mbId of pendingBinders.toDelete) {
+    actions.push(['RemoveRecord', 'MIX_DESIGN_BINDER', mbId]);
+  }
+
+  // 3. Ajouts de liants
+  for (const fields of pendingBinders.toAdd) {
+    actions.push(['AddRecord', 'MIX_DESIGN_BINDER', null, fields]);
+  }
+
+  if (actions.length === 0) {
+    GristHelpers.log('Aucune modification à enregistrer.', 'warn');
+    return;
+  }
+
+  GristHelpers.setStatus('Enregistrement…', '');
+  GristHelpers.log('Envoi de ' + actions.length + ' action(s)…');
+
+  try {
+    await grist.docApi.applyUserActions(actions);
+    GristHelpers.log('Enregistré avec succès ✓', 'ok');
+    GristHelpers.setStatus('Enregistré', 'ready');
+    // Recharger
+    pendingChanges = new Map();
+    pendingBinders = { toAdd: [], toDelete: [] };
+    updateSaveBar();
+    await loadMaterial(currentRecord);
+  } catch(err) {
+    GristHelpers.setStatus('Erreur', 'error');
+    GristHelpers.log('Erreur enregistrement : ' + err.message, 'err');
+    console.error(err);
+  }
+}
+
+function resetChanges() {
+  pendingChanges = new Map();
+  pendingBinders = { toAdd: [], toDelete: [] };
+  updateSaveBar();
+  loadMaterial(currentRecord);
+}
+
+// =========================================================================
+// INIT
+// =========================================================================
+(async function() {
+  GristHelpers.log('Initialisation Éditeur…');
+  grist.ready({ requiredAccess: 'full' });
+  grist.onRecord(async (record) => {
+    await loadMaterial(record);
+  });
+  await GristHelpers.ensureSchema();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Export données — Durabilité</title>
+
+  <link rel="stylesheet" href="assets/shared-styles.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="assets/grist-helpers.js"></script>
+
+  <style>
+    .col-selector { padding: 10px 0; }
+    .group-row { margin-bottom: 6px; }
+    .group-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      cursor: pointer; margin-bottom: 4px; user-select: none;
+    }
+    .group-label input[type=checkbox] { cursor: pointer; }
+    .cols-row { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 20px; margin-bottom: 2px; }
+    .col-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 14px;
+      border: 1px solid var(--surface2); background: var(--bg);
+      font-size: 11px; cursor: pointer; user-select: none; color: var(--text-muted);
+    }
+    .col-chip:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .col-chip input { display: none; }
+
+    .sep-choice { display: flex; gap: 12px; align-items: center; font-size: 12px; }
+    .sep-choice label { display: flex; gap: 4px; align-items: center; cursor: pointer; color: var(--text-muted); }
+
+    .selector-toolbar {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      margin-bottom: 12px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--surface2);
+    }
+    .selector-toolbar span { color: var(--text-dim); font-size: 11px; }
+
+    .export-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .export-info { font-size: 12px; color: var(--text-dim); }
+
+    .preview-wrap {
+      overflow-x: auto; overflow-y: auto; max-height: 55vh;
+      border-radius: 8px; border: 1px solid var(--surface2);
+    }
+    #preview-table { width: 100%; border-collapse: collapse; font-size: 11px; color: var(--text); }
+    #preview-table thead th {
+      position: sticky; top: 0; z-index: 2;
+      background: var(--surface); padding: 7px 10px;
+      text-align: left; font-size: 10px; font-weight: 700;
+      color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px;
+      border-bottom: 2px solid var(--surface2); white-space: nowrap;
+    }
+    #preview-table tbody tr { border-bottom: 1px solid var(--surface2); }
+    #preview-table tbody tr:hover { background: var(--surface); }
+    #preview-table tbody td {
+      padding: 5px 10px; white-space: nowrap;
+      max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+    }
+    .preview-truncated {
+      font-size: 11px; color: var(--text-dim);
+      text-align: center; padding: 8px; font-style: italic;
+    }
+    .empty-preview {
+      text-align: center; padding: 32px;
+      color: var(--text-dim); font-size: 13px; font-style: italic;
+    }
+
+    #btn-export { white-space: nowrap; }
+    #btn-export:disabled {
+      background: var(--surface2); color: var(--text-dim); cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1><span class="icon">📤</span> Export données</h1>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-secondary" onclick="loadAllData()" style="font-size:12px;padding:6px 12px;">🔄 Rafraîchir</button>
+      <div id="status" class="status">
+        <div class="dot"></div>
+        <span id="status-text">Initialisation…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD : Sélection des colonnes -->
+  <div class="card">
+    <div class="card-title">Sélection des colonnes</div>
+
+    <div class="selector-toolbar">
+      <button class="btn btn-secondary" style="font-size:11px;padding:5px 12px;" onclick="selectAll(true)">Tout cocher</button>
+      <button class="btn btn-secondary" style="font-size:11px;padding:5px 12px;" onclick="selectAll(false)">Tout décocher</button>
+      <span>|</span>
+      <div class="sep-choice">
+        <span>Séparateur CSV :</span>
+        <label><input type="radio" name="sep" value="," checked> , (virgule)</label>
+        <label><input type="radio" name="sep" value=";"> ; (point-virgule)</label>
+      </div>
+    </div>
+
+    <div class="col-selector" id="col-selector">
+      <!-- généré par buildColumnSelector() -->
+    </div>
+  </div>
+
+  <!-- CARD : Export & Aperçu -->
+  <div class="card">
+    <div class="card-title">Export &amp; Aperçu</div>
+
+    <div class="export-bar">
+      <button id="btn-export" class="btn btn-primary" onclick="exportCSV()" disabled>
+        📤 Exporter CSV
+      </button>
+      <span class="export-info" id="export-info">Chargement en cours…</span>
+    </div>
+
+    <div class="preview-wrap">
+      <div class="empty-preview" id="preview-empty">Aucune donnée chargée.</div>
+      <table id="preview-table" style="display:none;">
+        <thead id="preview-head"></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+    <div id="preview-truncated-msg" class="preview-truncated" style="display:none;"></div>
+  </div>
+
+  <!-- JOURNAL -->
+  <div class="card">
+    <div class="card-title">Journal</div>
+    <pre id="log" class="log"></pre>
+  </div>
+
+<script>
+// =========================================================================
+// Définition des groupes de colonnes
+// =========================================================================
+const COLUMN_GROUPS = [
+  { id: 'source', label: '📄 Source', cols: [
+    { id: 'src_designation', label: 'Désignation',    def: true  },
+    { id: 'src_authors',     label: 'Auteurs',        def: true  },
+    { id: 'src_year',        label: 'Année',          def: true  },
+    { id: 'src_doi',         label: 'DOI',            def: false },
+    { id: 'src_journal',     label: 'Revue',          def: false },
+  ]},
+  { id: 'materiau', label: '🧱 Matériau', cols: [
+    { id: 'mat_name',  label: 'Nom',  def: true  },
+    { id: 'mat_type',  label: 'Type', def: false },
+  ]},
+  { id: 'site', label: '📍 Site', cols: [
+    { id: 'site_region', label: 'Région/Pays', def: true  },
+    { id: 'site_lat',    label: 'Latitude',    def: false },
+    { id: 'site_lon',    label: 'Longitude',   def: false },
+  ]},
+  { id: 'exposition', label: '🌊 Exposition', cols: [
+    { id: 'expo_type',   label: 'Type',   def: true },
+    { id: 'expo_nature', label: 'Nature', def: true },
+  ]},
+  { id: 'formulation', label: '⚗️ Formulation', cols: [
+    { id: 'mix_wc',       label: 'E/C',              def: true  },
+    { id: 'mix_wl',       label: 'E/L',              def: true  },
+    { id: 'mix_water',    label: 'Eau (kg/m³)',       def: false },
+    { id: 'mix_aggr',     label: 'Granulats (kg/m³)', def: false },
+    { id: 'mix_admix',    label: 'Type adjuvant',     def: false },
+    { id: 'mix_adjuvant', label: 'Adjuvant (kg/m³)',  def: false },
+    { id: 'mix_air',      label: 'Air entraîné (%)',  def: false },
+  ]},
+  { id: 'liants', label: '🏗️ Liants', cols: [
+    { id: 'cement_name',     label: 'Ciment',               def: true  },
+    { id: 'cement_kg',       label: 'Ciment (kg/m³)',       def: true  },
+    { id: 'scm_str',         label: 'Additions',            def: true  },
+    { id: 'total_binder_kg', label: 'Liant total (kg/m³)',  def: false },
+  ]},
+  { id: 'cure', label: '🌡️ Cure', cols: [
+    { id: 'cure_days',     label: 'Durée cure (j)',   def: true  },
+    { id: 'cure_method',   label: 'Méthode cure',     def: false },
+    { id: 'cure_temp',     label: 'Température (°C)', def: false },
+    { id: 'cure_humidity', label: 'Humidité (%)',     def: false },
+  ]},
+  { id: 'test', label: '🧪 Test', cols: [
+    { id: 'cl_type', label: 'Type Cl⁻ (total/libre)', def: true },
+  ]},
+  { id: 'scalaires', label: '📊 Résultats', cols: [
+    { id: 'D',       label: 'Dapp (m²/s)',          def: true },
+    { id: 'Cs',      label: 'Cs (%)',               def: true },
+    { id: 'dur_exp', label: 'Durée exposition (ans)', def: true },
+  ]},
+  { id: 'profil', label: '📈 Profil', cols: [
+    { id: 'nb_points', label: 'Nb points',                     def: true  },
+    { id: 'x_values',  label: 'Profondeurs (mm) — liste',      def: false },
+    { id: 'y_values',  label: 'Teneurs Cl⁻ (%) — liste',       def: false },
+  ]},
+];
+
+// =========================================================================
+// État global
+// =========================================================================
+let allProfiles    = [];    // résultat de joinChlorideProfiles
+let testMapGlobal  = new Map(); // id → fields (TEST)
+let dataReady      = false;
+
+// =========================================================================
+// Construire le sélecteur de colonnes
+// =========================================================================
+function buildColumnSelector() {
+  const container = document.getElementById('col-selector');
+  container.innerHTML = '';
+
+  COLUMN_GROUPS.forEach(grp => {
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'group-row';
+
+    // Label groupe avec case à cocher
+    const grpLabel = document.createElement('label');
+    grpLabel.className = 'group-label';
+    const grpCb = document.createElement('input');
+    grpCb.type = 'checkbox';
+    grpCb.id  = 'grp-' + grp.id;
+    // Coché si au moins une col par défaut
+    grpCb.checked = grp.cols.some(c => c.def);
+    grpLabel.appendChild(grpCb);
+    grpLabel.appendChild(document.createTextNode(' ' + grp.label));
+    groupDiv.appendChild(grpLabel);
+
+    // Listener : cocher/décocher tout le groupe
+    grpCb.addEventListener('change', () => {
+      container.querySelectorAll(`.col-chip[data-grp="${grp.id}"] input`).forEach(cb => {
+        cb.checked = grpCb.checked;
+      });
+      refreshPreview();
+    });
+
+    // Chips colonnes
+    const colsRow = document.createElement('div');
+    colsRow.className = 'cols-row';
+
+    grp.cols.forEach(col => {
+      const chip = document.createElement('label');
+      chip.className = 'col-chip';
+      chip.dataset.grp = grp.id;
+      const cb = document.createElement('input');
+      cb.type    = 'checkbox';
+      cb.id      = 'col-' + col.id;
+      cb.checked = col.def;
+      cb.addEventListener('change', () => {
+        // Synchroniser la case groupe
+        const allInGrp = grp.cols.map(c => document.getElementById('col-' + c.id));
+        const anyChecked  = allInGrp.some(el => el && el.checked);
+        const allChecked  = allInGrp.every(el => el && el.checked);
+        grpCb.indeterminate = anyChecked && !allChecked;
+        grpCb.checked = allChecked;
+        refreshPreview();
+      });
+      chip.appendChild(cb);
+      chip.appendChild(document.createTextNode(col.label));
+      colsRow.appendChild(chip);
+    });
+
+    groupDiv.appendChild(colsRow);
+    container.appendChild(groupDiv);
+  });
+
+  // Synchroniser les états indéterminés initiaux
+  COLUMN_GROUPS.forEach(grp => {
+    const grpCb = document.getElementById('grp-' + grp.id);
+    const allInGrp = grp.cols.map(c => document.getElementById('col-' + c.id));
+    const anyChecked = allInGrp.some(el => el && el.checked);
+    const allChecked = allInGrp.every(el => el && el.checked);
+    if (grpCb) {
+      grpCb.indeterminate = anyChecked && !allChecked;
+      grpCb.checked = allChecked;
+    }
+  });
+}
+
+function selectAll(checked) {
+  COLUMN_GROUPS.forEach(grp => {
+    const grpCb = document.getElementById('grp-' + grp.id);
+    if (grpCb) { grpCb.checked = checked; grpCb.indeterminate = false; }
+    grp.cols.forEach(col => {
+      const cb = document.getElementById('col-' + col.id);
+      if (cb) cb.checked = checked;
+    });
+  });
+  refreshPreview();
+}
+
+function getSelectedCols() {
+  const selected = [];
+  COLUMN_GROUPS.forEach(grp => {
+    grp.cols.forEach(col => {
+      const cb = document.getElementById('col-' + col.id);
+      if (cb && cb.checked) selected.push(col);
+    });
+  });
+  return selected;
+}
+
+// =========================================================================
+// Chargement de toutes les données
+// =========================================================================
+async function loadAllData() {
+  dataReady = false;
+  document.getElementById('btn-export').disabled = true;
+  document.getElementById('export-info').textContent = 'Chargement en cours…';
+  GristHelpers.setStatus('Chargement…', '');
+  GristHelpers.log('Chargement de toutes les tables…');
+
+  try {
+    const [
+      dataPoints, curves, measurements, materials,
+      mixDesigns, mixBinders, binders,
+      exposures, sites, sources, scalars,
+      curingConditions, tests,
+    ] = await Promise.all([
+      GristHelpers.fetchAllRecords('DATA_CURVE'),
+      GristHelpers.fetchAllRecords('CURVE'),
+      GristHelpers.fetchAllRecords('MEASUREMENT'),
+      GristHelpers.fetchAllRecords('MATERIAL'),
+      GristHelpers.fetchAllRecords('MIX_DESIGN'),
+      GristHelpers.fetchAllRecords('MIX_DESIGN_BINDER'),
+      GristHelpers.fetchAllRecords('BINDER'),
+      GristHelpers.fetchAllRecords('EXPOSURE'),
+      GristHelpers.fetchAllRecords('SITE'),
+      GristHelpers.fetchAllRecords('SOURCE'),
+      GristHelpers.fetchAllRecords('SCALAR'),
+      GristHelpers.fetchAllRecords('CURING_CONDITION'),
+      GristHelpers.fetchAllRecords('TEST'),
+    ]);
+
+    testMapGlobal = new Map(tests.map(t => [t.id, t.fields]));
+
+    // Filtrer seulement les courbes liées à un test cl_profil
+    const clMeasIds = new Set(
+      measurements
+        .filter(m => {
+          const test = testMapGlobal.get(m.fields.id_test) || {};
+          return test.name === 'cl_profil';
+        })
+        .map(m => m.id)
+    );
+    const clCurves = curves.filter(c => clMeasIds.has(c.fields.id_measurement));
+
+    allProfiles = GristHelpers.joinChlorideProfiles(
+      dataPoints, clCurves, measurements, materials,
+      mixDesigns, mixBinders, binders,
+      exposures, sites, sources, scalars,
+      curingConditions
+    );
+
+    GristHelpers.log(`${allProfiles.length} profil(s) chlorure chargé(s) ✓`, 'ok');
+    GristHelpers.setStatus('Prêt', 'ready');
+    dataReady = true;
+
+    document.getElementById('btn-export').disabled = false;
+    refreshPreview();
+  } catch(err) {
+    GristHelpers.setStatus('Erreur', 'error');
+    GristHelpers.log('Erreur chargement : ' + err.message, 'err');
+    console.error(err);
+    document.getElementById('export-info').textContent = 'Erreur de chargement.';
+  }
+}
+
+// =========================================================================
+// Construire les lignes plates
+// =========================================================================
+const SCM_LABELS = {
+  fly_ash:           'FA',
+  silica_fume:       'SF',
+  slag:              'Laitier',
+  metakaolin:        'MK',
+  limestone_filler:  'Calcaire',
+  natural_pozzolan:  'Pouzzolane',
+  zeolite:           'Zéolite',
+  other:             'Autre',
+};
+
+function buildFlatRows() {
+  return allProfiles.map(p => {
+    const cem  = p.binders.find(b =>
+      b.binder_type === 'portland_cement' || b.binder_type === 'blended_cement'
+    );
+    const scms = p.binders.filter(b =>
+      b.binder_type !== 'portland_cement' && b.binder_type !== 'blended_cement'
+    );
+    const scm_str = scms.map(b =>
+      (SCM_LABELS[b.binder_type] || b.binder_type) +
+      (b.content_kg_m3 != null ? ` ${b.content_kg_m3}kg` : '')
+    ).join(' + ') || '—';
+
+    const totalBinder = p.binders.reduce((s, b) => s + (b.content_kg_m3 || 0), 0);
+    const total_binder_kg = totalBinder > 0 ? totalBinder.toFixed(1) : '';
+
+    const testFields = testMapGlobal.get(p.measurement.id_test) || {};
+    let cl_type = '';
+    if      (testFields.test_type === 'free_cl')  cl_type = 'libre';
+    else if (testFields.test_type === 'total_cl') cl_type = 'total';
+
+    const mix  = p.mix    || {};
+    const site = p.site   || {};
+    const expo = p.exposure || {};
+    const src  = p.source  || {};
+    const mat  = p.material || {};
+    const cur  = p.curing  || {};
+    const sc   = p.scalars || {};
+
+    return {
+      src_designation: src.designation || '',
+      src_authors:     src.authors     || '',
+      src_year:        src.year        != null ? src.year     : '',
+      src_doi:         src.doi         || '',
+      src_journal:     src.journal     || '',
+      mat_name:        mat.name        || '',
+      mat_type:        mat.material_type || '',
+      site_region:     site.country_region || '',
+      site_lat:        site.latitude   != null ? site.latitude  : '',
+      site_lon:        site.longitude  != null ? site.longitude : '',
+      expo_type:       expo.exposure_type   || '',
+      expo_nature:     expo.exposure_nature || '',
+      mix_wc:          mix.wc_ratio         != null ? mix.wc_ratio          : '',
+      mix_wl:          (mix.wl_ratio ?? mix.wc_ratio) != null ? (mix.wl_ratio ?? mix.wc_ratio) : '',
+      mix_water:       mix.water_content_kg    != null ? mix.water_content_kg    : '',
+      mix_aggr:        mix.aggregate_content_kg != null ? mix.aggregate_content_kg : '',
+      mix_admix:       mix.admix_type    || '',
+      mix_adjuvant:    mix.adjuvant_content != null ? mix.adjuvant_content : '',
+      mix_air:         mix.entrained_air  != null ? mix.entrained_air : '',
+      cement_name:     cem ? (cem.name || '') : '',
+      cement_kg:       cem && cem.content_kg_m3 != null ? cem.content_kg_m3 : '',
+      scm_str,
+      total_binder_kg,
+      cure_days:       cur.curing_duration_days != null ? cur.curing_duration_days : '',
+      cure_method:     cur.curing_method || '',
+      cure_temp:       cur.temperature_c  != null ? cur.temperature_c  : '',
+      cure_humidity:   cur.humidity_pct   != null ? cur.humidity_pct   : '',
+      cl_type,
+      D:       sc.D                != null ? sc.D       : '',
+      Cs:      sc.Cs               != null ? sc.Cs      : '',
+      dur_exp: sc.exposure_duration != null ? sc.exposure_duration : '',
+      nb_points: p.points.length,
+      x_values:  p.points.map(pt => pt.x).join(';'),
+      y_values:  p.points.map(pt => pt.y).join(';'),
+    };
+  });
+}
+
+// =========================================================================
+// Aperçu du tableau
+// =========================================================================
+const PREVIEW_LIMIT = 50;
+
+function refreshPreview() {
+  const cols = getSelectedCols();
+  const thead = document.getElementById('preview-head');
+  const tbody = document.getElementById('preview-body');
+  const table = document.getElementById('preview-table');
+  const empty = document.getElementById('preview-empty');
+  const truncMsg = document.getElementById('preview-truncated-msg');
+  const infoEl = document.getElementById('export-info');
+
+  if (!dataReady || allProfiles.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    empty.textContent = dataReady ? 'Aucun profil chlorure trouvé.' : 'Aucune donnée chargée.';
+    truncMsg.style.display = 'none';
+    infoEl.textContent = dataReady ? '0 profil' : 'Chargement en cours…';
+    return;
+  }
+
+  const rows = buildFlatRows();
+  const colSel = cols.length;
+  infoEl.textContent = `${rows.length} profil${rows.length > 1 ? 's' : ''} · ${colSel} colonne${colSel > 1 ? 's' : ''} sélectionnée${colSel > 1 ? 's' : ''}`;
+
+  if (cols.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    empty.textContent = 'Aucune colonne sélectionnée.';
+    truncMsg.style.display = 'none';
+    return;
+  }
+
+  // En-tête
+  thead.innerHTML = '<tr>' + cols.map(c => `<th title="${c.label}">${c.label}</th>`).join('') + '</tr>';
+
+  // Corps (max PREVIEW_LIMIT lignes)
+  const preview = rows.slice(0, PREVIEW_LIMIT);
+  tbody.innerHTML = '';
+  preview.forEach(row => {
+    const tr = document.createElement('tr');
+    cols.forEach(col => {
+      const td = document.createElement('td');
+      const v  = row[col.id];
+      td.textContent = v != null ? String(v) : '';
+      td.title = td.textContent;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  if (rows.length > PREVIEW_LIMIT) {
+    truncMsg.style.display = '';
+    truncMsg.textContent = `Aperçu limité aux ${PREVIEW_LIMIT} premières lignes sur ${rows.length}. L'export CSV contiendra toutes les lignes.`;
+  } else {
+    truncMsg.style.display = 'none';
+  }
+}
+
+// =========================================================================
+// Export CSV
+// =========================================================================
+function exportCSV() {
+  if (!dataReady || allProfiles.length === 0) {
+    alert('Aucune donnée à exporter.');
+    return;
+  }
+
+  const sep  = document.querySelector('input[name="sep"]:checked').value;
+  const cols = getSelectedCols();
+  if (cols.length === 0) {
+    alert('Veuillez sélectionner au moins une colonne.');
+    return;
+  }
+
+  const rows = buildFlatRows();
+
+  // Ligne d'en-tête
+  const header = cols.map(c => c.label);
+  const lines  = [header.join(sep)];
+
+  // Lignes de données
+  for (const row of rows) {
+    lines.push(cols.map(c => {
+      const v = row[c.id];
+      if (v == null) return '';
+      const s = String(v);
+      if (s.includes(sep) || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(sep));
+  }
+
+  const bom  = '\ufeff'; // BOM UTF-8 pour Excel
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `chlorures_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  GristHelpers.log(`Export CSV : ${rows.length} ligne(s), ${cols.length} colonne(s), séparateur "${sep}" ✓`, 'ok');
+}
+
+// =========================================================================
+// INIT
+// =========================================================================
+(async function() {
+  GristHelpers.log('Initialisation Export…');
+  grist.ready({ requiredAccess: 'full' });
+  buildColumnSelector();
+  await GristHelpers.ensureSchema();
+  await loadAllData();
+})();
+</script>
+</body>
+</html>
