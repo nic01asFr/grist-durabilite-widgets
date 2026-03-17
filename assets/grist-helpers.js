@@ -386,6 +386,80 @@ const GristHelpers = {
   },
 
   // =========================================================================
+  // JOINTURES — profils chlorures complets
+  // DATA_CURVE ← CURVE ← MEASUREMENT ← MATERIAL
+  //   ← MIX_DESIGN ← MIX_DESIGN_BINDER ← BINDER
+  //   ← EXPOSURE, SITE, SOURCE, SCALAR
+  // Retourne un tableau de profils enrichis, triés par profondeur croissante.
+  // =========================================================================
+  joinChlorideProfiles(dataPoints, curves, measurements, materials,
+                       mixDesigns, mixBinders, binders,
+                       exposures, sites, sources, scalars) {
+    const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
+    const materialMap = new Map(materials.map(m    => [m.id, m.fields]));
+    const mixMap      = new Map(mixDesigns.map(m   => [m.id, m.fields]));
+    const exposureMap = new Map(exposures.map(e    => [e.id, e.fields]));
+    const siteMap     = new Map(sites.map(s        => [s.id, s.fields]));
+    const sourceMap   = new Map(sources.map(s      => [s.id, s.fields]));
+    const binderMap   = new Map(binders.map(b      => [b.id, b.fields]));
+
+    // Index scalaires par measurement_id → { name: value }
+    const scalByMeas = new Map();
+    scalars.forEach(s => {
+      const mid = s.fields.id_measurement;
+      if (!scalByMeas.has(mid)) scalByMeas.set(mid, {});
+      scalByMeas.get(mid)[s.fields.name] = s.fields.value;
+    });
+
+    // Index liants par mix_design_id → [{...binder, content_kg_m3}]
+    const bindersByMix = new Map();
+    mixBinders.forEach(mb => {
+      const mid = mb.fields.id_mix_design;
+      if (!bindersByMix.has(mid)) bindersByMix.set(mid, []);
+      const b = binderMap.get(mb.fields.id_binder) || {};
+      bindersByMix.get(mid).push({ ...b, content_kg_m3: mb.fields.content_kg_m3 });
+    });
+
+    // Grouper les points par curve_id
+    const ptsByCurve = new Map();
+    dataPoints.forEach(p => {
+      const cid = p.fields.id_curve;
+      if (!ptsByCurve.has(cid)) ptsByCurve.set(cid, []);
+      ptsByCurve.get(cid).push({ x: p.fields.x, y: p.fields.y });
+    });
+
+    return curves
+      .map(c => {
+        const cf    = c.fields;
+        const meas  = measureMap.get(cf.id_measurement)      || {};
+        const mat   = materialMap.get(meas.id_material)       || {};
+        const mix   = mixMap.get(mat.id_mix_design)           || {};
+        const expo  = exposureMap.get(mat.id_exposure)        || {};
+        const site  = siteMap.get(mat.id_site)                || {};
+        const src   = sourceMap.get(meas.id_source)           || {};
+        const sc    = scalByMeas.get(cf.id_measurement)       || {};
+        const bList = bindersByMix.get(mat.id_mix_design)     || [];
+        const pts   = (ptsByCurve.get(c.id) || []).sort((a, b) => a.x - b.x);
+        if (pts.length === 0) return null;
+        return {
+          curve_id: c.id,
+          x_name: cf.x_name, y_name: cf.y_name,
+          x_unit: cf.x_unit, y_unit: cf.y_unit,
+          points: pts,
+          measurement: meas,
+          material:    mat,
+          mix,
+          exposure:    expo,
+          site,
+          source:      src,
+          binders:     bList,
+          scalars:     sc,
+        };
+      })
+      .filter(Boolean);
+  },
+
+  // =========================================================================
   // PLOTLY — Thème clair
   // =========================================================================
   plotlyDarkLayout(overrides = {}) {
