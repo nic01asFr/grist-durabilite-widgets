@@ -959,7 +959,7 @@ async function loadMeasurementsTable() {
 // Construit l'en-tête du tableau (colonnes fixes + dynamiques)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Type Cl⁻', 'Matériau', 'Source', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat',
+  const fixedCols = ['Type Cl⁻', 'Matériau', 'Source', 'Opérateur',
                      'Type mat.', 'Type expo.', 'Nature', 'E/C', 'E/L', 'Eau (kg/m³)'];
   const allCols   = [...fixedCols, ...measScalarNames, 'Courbes', 'Test'];
   const tr = document.querySelector('#meas-thead tr');
@@ -1074,11 +1074,7 @@ function renderMeasTable() {
       <td>${clTag(r.testType)}</td>
       <td>${r.mat_name    || '—'}</td>
       <td>${r.source      || '—'}</td>
-      <td>${r.sample_type || '—'}</td>
-      <td>${r.dimensions  || '—'}</td>
       <td>${r.operator    || '—'}</td>
-      <td>${r.prep        || '—'}</td>
-      <td>${r.result      || '—'}</td>
       <td>${r.mat_type    || '—'}</td>
       <td>${expoTag(r.expo_type)}</td>
       <td>${r.expo_nature || '—'}</td>
@@ -1101,7 +1097,7 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+  const fixed = [r.testType, r.mat_name, r.source, r.operator,
                  r.mat_type, r.expo_type, r.expo_nature, r.wc_ratio, r.wl_ratio, r.water_kg];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
