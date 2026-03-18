@@ -959,9 +959,9 @@ async function loadMeasurementsTable() {
 // Construit l'en-tête du tableau (colonnes fixes + dynamiques)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Type Cl⁻', 'Matériau', 'Source', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat',
+  const fixedCols = ['Type Cl⁻', 'Matériau', 'Source', 'Type éch.', 'Dimensions', 'Opérateur', 'Préparation', 'Résultat',
                      'Type mat.', 'Type expo.', 'Nature', 'E/C', 'E/L', 'Eau (kg/m³)'];
-  const allCols   = [...fixedCols, ...measScalarNames, 'Courbes'];
+  const allCols   = [...fixedCols, ...measScalarNames, 'Courbes', 'Test'];
   const tr = document.querySelector('#meas-thead tr');
   tr.innerHTML = allCols.map((name, i) =>
     `<th onclick="sortMeasTable(${i})" data-col="${i}">${name}<span class="sort-arrow"></span></th>`
@@ -1071,7 +1071,6 @@ function renderMeasTable() {
     const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
     const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
     return `<tr${sel} data-meas-id="${r.id}">
-      <td><span class="meas-badge">${r.test || '?'}</span></td>
       <td>${clTag(r.testType)}</td>
       <td>${r.mat_name    || '—'}</td>
       <td>${r.source      || '—'}</td>
@@ -1088,6 +1087,7 @@ function renderMeasTable() {
       <td>${fmtNum(r.water_kg, 0)}</td>
       ${scCells}
       <td>${r.nCurves || '—'}</td>
+      <td><span class="meas-badge">${r.test || '?'}</span></td>
     </tr>`;
   }).join('');
 
@@ -1101,12 +1101,13 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.test, r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
+  const fixed = [r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
                  r.mat_type, r.expo_type, r.expo_nature, r.wc_ratio, r.wl_ratio, r.water_kg];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
   if (scIdx < r.scalars.length) return r.scalars[scIdx] ?? -Infinity;
-  return r.nCurves;
+  if (scIdx === r.scalars.length) return r.nCurves;
+  return r.test;
 }
 
 function sortMeasTable(colIdx) {
