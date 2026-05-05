@@ -1,8 +1,9 @@
 // =========================================================================
 // GristHelpers — Utilitaires partagés pour les widgets durabilité
-// Schéma v2.3 — 14 tables, 11 enums (architecture générique)
+// Schéma v2.4 — 15 tables, 11 enums (architecture générique)
 // Résultats : SCALAR (scalaires 0..n) + CURVE+DATA_CURVE (courbes 0..n)
 //             directement liés à MEASUREMENT (plus de table RESULT)
+// Granulats par coupure : MIX_DESIGN_AGGREGATE (table de jonction)
 // =========================================================================
 const GristHelpers = {
 
@@ -87,16 +88,14 @@ const GristHelpers = {
     // --- Formulation du béton ---
     MIX_DESIGN: {
       columns: [
-        { id: 'water_type',                          fields: { type: 'Choice',        label: "Type d'eau", widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
-        { id: 'water_content_kg',                    fields: { type: 'Numeric',       label: 'Eau (kg/m³)' } },
-        { id: 'id_aggregate',                        fields: { type: 'Ref:AGGREGATE', label: 'Granulat' } },
-        { id: 'aggregate_content_kg',                fields: { type: 'Numeric',       label: 'Granulats (kg/m³)' } },
-        { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric',       label: 'GWP (kg éq. CO₂/m³)' } },
-        { id: 'wc_ratio',                            fields: { type: 'Numeric',       label: 'E/C' } },
-        { id: 'wl_ratio',                            fields: { type: 'Numeric',       label: 'E/L' } },
-        { id: 'admix_type',                          fields: { type: 'Text',          label: 'Type adjuvant' } },
-        { id: 'adjuvant_content',                    fields: { type: 'Numeric',       label: 'Adjuvant (kg/m³)' } },
-        { id: 'entrained_air',                       fields: { type: 'Numeric',       label: 'Air entraîné (%)' } },
+        { id: 'water_type',                          fields: { type: 'Choice',  label: "Type d'eau", widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
+        { id: 'water_content_kg',                    fields: { type: 'Numeric', label: 'Eau (kg/m³)' } },
+        { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric', label: 'GWP (kg éq. CO₂/m³)' } },
+        { id: 'wc_ratio',                            fields: { type: 'Numeric', label: 'E/C' } },
+        { id: 'wl_ratio',                            fields: { type: 'Numeric', label: 'E/L' } },
+        { id: 'admix_type',                          fields: { type: 'Text',    label: 'Type adjuvant' } },
+        { id: 'adjuvant_content',                    fields: { type: 'Numeric', label: 'Adjuvant (kg/m³)' } },
+        { id: 'entrained_air',                       fields: { type: 'Numeric', label: 'Air entraîné (%)' } },
       ]
     },
 
@@ -106,6 +105,15 @@ const GristHelpers = {
         { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN', label: 'Formulation' } },
         { id: 'id_binder',     fields: { type: 'Ref:BINDER',     label: 'Liant' } },
         { id: 'content_kg_m3', fields: { type: 'Numeric',        label: 'Dosage (kg/m³)' } },
+      ]
+    },
+
+    // --- Liaisons granulat ↔ formulation (1 coupure = 1 ligne) ---
+    MIX_DESIGN_AGGREGATE: {
+      columns: [
+        { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN',  label: 'Formulation' } },
+        { id: 'id_aggregate',  fields: { type: 'Ref:AGGREGATE',   label: 'Granulat' } },
+        { id: 'content_kg_m3', fields: { type: 'Numeric',         label: 'Dosage (kg/m³)' } },
       ]
     },
 
@@ -218,7 +226,7 @@ const GristHelpers = {
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
-    log('Vérification du schéma Grist (14 tables)…');
+    log('Vérification du schéma Grist (15 tables)…');
 
     try {
       const [metaTables, metaCols] = await Promise.all([

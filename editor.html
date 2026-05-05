@@ -347,10 +347,6 @@
             </select>
           </div>
           <div class="field-item">
-            <label>Granulats (kg/m³)</label>
-            <input type="number" step="any" min="0" id="f-mix-aggr" data-table="MIX_DESIGN" data-field="aggregate_content_kg">
-          </div>
-          <div class="field-item">
             <label>Type adjuvant</label>
             <input type="text" id="f-mix-admix" data-table="MIX_DESIGN" data-field="admix_type">
           </div>
@@ -361,6 +357,18 @@
           <div class="field-item">
             <label>Air entraîné (%)</label>
             <input type="number" step="any" min="0" id="f-mix-air" data-table="MIX_DESIGN" data-field="entrained_air">
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <div class="sub-section-title">Granulats</div>
+          <div id="aggregates-list"></div>
+          <button class="btn-add-inline" onclick="showAddAggregateRow()">+ Ajouter un granulat</button>
+          <div class="add-binder-row" id="add-aggregate-row" style="display:none;">
+            <select id="new-aggregate-select">
+              <option value="">— choisir un granulat —</option>
+            </select>
+            <input type="number" step="any" min="0" id="new-aggregate-kg" placeholder="kg/m³">
+            <button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="confirmAddAggregate()">Ajouter</button>
           </div>
         </div>
       </div>
@@ -516,12 +524,16 @@ let currentSourceId = null;   // source de la 1ère mesure
 let pendingChanges = new Map();
 // pendingBinders
 let pendingBinders = { toAdd: [], toDelete: [] };
+// pendingAggregates
+let pendingAggregates = { toAdd: [], toDelete: [] };
 // pendingScalars
 let pendingScalars = { toAdd: [], toDelete: [] };
 
 // Cache global
-let allBinders       = [];  // [{id, fields}]
-let allMixBinders    = [];  // [{id, fields}] MIX_DESIGN_BINDER
+let allBinders          = [];  // [{id, fields}]
+let allMixBinders       = [];  // [{id, fields}] MIX_DESIGN_BINDER
+let allAggregates       = [];  // [{id, fields}]
+let allMixAggregates    = [];  // [{id, fields}] MIX_DESIGN_AGGREGATE
 let allMeasurements  = [];  // [{id, fields}]
 let allScalars       = [];  // [{id, fields}]
 let allCurves        = [];  // [{id, fields}]
@@ -586,8 +598,9 @@ function markChanged(tableName, rowId, fieldId, value) {
 }
 
 function countChanges() {
-  let n = pendingBinders.toAdd.length + pendingBinders.toDelete.length
-        + pendingScalars.toAdd.length + pendingScalars.toDelete.length;
+  let n = pendingBinders.toAdd.length    + pendingBinders.toDelete.length
+        + pendingAggregates.toAdd.length + pendingAggregates.toDelete.length
+        + pendingScalars.toAdd.length    + pendingScalars.toDelete.length;
   for (const [, rowMap] of pendingChanges) n += rowMap.size;
   return n;
 }
@@ -662,9 +675,10 @@ async function loadMaterial(record) {
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('editor-content').style.display = '';
   selectedMeasId = null;
-  pendingChanges = new Map();
-  pendingBinders = { toAdd: [], toDelete: [] };
-  pendingScalars = { toAdd: [], toDelete: [] };
+  pendingChanges    = new Map();
+  pendingBinders    = { toAdd: [], toDelete: [] };
+  pendingAggregates = { toAdd: [], toDelete: [] };
+  pendingScalars    = { toAdd: [], toDelete: [] };
   updateSaveBar();
 
   currentRecord = record;
@@ -710,11 +724,13 @@ async function loadMaterial(record) {
       'f-mix-wl':        'wl_ratio',
       'f-mix-water':     'water_content_kg',
       'f-mix-watertype': 'water_type',
-      'f-mix-aggr':      'aggregate_content_kg',
       'f-mix-admix':     'admix_type',
       'f-mix-adjuvant':  'adjuvant_content',
       'f-mix-air':       'entrained_air',
     }, 'card-mix') || {};
+
+    // ---- GRANULATS ----
+    await loadAggregates();
 
     // ---- LIANTS ----
     await loadBinders();
@@ -887,6 +903,124 @@ function confirmAddBinder() {
   sel.value  = '';
   inp.value  = '';
   document.getElementById('add-binder-row').style.display = 'none';
+  updateSaveBar();
+}
+
+// =========================================================================
+// Granulats : MIX_DESIGN_AGGREGATE + AGGREGATE
+// =========================================================================
+async function loadAggregates() {
+  const listEl = document.getElementById('aggregates-list');
+  listEl.innerHTML = '';
+
+  if (!currentMixId) {
+    listEl.innerHTML = '<div class="no-binders">Aucune formulation liée.</div>';
+    return;
+  }
+
+  try {
+    [allMixAggregates, allAggregates] = await Promise.all([
+      GristHelpers.fetchAllRecords('MIX_DESIGN_AGGREGATE'),
+      GristHelpers.fetchAllRecords('AGGREGATE'),
+    ]);
+
+    const aggregateMap = new Map(allAggregates.map(a => [a.id, a.fields]));
+
+    // Peupler le select de création
+    const sel = document.getElementById('new-aggregate-select');
+    sel.innerHTML = '<option value="">— choisir un granulat —</option>';
+    allAggregates.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      const size = (a.fields.size_min_mm != null && a.fields.size_max_mm != null)
+        ? ` ${a.fields.size_min_mm}/${a.fields.size_max_mm} mm` : '';
+      opt.textContent = (a.fields.name || 'Granulat #' + a.id) + size + ' (' + (a.fields.aggregate_type || '') + ')';
+      sel.appendChild(opt);
+    });
+
+    const rows = allMixAggregates.filter(ma => ma.fields.id_mix_design === currentMixId);
+
+    if (rows.length === 0) {
+      listEl.innerHTML = '<div class="no-binders">Aucun granulat dans cette formulation.</div>';
+      return;
+    }
+
+    rows.forEach(ma => {
+      const agg = aggregateMap.get(ma.fields.id_aggregate) || {};
+      const size = (agg.size_min_mm != null && agg.size_max_mm != null)
+        ? `${agg.size_min_mm}/${agg.size_max_mm} mm` : '—';
+      const row = document.createElement('div');
+      row.className = 'binder-row';
+      row.dataset.maId = ma.id;
+      row.innerHTML = `
+        <span class="b-name">${agg.name || '(sans nom)'}</span>
+        <span class="b-type">${size}</span>
+        <input type="number" step="any" min="0" value="${ma.fields.content_kg_m3 != null ? ma.fields.content_kg_m3 : ''}" placeholder="kg/m³" data-ma-id="${ma.id}">
+        <button class="btn-del" data-ma-id="${ma.id}" title="Supprimer">✕</button>
+      `;
+      listEl.appendChild(row);
+
+      const inp = row.querySelector('input[type=number]');
+      inp.addEventListener('input', () => {
+        const val = inp.value === '' ? null : parseFloat(inp.value);
+        if (pendingAggregates.toDelete.includes(ma.id)) return;
+        markChanged('MIX_DESIGN_AGGREGATE', ma.id, 'content_kg_m3', val);
+      });
+
+      const delBtn = row.querySelector('.btn-del');
+      delBtn.addEventListener('click', () => {
+        if (!pendingAggregates.toDelete.includes(ma.id))
+          pendingAggregates.toDelete.push(ma.id);
+        row.style.opacity = '0.4';
+        row.style.textDecoration = 'line-through';
+        delBtn.disabled = true;
+        updateSaveBar();
+      });
+    });
+  } catch(err) {
+    GristHelpers.log('Erreur chargement granulats : ' + err.message, 'err');
+  }
+}
+
+function showAddAggregateRow() {
+  const el = document.getElementById('add-aggregate-row');
+  el.style.display = el.style.display === 'none' ? 'grid' : 'none';
+}
+
+function confirmAddAggregate() {
+  const sel        = document.getElementById('new-aggregate-select');
+  const inp        = document.getElementById('new-aggregate-kg');
+  const aggregateId = parseInt(sel.value);
+  const kg         = inp.value === '' ? null : parseFloat(inp.value);
+
+  if (!aggregateId) { alert('Veuillez choisir un granulat.'); return; }
+  if (!currentMixId) { alert('Aucune formulation liée à ce matériau.'); return; }
+
+  pendingAggregates.toAdd.push({
+    id_mix_design: currentMixId,
+    id_aggregate:  aggregateId,
+    content_kg_m3: kg,
+  });
+
+  const agg = allAggregates.find(a => a.id === aggregateId);
+  const size = (agg?.fields?.size_min_mm != null && agg?.fields?.size_max_mm != null)
+    ? `${agg.fields.size_min_mm}/${agg.fields.size_max_mm} mm` : '—';
+  const listEl = document.getElementById('aggregates-list');
+  const tempRow = document.createElement('div');
+  tempRow.className = 'binder-row';
+  tempRow.style.opacity = '0.6';
+  tempRow.style.fontStyle = 'italic';
+  tempRow.innerHTML = `
+    <span class="b-name">${agg?.fields?.name || '(nouveau)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
+    <span class="b-type">${size}</span>
+    <span>${kg != null ? kg + ' kg/m³' : '—'}</span>
+    <span></span>
+  `;
+  listEl.appendChild(tempRow);
+
+  sel.value = '';
+  inp.value = '';
+  document.getElementById('add-aggregate-row').style.display = 'none';
   updateSaveBar();
 }
 
@@ -1416,12 +1550,22 @@ async function saveAll() {
     actions.push(['AddRecord', 'MIX_DESIGN_BINDER', null, fields]);
   }
 
-  // 4. Suppressions de scalaires
+  // 4. Suppressions de granulats
+  for (const maId of pendingAggregates.toDelete) {
+    actions.push(['RemoveRecord', 'MIX_DESIGN_AGGREGATE', maId]);
+  }
+
+  // 5. Ajouts de granulats
+  for (const fields of pendingAggregates.toAdd) {
+    actions.push(['AddRecord', 'MIX_DESIGN_AGGREGATE', null, fields]);
+  }
+
+  // 6. Suppressions de scalaires
   for (const sId of pendingScalars.toDelete) {
     actions.push(['RemoveRecord', 'SCALAR', sId]);
   }
 
-  // 5. Ajouts de scalaires
+  // 7. Ajouts de scalaires
   for (const fields of pendingScalars.toAdd) {
     actions.push(['AddRecord', 'SCALAR', null, fields]);
   }
@@ -1439,9 +1583,10 @@ async function saveAll() {
     GristHelpers.log('Enregistré avec succès ✓', 'ok');
     GristHelpers.setStatus('Enregistré', 'ready');
     const prevMeasId = selectedMeasId;
-    pendingChanges = new Map();
-    pendingBinders = { toAdd: [], toDelete: [] };
-    pendingScalars = { toAdd: [], toDelete: [] };
+    pendingChanges    = new Map();
+    pendingBinders    = { toAdd: [], toDelete: [] };
+    pendingAggregates = { toAdd: [], toDelete: [] };
+    pendingScalars    = { toAdd: [], toDelete: [] };
     updateSaveBar();
     await loadMaterial(currentRecord);
     // Re-sélectionner la mesure après rechargement
@@ -1454,9 +1599,10 @@ async function saveAll() {
 }
 
 function resetChanges() {
-  pendingChanges = new Map();
-  pendingBinders = { toAdd: [], toDelete: [] };
-  pendingScalars = { toAdd: [], toDelete: [] };
+  pendingChanges    = new Map();
+  pendingBinders    = { toAdd: [], toDelete: [] };
+  pendingAggregates = { toAdd: [], toDelete: [] };
+  pendingScalars    = { toAdd: [], toDelete: [] };
   updateSaveBar();
   loadMaterial(currentRecord);
 }
