@@ -259,42 +259,50 @@
   <!-- ============================================================ -->
   <!-- TAB: AGGREGATE (Granulats) -->
   <!-- ============================================================ -->
-  <div class="tab-panel" id="panel-aggregate">
-    <div class="card">
-      <div class="card-title">Granulat (AGGREGATE)</div>
-      <div class="selector-row">
-        <select id="sel-aggregate" onchange="onSel('aggregate')">
-          <option value="">— Sélectionner un granulat —</option>
-        </select>
-        <button class="btn btn-secondary" onclick="toggleForm('aggregate')">+ Nouveau</button>
+<div class="tab-panel" id="panel-aggregate">
+  <div class="card">
+    <div class="card-title">Coupures granulaires pour la formulation</div>
+    <div id="agg-selection-list"></div>
+    <p id="agg-selection-empty" style="font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 0;margin:0;">
+      Aucun granulat ajouté pour cette formulation.
+    </p>
+    <div class="selector-row" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--surface2);">
+      <select id="sel-aggregate-add">
+        <option value="">— Choisir un granulat à ajouter —</option>
+      </select>
+      <input type="number" id="agg-add-qty" step="10" min="0" placeholder="kg/m³"
+        style="width:100px;padding:7px 8px;background:var(--bg);border:1px solid var(--surface2);border-radius:6px;color:var(--text);font-size:13px;">
+      <button class="btn btn-secondary" onclick="addAggregateToSelection()">+ Ajouter</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Créer un nouveau type de granulat</div>
+    <div id="form-aggregate">
+      <div class="form-grid">
+        <div class="form-field"><label>Nom <span class="req">*</span></label><input type="text" id="f-agg-name" placeholder="Sable Loire 0/4"></div>
+        <div class="form-field">
+          <label>Type <span class="req">*</span></label>
+          <select id="f-agg-type">
+            <option value="">Choisir…</option>
+            <option value="sand">sand</option>
+            <option value="gravel">gravel</option>
+            <option value="crushed_stone">crushed_stone</option>
+            <option value="lightweight">lightweight</option>
+            <option value="recycled">recycled</option>
+          </select>
+        </div>
+        <div class="form-field"><label>D min (mm)</label><input type="number" id="f-agg-dmin" step="0.1" min="0" placeholder="0"></div>
+        <div class="form-field"><label>D max (mm)</label><input type="number" id="f-agg-dmax" step="0.5" min="0" placeholder="4"></div>
+        <div class="form-field"><label>Masse volumique (kg/m³)</label><input type="number" id="f-agg-density" step="10" placeholder="2650"></div>
+        <div class="form-field"><label>Absorption eau (%)</label><input type="number" id="f-agg-wa" step="0.1" min="0" placeholder="0.5"></div>
+        <div class="form-field" style="grid-column:1/-1;"><label>Notes</label><textarea id="f-agg-notes" placeholder="Origine, norme…" style="min-height:40px;"></textarea></div>
       </div>
-      <div id="form-aggregate" style="display:none;">
-        <div class="form-grid">
-          <div class="form-field"><label>Nom <span class="req">*</span></label><input type="text" id="f-agg-name" placeholder="Sable Loire 0/4"></div>
-          <div class="form-field">
-            <label>Type <span class="req">*</span></label>
-            <select id="f-agg-type">
-              <option value="">Choisir…</option>
-              <option value="sand">sand</option>
-              <option value="gravel">gravel</option>
-              <option value="crushed_stone">crushed_stone</option>
-              <option value="lightweight">lightweight</option>
-              <option value="recycled">recycled</option>
-            </select>
-          </div>
-          <div class="form-field"><label>D min (mm)</label><input type="number" id="f-agg-dmin" step="0.1" min="0" placeholder="0"></div>
-          <div class="form-field"><label>D max (mm)</label><input type="number" id="f-agg-dmax" step="0.5" min="0" placeholder="4"></div>
-          <div class="form-field"><label>Masse volumique (kg/m³)</label><input type="number" id="f-agg-density" step="10" placeholder="2650"></div>
-          <div class="form-field"><label>Absorption eau (%)</label><input type="number" id="f-agg-wa" step="0.1" min="0" placeholder="0.5"></div>
-          <div class="form-field" style="grid-column:1/-1;"><label>Notes</label><textarea id="f-agg-notes" placeholder="Origine, norme…" style="min-height:40px;"></textarea></div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-secondary" onclick="toggleForm('aggregate')">Annuler</button>
-          <button class="btn btn-primary" onclick="saveAggregate()">Enregistrer le granulat</button>
-        </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveAggregate()">Enregistrer et ajouter à la formulation</button>
       </div>
     </div>
   </div>
+</div>
 
   <!-- ============================================================ -->
   <!-- TAB: MIX_DESIGN (Formulation) -->
@@ -328,7 +336,10 @@
               <option value="sea_water">sea_water</option>
             </select>
           </div>
-          <div class="form-field"><label>Granulats (kg/m³)</label><input type="number" id="f-mix-agg-kg" step="10" min="0" placeholder="1800"></div>
+          <div class="form-field" style="grid-column:1/-1;">
+            <label>Granulats <span style="font-size:10px;color:var(--text-dim);">→ configurer dans l'onglet Granulats</span></label>
+            <div id="mix-agg-summary" style="padding:5px 0;font-size:12px;color:var(--text-dim);font-style:italic;">Aucun granulat configuré.</div>
+          </div>
           <div class="form-field"><label>GWP (kg éq. CO₂/m³)</label><input type="number" id="f-mix-gwp" step="1" min="0" placeholder="250"></div>
           <div class="form-field"><label>Type adjuvant</label><input type="text" id="f-mix-admix" placeholder="Superplastifiant"></div>
           <div class="form-field"><label>Adjuvant (kg/m³)</label><input type="number" id="f-mix-admix-content" step="0.1" min="0" placeholder="1.0"></div>
@@ -680,9 +691,10 @@
 
     const sel = {
       source: null, binder_cement: null, binder_scm: null,
-      aggregate: null, mix: null, exposure: null, curing: null,
+      mix: null, exposure: null, curing: null,
       site: null, material: null, measurement: null, test: null,
     };
+    let selectedAggregates = [];  // [{id_aggregate, content_kg_m3, _name, _size}]
 
     // =========================================================================
     // COLLAPSIBLES
@@ -704,7 +716,7 @@
       document.querySelectorAll('.tab-panel').forEach(p =>
         p.classList.toggle('active', p.id === 'panel-' + tabName)
       );
-      if (tabName === 'mix')         updateMixContextBar();
+      if (tabName === 'mix')         { updateMixContextBar(); updateMixAggSummary(); }
       if (tabName === 'material')    updateMaterialContextBar();
       if (tabName === 'measurement') updateMeasurementContextBar();
       if (tabName === 'results')     updateResultsPanel();
@@ -790,7 +802,7 @@
       });
       fillDrop('sel-binder-cement', allBinders,    b => `${b.fields.name || 'Liant #' + b.id} (${b.fields.binder_type || '?'})`);
       fillDrop('sel-binder-scm',    allBinders,    b => `${b.fields.name || 'Liant #' + b.id} (${b.fields.binder_type || '?'})`);
-      fillDrop('sel-aggregate',     allAggregates, a => {
+      fillDrop('sel-aggregate-add', allAggregates, a => {
         const name = a.fields.name || `Granulat #${a.id}`;
         const type = a.fields.aggregate_type || '';
         const size = (a.fields.size_min_mm != null || a.fields.size_max_mm != null)
@@ -836,7 +848,7 @@
       // Restore selections
       const map = {
         'sel-source': 'source', 'sel-binder-cement': 'binder_cement', 'sel-binder-scm': 'binder_scm',
-        'sel-aggregate': 'aggregate', 'sel-mix': 'mix', 'sel-exposure': 'exposure',
+        'sel-mix': 'mix', 'sel-exposure': 'exposure',
         'sel-curing': 'curing', 'sel-site': 'site', 'sel-material': 'material',
         'sel-measurement': 'measurement',
       };
@@ -954,9 +966,22 @@
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('AGGREGATE', fields);
         GristHelpers.log(`Granulat "${name}" créé (id=${result.id}) ✓`, 'ok');
-        sel.aggregate = result.id;
-        toggleForm('aggregate');
+        const sizeStr = (fields.size_min_mm != null && fields.size_max_mm != null)
+          ? `${fields.size_min_mm}/${fields.size_max_mm} mm`
+          : (fields.aggregate_type || '');
+        selectedAggregates.push({
+          id_aggregate:  result.id,
+          content_kg_m3: null,
+          _name:         name,
+          _size:         sizeStr,
+        });
+        ['f-agg-name','f-agg-dmin','f-agg-dmax','f-agg-density','f-agg-wa','f-agg-notes'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        document.getElementById('f-agg-type').value = '';
         await refreshAll();
+        renderSelectedAggregates();
       } catch (err) { GristHelpers.log('Erreur : ' + err.message, 'err'); }
     }
 
@@ -968,13 +993,13 @@
     }
 
     function updateMixContextBar() {
-      const bc = allBinders.find(b => b.id === sel.binder_cement);
-      const bs = allBinders.find(b => b.id === sel.binder_scm);
-      const ag = allAggregates.find(a => a.id === sel.aggregate);
+      const bc   = allBinders.find(b => b.id === sel.binder_cement);
+      const bs   = allBinders.find(b => b.id === sel.binder_scm);
+      const nAgg = selectedAggregates.length;
       document.getElementById('mix-context-bar').innerHTML =
         tagHTML('Ciment', bc?.fields.name) +
         tagHTML('SCM', bs?.fields.name) +
-        tagHTML('Granulat', ag?.fields.name);
+        tagHTML('Granulats', nAgg > 0 ? `${nAgg} coupure${nAgg > 1 ? 's' : ''}` : null);
     }
 
     function updateMaterialContextBar() {
@@ -1039,8 +1064,6 @@
         const mixFields = {
           water_content_kg:                    floatOrNull('f-mix-water-kg')      ?? 0,
           water_type:                          document.getElementById('f-mix-water-type').value || '',
-          id_aggregate:                        sel.aggregate                      || 0,
-          aggregate_content_kg:                floatOrNull('f-mix-agg-kg')        ?? 0,
           wc_ratio:                            floatOrNull('f-mix-wc')            ?? 0,
           wl_ratio:                            wlSaisie ?? wlCalc,
           global_warming_performance_kg_eq_m3: floatOrNull('f-mix-gwp')           ?? 0,
@@ -1067,6 +1090,19 @@
             content_kg_m3: scmKg,
           });
         }
+
+        // Granulats → MIX_DESIGN_AGGREGATE
+        for (const agg of selectedAggregates) {
+          if (agg.id_aggregate) {
+            await GristHelpers.createRecord('MIX_DESIGN_AGGREGATE', {
+              id_mix_design:  result.id,
+              id_aggregate:   agg.id_aggregate,
+              content_kg_m3:  agg.content_kg_m3 ?? 0,
+            });
+          }
+        }
+        selectedAggregates = [];
+        renderSelectedAggregates();
 
         sel.mix = result.id;
         toggleForm('mix');
@@ -1303,6 +1339,74 @@
           tagHTML('Matériau', mat?.fields.name) +
           tagHTML('Test',     test ? `${test.fields.name} (${test.fields.test_type})` : null);
       }
+    }
+
+    // =========================================================================
+    // GRANULATS — sélection multi-coupures
+    // =========================================================================
+    function renderSelectedAggregates() {
+      const listEl  = document.getElementById('agg-selection-list');
+      const emptyEl = document.getElementById('agg-selection-empty');
+      if (!listEl) return;
+      if (selectedAggregates.length === 0) {
+        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = '';
+      } else {
+        if (emptyEl) emptyEl.style.display = 'none';
+        listEl.innerHTML = selectedAggregates.map((item, idx) => `
+          <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--surface2);font-size:12px;">
+            <span style="flex:1;color:var(--text-muted);font-weight:500;">${item._name}</span>
+            <span style="color:var(--text-dim);font-size:11px;min-width:80px;">${item._size}</span>
+            <input type="number" step="10" min="0" value="${item.content_kg_m3 ?? ''}" placeholder="kg/m³"
+              style="width:90px;padding:4px 7px;background:var(--bg);border:1px solid var(--surface2);border-radius:5px;color:var(--text);font-size:12px;"
+              oninput="selectedAggregates[${idx}].content_kg_m3 = this.value === '' ? null : parseFloat(this.value); updateMixAggSummary();">
+            <button class="btn-icon" title="Supprimer" onclick="removeAggregateFromSelection(${idx})" style="color:var(--error);">✕</button>
+          </div>
+        `).join('');
+      }
+      updateMixAggSummary();
+    }
+
+    function addAggregateToSelection() {
+      const selEl = document.getElementById('sel-aggregate-add');
+      const qtyEl = document.getElementById('agg-add-qty');
+      const id    = parseInt(selEl.value);
+      if (!id) { GristHelpers.log('Choisissez un granulat dans la liste', 'warn'); return; }
+      if (selectedAggregates.some(a => a.id_aggregate === id)) {
+        GristHelpers.log('Ce granulat est déjà dans la sélection', 'warn'); return;
+      }
+      const agg  = allAggregates.find(a => a.id === id);
+      const size = (agg?.fields.size_min_mm != null && agg?.fields.size_max_mm != null)
+        ? `${agg.fields.size_min_mm}/${agg.fields.size_max_mm} mm`
+        : (agg?.fields.aggregate_type || '');
+      selectedAggregates.push({
+        id_aggregate:  id,
+        content_kg_m3: qtyEl.value === '' ? null : parseFloat(qtyEl.value),
+        _name:         agg?.fields.name || `Granulat #${id}`,
+        _size:         size,
+      });
+      selEl.value = '';
+      qtyEl.value = '';
+      renderSelectedAggregates();
+    }
+
+    function removeAggregateFromSelection(idx) {
+      selectedAggregates.splice(idx, 1);
+      renderSelectedAggregates();
+    }
+
+    function updateMixAggSummary() {
+      const el = document.getElementById('mix-agg-summary');
+      if (!el) return;
+      if (selectedAggregates.length === 0) {
+        el.textContent = 'Aucun granulat configuré — voir onglet Granulats.';
+        return;
+      }
+      el.innerHTML = selectedAggregates
+        .map(a => `<strong>${a._name}</strong>${a.content_kg_m3 != null ? ' — ' + a.content_kg_m3 + ' kg/m³' : ''}`)
+        .join(' · ');
+      el.style.fontStyle = 'normal';
+      el.style.color = 'var(--text-muted)';
     }
 
     // =========================================================================
