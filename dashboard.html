@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Comparatif — Durabilité</title>
+  <title>Comparative Dashboard — Durability</title>
 
   <link rel="stylesheet" href="assets/shared-styles.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
@@ -30,45 +30,45 @@
 <body>
 
   <div class="header">
-    <h1><span class="icon">📈</span> Dashboard Comparatif</h1>
+    <h1><span class="icon">📈</span> Comparative Dashboard</h1>
     <div style="display:flex; gap:8px; align-items:center;">
-      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Rafraîchir</button>
+      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Refresh</button>
       <div class="status" id="status">
         <span class="dot"></span>
-        <span id="status-text">Chargement…</span>
+        <span id="status-text">Loading…</span>
       </div>
     </div>
   </div>
 
   <!-- KPIs -->
   <div class="card">
-    <div class="card-title">Vue d'ensemble</div>
+    <div class="card-title">Overview</div>
     <div class="stats-row" id="summary-stats">
-      <div class="info-item"><div class="label">Analyses D</div><div class="value">—</div></div>
-      <div class="info-item"><div class="label">Mélanges</div><div class="value">—</div></div>
-      <div class="info-item"><div class="label">D moyen</div><div class="value">—</div></div>
-      <div class="info-item"><div class="label">Durée de vie moy.</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">D analyses</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Mixes</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Mean D</div><div class="value">—</div></div>
+      <div class="info-item"><div class="label">Avg. service life</div><div class="value">—</div></div>
     </div>
   </div>
 
   <!-- Filters -->
   <div class="card">
-    <div class="card-title">Filtres</div>
+    <div class="card-title">Filters</div>
     <div class="filter-bar">
-      <select id="filter-mix"><option value="">Tous mélanges</option></select>
-      <select id="filter-exposure-type"><option value="">Tous types expo.</option></select>
-      <select id="filter-exposure-nature"><option value="">Toutes natures expo.</option></select>
-      <select id="filter-source"><option value="">Toutes sources</option></select>
-      <button class="btn btn-secondary" onclick="resetFilters()">Réinitialiser</button>
+      <select id="filter-mix"><option value="">All materials</option></select>
+      <select id="filter-exposure-type"><option value="">All exposure types</option></select>
+      <select id="filter-exposure-nature"><option value="">All exposure natures</option></select>
+      <select id="filter-source"><option value="">All sources</option></select>
+      <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
     </div>
   </div>
 
   <!-- Charts -->
   <div class="card">
     <div class="tabs">
-      <div class="tab active" data-tab="d-mix"    onclick="showTab('d-mix')">D par mélange</div>
-      <div class="tab"        data-tab="wl-d"     onclick="showTab('wl-d')">E/C vs D</div>
-      <div class="tab"        data-tab="duree-vie" onclick="showTab('duree-vie')">Durée de vie</div>
+      <div class="tab active" data-tab="d-mix"    onclick="showTab('d-mix')">D by material</div>
+      <div class="tab"        data-tab="wl-d"     onclick="showTab('wl-d')">w/c vs D</div>
+      <div class="tab"        data-tab="duree-vie" onclick="showTab('duree-vie')">Service life</div>
     </div>
     <div id="tab-d-mix"    class="tab-content active"><div id="chart-d-mix"    class="chart-container"></div></div>
     <div id="tab-wl-d"     class="tab-content">       <div id="chart-wl-d"    class="chart-container"></div></div>
@@ -78,15 +78,15 @@
   <!-- Data table -->
   <div class="card">
     <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
-      <span>Données filtrées</span>
+      <span>Filtered data</span>
       <span id="table-count" style="font-size:11px; color:var(--text-dim); text-transform:none; letter-spacing:0;"></span>
     </div>
     <div style="overflow-x:auto; max-height:300px; overflow-y:auto;">
       <table class="data-table">
         <thead><tr>
-          <th>Matériau</th><th>Mélange</th><th>E/C</th>
-          <th>Type expo.</th><th>Nature expo.</th>
-          <th>D (m²/s)</th><th>Durée vie</th><th>Source</th>
+          <th>Material</th><th>Mix</th><th>w/c</th>
+          <th>Expo. type</th><th>Expo. nature</th>
+          <th>D (m²/s)</th><th>Service life</th><th>Source</th>
         </tr></thead>
         <tbody id="data-table-body"></tbody>
       </table>
@@ -94,17 +94,17 @@
   </div>
 
   <div class="card">
-    <div class="card-title">Journal</div>
+    <div class="card-title">Log</div>
     <div class="log" id="log"></div>
   </div>
 
   <script>
     // =========================================================================
     // STATE
-    // Chaque élément de allData : {
+    // Each element of allData: {
     //   _id, D, duree_vie_ans,
     //   material: {name, material_type, id_mix_design, id_exposure},
-    //   mix:      {wc_ratio, …},  // liants via MIX_DESIGN_BINDER
+    //   mix:      {wc_ratio, …},  // binders via MIX_DESIGN_BINDER
     //   exposure: {exposure_type, exposure_nature},
     //   source:   {authors, designation, year}
     // }
@@ -121,13 +121,13 @@
 
     // =========================================================================
     // LOAD DATA
-    // Architecture v2.2 :
+    // Architecture v2.2:
     //   SCALAR (name='D') → MEASUREMENT → MATERIAL → MIX_DESIGN + EXPOSURE
-    //   duree_vie : SCALAR name='duree_vie_ans' sur le même MEASUREMENT
+    //   service life: SCALAR name='duree_vie_ans' on the same MEASUREMENT
     // =========================================================================
     async function loadAllData() {
-      GristHelpers.log('Chargement des données…');
-      GristHelpers.setStatus('Chargement…', '');
+      GristHelpers.log('Loading data…');
+      GristHelpers.setStatus('Loading…', '');
 
       try {
         const [scalars, measurements, materials, mixes, exposures, sources] = await Promise.all([
@@ -146,7 +146,7 @@
         const exposureMap = new Map(exposures.map(e => [e.id, e.fields]));
         const sourceMap   = new Map(sources.map(s => [s.id, s.fields]));
 
-        // Duree de vie : SCALAR name='duree_vie_ans', groupé par id_measurement
+        // Service life: SCALAR name='duree_vie_ans', grouped by id_measurement
         const dureeMap = new Map();
         scalars.forEach(s => {
           if (s.fields.name === 'duree_vie_ans' && s.fields.value != null) {
@@ -154,7 +154,7 @@
           }
         });
 
-        // Scalaires D (coefficient de diffusion apparent)
+        // D scalars (apparent diffusion coefficient)
         const dScalars = scalars.filter(s =>
           s.fields.name === 'D' &&
           s.fields.value != null &&
@@ -178,14 +178,14 @@
           };
         });
 
-        GristHelpers.log(`${allData.length} valeurs D chargées (${mixes.length} mélanges, ${exposures.length} expositions)`, 'ok');
+        GristHelpers.log(`${allData.length} D values loaded (${mixes.length} mixes, ${exposures.length} exposures)`, 'ok');
 
         populateFilters(allData);
         applyFilters();
         GristHelpers.setStatus(`${allData.length} analyses`, 'ready');
       } catch (err) {
-        GristHelpers.log('Erreur chargement : ' + err.message, 'err');
-        GristHelpers.setStatus('Erreur', 'error');
+        GristHelpers.log('Load error: ' + err.message, 'err');
+        GristHelpers.setStatus('Error', 'error');
       }
     }
 
@@ -198,10 +198,10 @@
       const expoNatures = [...new Set(data.map(d => d.exposure.exposure_nature).filter(Boolean))].sort();
       const srcLabels   = [...new Set(data.map(d => sourceLabel(d.source)).filter(Boolean))].sort();
 
-      fillSelect('filter-mix',            matNames,    'Tous matériaux');
-      fillSelect('filter-exposure-type',  expoTypes,   'Tous types expo.');
-      fillSelect('filter-exposure-nature',expoNatures, 'Toutes natures');
-      fillSelect('filter-source',         srcLabels,   'Toutes sources');
+      fillSelect('filter-mix',            matNames,    'All materials');
+      fillSelect('filter-exposure-type',  expoTypes,   'All exposure types');
+      fillSelect('filter-exposure-nature',expoNatures, 'All natures');
+      fillSelect('filter-source',         srcLabels,   'All sources');
     }
 
     function sourceLabel(source) {
@@ -234,7 +234,7 @@
         return true;
       });
 
-      GristHelpers.log(`${filteredData.length}/${allData.length} analyses après filtrage`);
+      GristHelpers.log(`${filteredData.length}/${allData.length} analyses after filtering`);
       updateSummary(filteredData);
       renderActiveChart();
       renderDataTable(filteredData);
@@ -275,20 +275,20 @@
       const dureeMoy  = dureeVies.length > 0 ? dureeVies.reduce((a, b) => a + b, 0) / dureeVies.length : null;
 
       document.getElementById('summary-stats').innerHTML = `
-        <div class="info-item"><div class="label">Analyses D</div><div class="value">${data.length}</div></div>
-        <div class="info-item"><div class="label">Mélanges</div><div class="value">${mixIds.size}</div></div>
-        <div class="info-item"><div class="label">D moyen</div><div class="value">${dMoyen ? GristHelpers.formatDapp(dMoyen) : '—'} <span class="unit">m²/s</span></div></div>
-        <div class="info-item"><div class="label">Durée de vie moy.</div><div class="value">${dureeMoy ? dureeMoy.toFixed(1) : '—'} <span class="unit">ans</span></div></div>
+        <div class="info-item"><div class="label">D analyses</div><div class="value">${data.length}</div></div>
+        <div class="info-item"><div class="label">Mixes</div><div class="value">${mixIds.size}</div></div>
+        <div class="info-item"><div class="label">Mean D</div><div class="value">${dMoyen ? GristHelpers.formatDapp(dMoyen) : '—'} <span class="unit">m²/s</span></div></div>
+        <div class="info-item"><div class="label">Avg. service life</div><div class="value">${dureeMoy ? dureeMoy.toFixed(1) : '—'} <span class="unit">yr</span></div></div>
       `;
     }
 
     // =========================================================================
-    // CHART 1 : D par matériau (box plots)
+    // CHART 1 : D by material (box plots)
     // =========================================================================
     function renderDByMix(data) {
       const groups = {};
       data.forEach(d => {
-        const key = d.material.name || `mix_${d.material.id_mix_design}` || 'Inconnu';
+        const key = d.material.name || `mix_${d.material.id_mix_design}` || 'Unknown';
         if (!groups[key]) groups[key] = [];
         if (d.D > 0) groups[key].push(d.D);
       });
@@ -308,7 +308,7 @@
     }
 
     // =========================================================================
-    // CHART 2 : E/C vs D (scatter)
+    // CHART 2 : w/c vs D (scatter)
     // =========================================================================
     function renderWlVsD(data) {
       const valid = data.filter(d => d.mix.wc_ratio != null && d.D > 0);
@@ -316,13 +316,13 @@
       if (valid.length === 0) {
         Plotly.purge('chart-wl-d');
         document.getElementById('chart-wl-d').innerHTML =
-          '<div class="empty-state" style="padding:40px"><h3>Pas de données E/C</h3><p>Renseignez <strong>wc_ratio</strong> dans MIX_DESIGN.</p></div>';
+          '<div class="empty-state" style="padding:40px"><h3>No w/c data</h3><p>Set <strong>wc_ratio</strong> in MIX_DESIGN.</p></div>';
         return;
       }
 
-      const matNames = [...new Set(valid.map(d => d.material.name || 'Inconnu'))].sort();
+      const matNames = [...new Set(valid.map(d => d.material.name || 'Unknown'))].sort();
       const traces = matNames.map((name, i) => {
-        const pts = valid.filter(d => (d.material.name || 'Inconnu') === name);
+        const pts = valid.filter(d => (d.material.name || 'Unknown') === name);
         return {
           x: pts.map(d => d.mix.wc_ratio), y: pts.map(d => d.D),
           mode: 'markers', type: 'scatter', name,
@@ -332,18 +332,18 @@
       });
 
       Plotly.newPlot('chart-wl-d', traces, GristHelpers.plotlyDarkLayout({
-        xaxis: GristHelpers.plotlyDarkAxis('Rapport E/C'),
+        xaxis: GristHelpers.plotlyDarkAxis('w/c ratio'),
         yaxis: GristHelpers.plotlyDarkAxis('D (m²/s)')
       }), { responsive: true, displaylogo: false });
     }
 
     // =========================================================================
-    // CHART 3 : Durée de vie (bar chart)
+    // CHART 3 : Service life (bar chart)
     // =========================================================================
     function renderDureeVie(data) {
       const groups = {};
       data.forEach(d => {
-        const key = d.material.name || 'Inconnu';
+        const key = d.material.name || 'Unknown';
         if (!groups[key]) groups[key] = [];
         if (d.duree_vie_ans != null && d.duree_vie_ans > 0) groups[key].push(d.duree_vie_ans);
       });
@@ -352,7 +352,7 @@
       if (names.length === 0) {
         Plotly.purge('chart-duree-vie');
         document.getElementById('chart-duree-vie').innerHTML =
-          '<div class="empty-state" style="padding:40px"><h3>Pas de données</h3><p>Enregistrez un scalaire <strong>duree_vie_ans</strong> dans SCALAR.</p></div>';
+          '<div class="empty-state" style="padding:40px"><h3>No data</h3><p>Record a <strong>duree_vie_ans</strong> scalar in SCALAR.</p></div>';
         return;
       }
 
@@ -362,7 +362,7 @@
       const counts = names.map(n => groups[n].length);
 
       Plotly.newPlot('chart-duree-vie', [{
-        x: names, y: means, type: 'bar', name: 'Moyenne',
+        x: names, y: means, type: 'bar', name: 'Average',
         marker: { color: names.map((_, i) => PALETTE[i % PALETTE.length]) },
         error_y: {
           type: 'data', symmetric: false,
@@ -370,11 +370,11 @@
           arrayminus: means.map((m, i) => m - mins[i]),
           color: '#94a3b8', thickness: 1.5
         },
-        text:      counts.map((c, i) => `n=${c}, moy=${means[i].toFixed(1)} ans`),
+        text:      counts.map((c, i) => `n=${c}, avg=${means[i].toFixed(1)} yr`),
         hoverinfo: 'text+name'
       }], GristHelpers.plotlyDarkLayout({
         xaxis:      GristHelpers.plotlyDarkAxis(''),
-        yaxis:      GristHelpers.plotlyDarkAxis('Durée de vie (ans)'),
+        yaxis:      GristHelpers.plotlyDarkAxis('Service life (yr)'),
         showlegend: false
       }), { responsive: true, displaylogo: false });
     }
@@ -383,7 +383,7 @@
     // DATA TABLE
     // =========================================================================
     function renderDataTable(data) {
-      document.getElementById('table-count').textContent = `${data.length} lignes`;
+      document.getElementById('table-count').textContent = `${data.length} rows`;
       document.getElementById('data-table-body').innerHTML = data.map(d => `
         <tr>
           <td>${d.material.name           || '—'}</td>
@@ -402,9 +402,9 @@
     // INIT
     // =========================================================================
     (async function() {
-      GristHelpers.log('Initialisation Dashboard Comparatif…');
+      GristHelpers.log('Initializing Comparative Dashboard…');
       grist.ready({ requiredAccess: 'full' });
-      GristHelpers.log('Connecté à Grist ✓', 'ok');
+      GristHelpers.log('Connected to Grist ✓', 'ok');
       await GristHelpers.ensureSchema();
       loadAllData();
     })();

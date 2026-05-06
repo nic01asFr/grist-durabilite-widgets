@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Éditeur — Durabilité</title>
+  <title>Editor — Durability</title>
 
   <link rel="stylesheet" href="assets/shared-styles.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
@@ -99,7 +99,7 @@
 
     .no-binders { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 4px 0; }
 
-    /* === TABLEAU MESURES === */
+    /* === MEASUREMENTS TABLE === */
     #meas-search {
       width: 100%; padding: 7px 10px; margin-bottom: 8px;
       background: var(--surface); border: 1px solid var(--surface2);
@@ -140,7 +140,7 @@
     .meas-scal-empty { color: var(--text-dim); }
     .meas-scal-unit { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
 
-    /* === FORMULAIRE MESURE SÉLECTIONNÉE === */
+    /* === SELECTED MEASUREMENT FORM === */
     .sub-section-title {
       font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
       text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;
@@ -183,17 +183,17 @@
 
   <!-- HEADER -->
   <div class="header">
-    <h1><span class="icon">✏️</span> Éditeur</h1>
+    <h1><span class="icon">✏️</span> Editor</h1>
     <div id="status" class="status">
       <div class="dot"></div>
-      <span id="status-text">Initialisation…</span>
+      <span id="status-text">Initializing…</span>
     </div>
   </div>
 
-  <!-- TABLEAU MESURES (toujours visible, toutes les mesures) -->
+  <!-- MEASUREMENTS TABLE (always visible, all measurements) -->
   <div class="card" id="meas-table-panel" style="display:none;">
-    <div class="card-title" style="margin-bottom:8px;">MESURES</div>
-    <input type="text" id="meas-search" placeholder="🔍 Rechercher une mesure…" oninput="renderMeasTable()">
+    <div class="card-title" style="margin-bottom:8px;">MEASUREMENTS</div>
+    <input type="text" id="meas-search" placeholder="🔍 Search a measurement…" oninput="renderMeasTable()">
     <div class="meas-tbl-stats" id="meas-tbl-stats">—</div>
     <div class="meas-tbl-wrap">
       <table id="meas-data-table">
@@ -203,61 +203,60 @@
     </div>
   </div>
 
-  <!-- FORMULAIRE MESURE SÉLECTIONNÉE -->
+  <!-- SELECTED MEASUREMENT FORM -->
   <div class="card" id="meas-detail-panel" style="display:none;">
     <div class="card-title" style="margin-bottom:10px;">
-      MESURE SÉLECTIONNÉE
+      SELECTED MEASUREMENT
       <span id="meas-detail-subtitle" style="font-weight:400;font-size:11px;color:var(--text-dim);margin-left:8px;"></span>
     </div>
 
   <!-- EMPTY STATE -->
   <div id="empty-state" class="empty-state">
     <div class="icon">🧱</div>
-    <h3>Aucun matériau sélectionné</h3>
-    <p>Cliquez sur une mesure dans le tableau pour éditer ses données.</p>
+    <h3>No material selected</h3>
+    <p>Click on a measurement in the table to edit its data.</p>
   </div>
 
   <!-- EDITOR CONTENT -->
   <div id="editor-content" style="display:none;">
 
-    <!-- FORMULAIRE MESURE SÉLECTIONNÉE (placeholder, déplacé plus haut) -->
       <div id="meas-detail-body"></div>
     </div>
 
-    <!-- SECTION : MATÉRIAU -->
+    <!-- SECTION: MATERIAL -->
     <div class="card" id="card-material">
       <div class="card-header">
-        <div class="card-title section-toggle" id="toggle-material" onclick="toggleSection('material')">MATÉRIAU</div>
+        <div class="card-title section-toggle" id="toggle-material" onclick="toggleSection('material')">MATERIAL</div>
       </div>
       <div class="section-body" id="body-material">
         <div class="field-grid cols-3">
           <div class="field-item">
-            <label>Nom</label>
+            <label>Name</label>
             <input type="text" id="f-mat-name" data-table="MATERIAL" data-field="name">
           </div>
           <div class="field-item">
             <label>Type</label>
             <select id="f-mat-type" data-table="MATERIAL" data-field="material_type">
-              <option value="">— choisir —</option>
-              <option value="cement_paste">Pâte de ciment</option>
-              <option value="mortar">Mortier</option>
-              <option value="concrete">Béton</option>
+              <option value="">— choose —</option>
+              <option value="cement_paste">Cement paste</option>
+              <option value="mortar">Mortar</option>
+              <option value="concrete">Concrete</option>
             </select>
           </div>
           <div class="field-item"><!-- spacer --></div>
           <div class="field-item">
-            <label>Date fabrication</label>
+            <label>Manufacturing date</label>
             <input type="date" id="f-mat-manuf" data-table="MATERIAL" data-field="manufacturing_date" data-date="true">
           </div>
           <div class="field-item">
-            <label>Date décoffrage</label>
+            <label>Demolding date</label>
             <input type="date" id="f-mat-demold" data-table="MATERIAL" data-field="demolding_date" data-date="true">
           </div>
         </div>
       </div>
     </div>
 
-    <!-- SECTION : SITE -->
+    <!-- SECTION: SITE -->
     <div class="card" id="card-site">
       <div class="card-header">
         <div class="card-title section-toggle collapsed" id="toggle-site" onclick="toggleSection('site')">SITE</div>
@@ -265,7 +264,7 @@
       <div class="section-body collapsed" id="body-site">
         <div class="field-grid cols-3">
           <div class="field-item">
-            <label>Pays / Région</label>
+            <label>Country / Region</label>
             <input type="text" id="f-site-region" data-table="SITE" data-field="country_region">
           </div>
           <div class="field-item">
@@ -280,192 +279,192 @@
       </div>
     </div>
 
-    <!-- SECTION : EXPOSITION -->
+    <!-- SECTION: EXPOSURE -->
     <div class="card" id="card-expo">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-expo" onclick="toggleSection('expo')">EXPOSITION</div>
+        <div class="card-title section-toggle collapsed" id="toggle-expo" onclick="toggleSection('expo')">EXPOSURE</div>
       </div>
       <div class="section-body collapsed" id="body-expo">
         <div class="field-grid">
           <div class="field-item">
-            <label>Type d'exposition</label>
+            <label>Exposure type</label>
             <select id="f-expo-type" data-table="EXPOSURE" data-field="exposure_type">
-              <option value="">— choisir —</option>
-              <option value="laboratory">Laboratoire</option>
+              <option value="">— choose —</option>
+              <option value="laboratory">Laboratory</option>
               <option value="in-situ">In situ</option>
             </select>
           </div>
           <div class="field-item">
-            <label>Nature d'exposition</label>
+            <label>Exposure nature</label>
             <select id="f-expo-nature" data-table="EXPOSURE" data-field="exposure_nature">
-              <option value="">— choisir —</option>
-              <option value="atmospheric">Atmosphérique</option>
-              <option value="spray">Embruns</option>
-              <option value="splash">Éclaboussures</option>
-              <option value="tidal">Marnage</option>
-              <option value="submerged">Immergé</option>
+              <option value="">— choose —</option>
+              <option value="atmospheric">Atmospheric</option>
+              <option value="spray">Spray</option>
+              <option value="splash">Splash</option>
+              <option value="tidal">Tidal</option>
+              <option value="submerged">Submerged</option>
             </select>
           </div>
           <div class="field-item">
-            <label>Mouillage (%)</label>
+            <label>Wetting (%)</label>
             <input type="number" step="any" min="0" max="100" id="f-expo-wet" data-table="EXPOSURE" data-field="wetting_duration_pct">
           </div>
           <div class="field-item">
-            <label>Séchage (%)</label>
+            <label>Drying (%)</label>
             <input type="number" step="any" min="0" max="100" id="f-expo-dry" data-table="EXPOSURE" data-field="drying_duration_pct">
           </div>
         </div>
       </div>
     </div>
 
-    <!-- SECTION : FORMULATION -->
+    <!-- SECTION: MIX DESIGN -->
     <div class="card" id="card-mix">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-mix" onclick="toggleSection('mix')">FORMULATION</div>
+        <div class="card-title section-toggle collapsed" id="toggle-mix" onclick="toggleSection('mix')">MIX DESIGN</div>
       </div>
       <div class="section-body collapsed" id="body-mix">
         <div class="field-grid cols-3">
           <div class="field-item">
-            <label>Rapport E/C</label>
+            <label>w/c ratio</label>
             <input type="number" step="0.01" min="0" id="f-mix-wc" data-table="MIX_DESIGN" data-field="wc_ratio">
           </div>
           <div class="field-item">
-            <label>Rapport E/L</label>
+            <label>w/b ratio</label>
             <input type="number" step="0.01" min="0" id="f-mix-wl" data-table="MIX_DESIGN" data-field="wl_ratio">
           </div>
           <div class="field-item">
-            <label>Eau (kg/m³)</label>
+            <label>Water (kg/m³)</label>
             <input type="number" step="any" min="0" id="f-mix-water" data-table="MIX_DESIGN" data-field="water_content_kg">
           </div>
           <div class="field-item">
-            <label>Type d'eau</label>
+            <label>Water type</label>
             <select id="f-mix-watertype" data-table="MIX_DESIGN" data-field="water_type">
-              <option value="">— choisir —</option>
-              <option value="tap_water">Eau du robinet</option>
-              <option value="pure_water">Eau pure</option>
-              <option value="sea_water">Eau de mer</option>
+              <option value="">— choose —</option>
+              <option value="tap_water">Tap water</option>
+              <option value="pure_water">Pure water</option>
+              <option value="sea_water">Sea water</option>
             </select>
           </div>
           <div class="field-item">
-            <label>Type adjuvant</label>
+            <label>Admixture type</label>
             <input type="text" id="f-mix-admix" data-table="MIX_DESIGN" data-field="admix_type">
           </div>
           <div class="field-item">
-            <label>Adjuvant (kg/m³)</label>
+            <label>Admixture (kg/m³)</label>
             <input type="number" step="any" min="0" id="f-mix-adjuvant" data-table="MIX_DESIGN" data-field="adjuvant_content">
           </div>
           <div class="field-item">
-            <label>Air entraîné (%)</label>
+            <label>Entrained air (%)</label>
             <input type="number" step="any" min="0" id="f-mix-air" data-table="MIX_DESIGN" data-field="entrained_air">
           </div>
         </div>
         <div style="margin-top:12px;">
-          <div class="sub-section-title">Granulats</div>
+          <div class="sub-section-title">Aggregates</div>
           <div id="aggregates-list"></div>
-          <button class="btn-add-inline" onclick="showAddAggregateRow()">+ Ajouter un granulat</button>
+          <button class="btn-add-inline" onclick="showAddAggregateRow()">+ Add aggregate</button>
           <div class="add-binder-row" id="add-aggregate-row" style="display:none;">
             <select id="new-aggregate-select">
-              <option value="">— choisir un granulat —</option>
+              <option value="">— choose an aggregate —</option>
             </select>
             <input type="number" step="any" min="0" id="new-aggregate-kg" placeholder="kg/m³">
-            <button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="confirmAddAggregate()">Ajouter</button>
+            <button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="confirmAddAggregate()">Add</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- SECTION : LIANTS -->
+    <!-- SECTION: BINDERS -->
     <div class="card" id="card-binders">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-binders" onclick="toggleSection('binders')">LIANTS</div>
+        <div class="card-title section-toggle collapsed" id="toggle-binders" onclick="toggleSection('binders')">BINDERS</div>
       </div>
       <div class="section-body collapsed" id="body-binders">
         <div id="binders-list"></div>
-        <button class="btn-add-inline" onclick="showAddBinderRow()">+ Ajouter un liant</button>
+        <button class="btn-add-inline" onclick="showAddBinderRow()">+ Add binder</button>
         <div class="add-binder-row" id="add-binder-row" style="display:none;">
           <select id="new-binder-select">
-            <option value="">— choisir un liant —</option>
+            <option value="">— choose a binder —</option>
           </select>
           <input type="number" step="any" min="0" id="new-binder-kg" placeholder="kg/m³">
-          <button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="confirmAddBinder()">Ajouter</button>
+          <button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="confirmAddBinder()">Add</button>
         </div>
       </div>
     </div>
 
-    <!-- SECTION : CURE -->
+    <!-- SECTION: CURING -->
     <div class="card" id="card-cure">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-cure" onclick="toggleSection('cure')">CURE</div>
+        <div class="card-title section-toggle collapsed" id="toggle-cure" onclick="toggleSection('cure')">CURING</div>
       </div>
       <div class="section-body collapsed" id="body-cure">
         <div class="field-grid cols-3">
           <div class="field-item">
-            <label>Méthode de cure</label>
+            <label>Curing method</label>
             <select id="f-cure-method" data-table="CURING_CONDITION" data-field="curing_method">
-              <option value="">— choisir —</option>
-              <option value="water_spraying">Aspersion d'eau</option>
-              <option value="wet_covering">Couvercle humide</option>
-              <option value="curing_compounds">Produit de cure</option>
-              <option value="forms_left_in_place">Coffrage maintenu</option>
-              <option value="wet_curing">Cure humide</option>
-              <option value="water_immersion">Immersion dans l'eau</option>
+              <option value="">— choose —</option>
+              <option value="water_spraying">Water spraying</option>
+              <option value="wet_covering">Wet covering</option>
+              <option value="curing_compounds">Curing compounds</option>
+              <option value="forms_left_in_place">Forms left in place</option>
+              <option value="wet_curing">Wet curing</option>
+              <option value="water_immersion">Water immersion</option>
             </select>
           </div>
           <div class="field-item">
-            <label>Durée cure (jours)</label>
+            <label>Curing duration (days)</label>
             <input type="number" step="any" min="0" id="f-cure-days" data-table="CURING_CONDITION" data-field="curing_duration_days">
           </div>
           <div class="field-item">
-            <label>Température (°C)</label>
+            <label>Temperature (°C)</label>
             <input type="number" step="any" id="f-cure-temp" data-table="CURING_CONDITION" data-field="temperature_c">
           </div>
           <div class="field-item">
-            <label>Humidité (%)</label>
+            <label>Humidity (%)</label>
             <input type="number" step="any" min="0" max="100" id="f-cure-humidity" data-table="CURING_CONDITION" data-field="humidity_pct">
           </div>
           <div class="field-item">
-            <label>Norme</label>
+            <label>Standard</label>
             <input type="text" id="f-cure-std" data-table="CURING_CONDITION" data-field="standard_name">
           </div>
           <div class="field-item" style="display:flex;gap:16px;align-items:flex-end;padding-bottom:4px;">
             <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-muted);cursor:pointer;">
               <input type="checkbox" id="f-cure-wind" data-table="CURING_CONDITION" data-field="wind_protection" data-bool="true">
-              Protection vent
+              Wind protection
             </label>
             <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-muted);cursor:pointer;">
               <input type="checkbox" id="f-cure-solar" data-table="CURING_CONDITION" data-field="solar_protection" data-bool="true">
-              Protection solaire
+              Solar protection
             </label>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- SECTION : SOURCE -->
+    <!-- SECTION: SOURCE -->
     <div class="card" id="card-source">
       <div class="card-header">
         <div class="card-title section-toggle collapsed" id="toggle-source" onclick="toggleSection('source')">SOURCE</div>
       </div>
       <div class="section-body collapsed" id="body-source">
         <div id="no-source-msg" style="display:none;font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 0;">
-          Aucune mesure liée à ce matériau — impossible de charger la source.
+          No measurement linked to this material — cannot load source.
         </div>
         <div id="source-fields">
           <div class="field-grid">
             <div class="field-item">
-              <label>Désignation</label>
+              <label>Designation</label>
               <input type="text" id="f-src-desig" data-table="SOURCE" data-field="designation">
             </div>
             <div class="field-item">
-              <label>Auteurs</label>
+              <label>Authors</label>
               <input type="text" id="f-src-authors" data-table="SOURCE" data-field="authors">
             </div>
             <div class="field-item">
-              <label>Titre</label>
+              <label>Title</label>
               <input type="text" id="f-src-title" data-table="SOURCE" data-field="title">
             </div>
             <div class="field-item">
-              <label>Année</label>
+              <label>Year</label>
               <input type="number" id="f-src-year" data-table="SOURCE" data-field="year">
             </div>
             <div class="field-item">
@@ -477,7 +476,7 @@
               <input type="text" id="f-src-url" data-table="SOURCE" data-field="url">
             </div>
             <div class="field-item">
-              <label>Revue</label>
+              <label>Journal</label>
               <input type="text" id="f-src-journal" data-table="SOURCE" data-field="journal">
             </div>
           </div>
@@ -490,10 +489,10 @@
     </div>
 
 
-    <!-- JOURNAL -->
+    <!-- LOG -->
     <div class="card" id="card-log">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-log" onclick="toggleSection('log')">JOURNAL</div>
+        <div class="card-title section-toggle collapsed" id="toggle-log" onclick="toggleSection('log')">LOG</div>
       </div>
       <div class="section-body collapsed" id="body-log">
         <pre id="log" class="log"></pre>
@@ -505,20 +504,20 @@
   <!-- SAVE BAR (sticky) -->
   <div class="save-bar" id="save-bar" style="display:none;">
     <span class="nb-changes" id="nb-changes-text"></span>
-    <button class="btn btn-secondary" onclick="resetChanges()">Annuler</button>
-    <button class="btn btn-primary" onclick="saveAll()">💾 Enregistrer</button>
+    <button class="btn btn-secondary" onclick="resetChanges()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveAll()">💾 Save</button>
   </div>
 
 <script>
 // =========================================================================
-// État global
+// Global state
 // =========================================================================
-let currentRecord   = null;   // MATERIAL record courant
+let currentRecord   = null;   // current MATERIAL record
 let currentSiteId   = null;
 let currentExpoId   = null;
 let currentMixId    = null;
 let currentCureId   = null;
-let currentSourceId = null;   // source de la 1ère mesure
+let currentSourceId = null;   // source of the first measurement
 
 // pendingChanges : Map<tableName, Map<rowId, {field: newValue}>>
 let pendingChanges = new Map();
@@ -529,7 +528,7 @@ let pendingAggregates = { toAdd: [], toDelete: [] };
 // pendingScalars
 let pendingScalars = { toAdd: [], toDelete: [] };
 
-// Cache global
+// Global cache
 let allBinders          = [];  // [{id, fields}]
 let allMixBinders       = [];  // [{id, fields}] MIX_DESIGN_BINDER
 let allAggregates       = [];  // [{id, fields}]
@@ -540,28 +539,28 @@ let allCurves        = [];  // [{id, fields}]
 let allTests         = new Map(); // id → fields
 let allSources       = new Map(); // id → fields
 
-// Champs du matériau courant et de ses tables liées (pour les formulaires d'édition)
+// Fields of the current material and its linked tables (for edit forms)
 let currentMatFields  = {};
 let currentExpoFields = {};
 let currentMixFields  = {};
 
-// Maps globales pour le tableau (toutes les mesures, toutes tables)
+// Global maps for the table (all measurements, all tables)
 let allMaterialsArr = [];        // [{id, fields}]
 let allMaterialsMap = new Map(); // id → fields
 let allExposuresMap = new Map(); // id → fields
 let allMixesMap     = new Map(); // id → fields
 
-// État tableau mesures
-let measLinked       = [];          // mesures filtrées pour le matériau courant
+// Measurement table state
+let measLinked       = [];          // measurements for the current material
 let measScalarsByMeas = new Map();
 let measCurvesByMeas  = new Map();
-let measScalarNames   = [];         // noms de colonnes dynamiques
+let measScalarNames   = [];         // dynamic column names
 let measSortCol       = -1;
 let measSortAsc       = true;
 let selectedMeasId    = null;
 
 // =========================================================================
-// Helpers dates Grist (unix timestamp secondes ↔ input[type=date])
+// Date helpers: Grist unix timestamp (seconds) ↔ input[type=date]
 // =========================================================================
 function tsToDateInput(ts) {
   if (ts == null || ts === 0) return '';
@@ -576,7 +575,7 @@ function dateInputToTs(str) {
 }
 
 // =========================================================================
-// Toggle sections collapsibles
+// Toggle collapsible sections
 // =========================================================================
 function toggleSection(key) {
   const toggle = document.getElementById('toggle-' + key);
@@ -611,14 +610,14 @@ function updateSaveBar() {
   const txt = document.getElementById('nb-changes-text');
   if (n > 0) {
     bar.style.display = 'flex';
-    txt.textContent = n + ' modification' + (n > 1 ? 's' : '') + ' en attente';
+    txt.textContent = n + ' pending change' + (n > 1 ? 's' : '');
   } else {
     bar.style.display = 'none';
   }
 }
 
 // =========================================================================
-// Attacher les listeners de changement à tous les champs d'un conteneur
+// Attach change listeners to all fields in a container
 // =========================================================================
 function attachListeners(container, tableName, rowId) {
   if (!rowId) return;
@@ -646,7 +645,7 @@ function attachListeners(container, tableName, rowId) {
 }
 
 // =========================================================================
-// Peupler un champ
+// Populate a field
 // =========================================================================
 function setField(id, val, isDate = false, isBool = false) {
   const el = document.getElementById(id);
@@ -662,7 +661,7 @@ function setField(id, val, isDate = false, isBool = false) {
 }
 
 // =========================================================================
-// CHARGEMENT PRINCIPAL
+// MAIN LOADING
 // =========================================================================
 async function loadMaterial(record) {
   if (!record || !record.id) {
@@ -682,21 +681,21 @@ async function loadMaterial(record) {
   updateSaveBar();
 
   currentRecord = record;
-  GristHelpers.setStatus('Chargement…', '');
-  GristHelpers.log('Chargement du matériau id=' + record.id);
+  GristHelpers.setStatus('Loading…', '');
+  GristHelpers.log('Loading material id=' + record.id);
 
   try {
-    // IDs des tables liées
+    // IDs of linked tables
     currentSiteId   = record.fields?.id_site             || record.id_site   || null;
     currentExpoId   = record.fields?.id_exposure         || record.id_exposure || null;
     currentMixId    = record.fields?.id_mix_design       || record.id_mix_design || null;
     currentCureId   = record.fields?.id_curing_condition || record.id_curing_condition || null;
 
-    // Normaliser : grist.onRecord peut livrer les champs à plat ou imbriqués
+    // Normalize: grist.onRecord can deliver fields flat or nested
     const f = record.fields || record;
     currentMatFields = f;
 
-    // ---- MATÉRIAU ----
+    // ---- MATERIAL ----
     setField('f-mat-name',    f.name);
     setField('f-mat-type',    f.material_type);
     setField('f-mat-manuf',   f.manufacturing_date,  true);
@@ -710,7 +709,7 @@ async function loadMaterial(record) {
       'f-site-lon':    'longitude',
     }, 'card-site');
 
-    // ---- EXPOSITION ----
+    // ---- EXPOSURE ----
     currentExpoFields = await loadLinked('EXPOSURE', currentExpoId, {
       'f-expo-type':   'exposure_type',
       'f-expo-nature': 'exposure_nature',
@@ -718,7 +717,7 @@ async function loadMaterial(record) {
       'f-expo-dry':    'drying_duration_pct',
     }, 'card-expo') || {};
 
-    // ---- FORMULATION ----
+    // ---- MIX DESIGN ----
     currentMixFields = await loadLinked('MIX_DESIGN', currentMixId, {
       'f-mix-wc':        'wc_ratio',
       'f-mix-wl':        'wl_ratio',
@@ -729,13 +728,13 @@ async function loadMaterial(record) {
       'f-mix-air':       'entrained_air',
     }, 'card-mix') || {};
 
-    // ---- GRANULATS ----
+    // ---- AGGREGATES ----
     await loadAggregates();
 
-    // ---- LIANTS ----
+    // ---- BINDERS ----
     await loadBinders();
 
-    // ---- CURE ----
+    // ---- CURING ----
     await loadLinked('CURING_CONDITION', currentCureId, {
       'f-cure-method':   'curing_method',
       'f-cure-days':     'curing_duration_days',
@@ -747,20 +746,20 @@ async function loadMaterial(record) {
       { id: 'f-cure-solar', field: 'solar_protection',  bool: true },
     ]);
 
-    // ---- SOURCE (1ère mesure du matériau) ----
+    // ---- SOURCE (first measurement of the material) ----
     await loadSource();
 
-    GristHelpers.setStatus('Prêt', 'ready');
-    GristHelpers.log('Matériau chargé ✓', 'ok');
+    GristHelpers.setStatus('Ready', 'ready');
+    GristHelpers.log('Material loaded ✓', 'ok');
   } catch(err) {
-    GristHelpers.setStatus('Erreur', 'error');
-    GristHelpers.log('Erreur chargement : ' + err.message, 'err');
+    GristHelpers.setStatus('Error', 'error');
+    GristHelpers.log('Loading error: ' + err.message, 'err');
     console.error(err);
   }
 }
 
 // =========================================================================
-// Charger une table liée par FK et remplir les champs
+// Load a linked table by FK and populate fields
 // =========================================================================
 async function loadLinked(tableName, rowId, fieldMap, cardId, extraBools = []) {
   if (!rowId) return null;
@@ -783,20 +782,20 @@ async function loadLinked(tableName, rowId, fieldMap, cardId, extraBools = []) {
     attachListeners(document.getElementById(cardId), tableName, rowId);
     return fields;
   } catch(err) {
-    GristHelpers.log('Erreur chargement ' + tableName + ' : ' + err.message, 'err');
+    GristHelpers.log('Error loading ' + tableName + ': ' + err.message, 'err');
     return null;
   }
 }
 
 // =========================================================================
-// Liants : MIX_DESIGN_BINDER + BINDER
+// Binders: MIX_DESIGN_BINDER + BINDER
 // =========================================================================
 async function loadBinders() {
   const listEl = document.getElementById('binders-list');
   listEl.innerHTML = '';
 
   if (!currentMixId) {
-    listEl.innerHTML = '<div class="no-binders">Aucune formulation liée.</div>';
+    listEl.innerHTML = '<div class="no-binders">No mix design linked.</div>';
     return;
   }
 
@@ -808,20 +807,20 @@ async function loadBinders() {
 
     const binderMap = new Map(allBinders.map(b => [b.id, b.fields]));
 
-    // Remplir le select de création
+    // Populate the creation select
     const sel = document.getElementById('new-binder-select');
-    sel.innerHTML = '<option value="">— choisir un liant —</option>';
+    sel.innerHTML = '<option value="">— choose a binder —</option>';
     allBinders.forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
-      opt.textContent = (b.fields.name || 'Liant #' + b.id) + ' (' + (b.fields.binder_type || '') + ')';
+      opt.textContent = (b.fields.name || 'Binder #' + b.id) + ' (' + (b.fields.binder_type || '') + ')';
       sel.appendChild(opt);
     });
 
     const rows = allMixBinders.filter(mb => mb.fields.id_mix_design === currentMixId);
 
     if (rows.length === 0) {
-      listEl.innerHTML = '<div class="no-binders">Aucun liant dans cette formulation.</div>';
+      listEl.innerHTML = '<div class="no-binders">No binder in this mix design.</div>';
       return;
     }
 
@@ -831,24 +830,22 @@ async function loadBinders() {
       row.className = 'binder-row';
       row.dataset.mbId = mb.id;
       row.innerHTML = `
-        <span class="b-name">${binder.name || '(sans nom)'}</span>
+        <span class="b-name">${binder.name || '(no name)'}</span>
         <span class="b-type">${binder.binder_type || '—'}</span>
         <input type="number" step="any" min="0" value="${mb.fields.content_kg_m3 != null ? mb.fields.content_kg_m3 : ''}" placeholder="kg/m³" data-mb-id="${mb.id}">
-        <button class="btn-del" data-mb-id="${mb.id}" title="Supprimer">✕</button>
+        <button class="btn-del" data-mb-id="${mb.id}" title="Remove">✕</button>
       `;
       listEl.appendChild(row);
 
-      // Listener dosage
+      // Dosage listener
       const inp = row.querySelector('input[type=number]');
       inp.addEventListener('input', () => {
         const val = inp.value === '' ? null : parseFloat(inp.value);
-        // Chercher si déjà en toDelete
         if (pendingBinders.toDelete.includes(mb.id)) return;
-        // Stocker comme UpdateRecord
         markChanged('MIX_DESIGN_BINDER', mb.id, 'content_kg_m3', val);
       });
 
-      // Listener suppression
+      // Delete listener
       const delBtn = row.querySelector('.btn-del');
       delBtn.addEventListener('click', () => {
         if (!pendingBinders.toDelete.includes(mb.id)) {
@@ -861,7 +858,7 @@ async function loadBinders() {
       });
     });
   } catch(err) {
-    GristHelpers.log('Erreur chargement liants : ' + err.message, 'err');
+    GristHelpers.log('Error loading binders: ' + err.message, 'err');
   }
 }
 
@@ -876,8 +873,8 @@ function confirmAddBinder() {
   const binderId = parseInt(sel.value);
   const kg   = inp.value === '' ? null : parseFloat(inp.value);
 
-  if (!binderId) { alert('Veuillez choisir un liant.'); return; }
-  if (!currentMixId) { alert('Aucune formulation liée à ce matériau.'); return; }
+  if (!binderId) { alert('Please choose a binder.'); return; }
+  if (!currentMixId) { alert('No mix design linked to this material.'); return; }
 
   pendingBinders.toAdd.push({
     id_mix_design: currentMixId,
@@ -885,7 +882,7 @@ function confirmAddBinder() {
     content_kg_m3: kg,
   });
 
-  // Affichage visuel temporaire
+  // Temporary visual display
   const binder = allBinders.find(b => b.id === binderId);
   const listEl = document.getElementById('binders-list');
   const tempRow = document.createElement('div');
@@ -893,7 +890,7 @@ function confirmAddBinder() {
   tempRow.style.opacity = '0.6';
   tempRow.style.fontStyle = 'italic';
   tempRow.innerHTML = `
-    <span class="b-name">${binder?.fields?.name || '(nouveau)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
+    <span class="b-name">${binder?.fields?.name || '(new)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
     <span class="b-type">${binder?.fields?.binder_type || ''}</span>
     <span>${kg != null ? kg + ' kg/m³' : '—'}</span>
     <span></span>
@@ -907,14 +904,14 @@ function confirmAddBinder() {
 }
 
 // =========================================================================
-// Granulats : MIX_DESIGN_AGGREGATE + AGGREGATE
+// Aggregates: MIX_DESIGN_AGGREGATE + AGGREGATE
 // =========================================================================
 async function loadAggregates() {
   const listEl = document.getElementById('aggregates-list');
   listEl.innerHTML = '';
 
   if (!currentMixId) {
-    listEl.innerHTML = '<div class="no-binders">Aucune formulation liée.</div>';
+    listEl.innerHTML = '<div class="no-binders">No mix design linked.</div>';
     return;
   }
 
@@ -926,22 +923,22 @@ async function loadAggregates() {
 
     const aggregateMap = new Map(allAggregates.map(a => [a.id, a.fields]));
 
-    // Peupler le select de création
+    // Populate the creation select
     const sel = document.getElementById('new-aggregate-select');
-    sel.innerHTML = '<option value="">— choisir un granulat —</option>';
+    sel.innerHTML = '<option value="">— choose an aggregate —</option>';
     allAggregates.forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.id;
       const size = (a.fields.size_min_mm != null && a.fields.size_max_mm != null)
         ? ` ${a.fields.size_min_mm}/${a.fields.size_max_mm} mm` : '';
-      opt.textContent = (a.fields.name || 'Granulat #' + a.id) + size + ' (' + (a.fields.aggregate_type || '') + ')';
+      opt.textContent = (a.fields.name || 'Aggregate #' + a.id) + size + ' (' + (a.fields.aggregate_type || '') + ')';
       sel.appendChild(opt);
     });
 
     const rows = allMixAggregates.filter(ma => ma.fields.id_mix_design === currentMixId);
 
     if (rows.length === 0) {
-      listEl.innerHTML = '<div class="no-binders">Aucun granulat dans cette formulation.</div>';
+      listEl.innerHTML = '<div class="no-binders">No aggregate in this mix design.</div>';
       return;
     }
 
@@ -953,10 +950,10 @@ async function loadAggregates() {
       row.className = 'binder-row';
       row.dataset.maId = ma.id;
       row.innerHTML = `
-        <span class="b-name">${agg.name || '(sans nom)'}</span>
+        <span class="b-name">${agg.name || '(no name)'}</span>
         <span class="b-type">${size}</span>
         <input type="number" step="any" min="0" value="${ma.fields.content_kg_m3 != null ? ma.fields.content_kg_m3 : ''}" placeholder="kg/m³" data-ma-id="${ma.id}">
-        <button class="btn-del" data-ma-id="${ma.id}" title="Supprimer">✕</button>
+        <button class="btn-del" data-ma-id="${ma.id}" title="Remove">✕</button>
       `;
       listEl.appendChild(row);
 
@@ -978,7 +975,7 @@ async function loadAggregates() {
       });
     });
   } catch(err) {
-    GristHelpers.log('Erreur chargement granulats : ' + err.message, 'err');
+    GristHelpers.log('Error loading aggregates: ' + err.message, 'err');
   }
 }
 
@@ -993,8 +990,8 @@ function confirmAddAggregate() {
   const aggregateId = parseInt(sel.value);
   const kg         = inp.value === '' ? null : parseFloat(inp.value);
 
-  if (!aggregateId) { alert('Veuillez choisir un granulat.'); return; }
-  if (!currentMixId) { alert('Aucune formulation liée à ce matériau.'); return; }
+  if (!aggregateId) { alert('Please choose an aggregate.'); return; }
+  if (!currentMixId) { alert('No mix design linked to this material.'); return; }
 
   pendingAggregates.toAdd.push({
     id_mix_design: currentMixId,
@@ -1011,7 +1008,7 @@ function confirmAddAggregate() {
   tempRow.style.opacity = '0.6';
   tempRow.style.fontStyle = 'italic';
   tempRow.innerHTML = `
-    <span class="b-name">${agg?.fields?.name || '(nouveau)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
+    <span class="b-name">${agg?.fields?.name || '(new)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
     <span class="b-type">${size}</span>
     <span>${kg != null ? kg + ' kg/m³' : '—'}</span>
     <span></span>
@@ -1025,7 +1022,7 @@ function confirmAddAggregate() {
 }
 
 // =========================================================================
-// Mesures — Tableau + formulaire de détail
+// Measurements — Table + detail form
 // =========================================================================
 async function loadMeasurementsTable() {
   try {
@@ -1050,10 +1047,10 @@ async function loadMeasurementsTable() {
     allExposuresMap = new Map(exposures.map(e => [e.id, e.fields]));
     allMixesMap     = new Map(mixes.map(m => [m.id, m.fields]));
 
-    measLinked = measurements; // toutes les mesures, sans filtre matériau
-    GristHelpers.log(`${measurements.length} mesures chargées`, 'ok');
+    measLinked = measurements; // all measurements, no material filter
+    GristHelpers.log(`${measurements.length} measurements loaded`, 'ok');
 
-    // Indexer scalaires et courbes par measurement id
+    // Index scalars and curves by measurement id
     measScalarsByMeas = new Map();
     scalars.forEach(s => {
       const mid = s.fields.id_measurement;
@@ -1067,7 +1064,7 @@ async function loadMeasurementsTable() {
       measCurvesByMeas.get(mid).push(c);
     });
 
-    // Noms de scalaires dynamiques (ordre d'apparition)
+    // Dynamic scalar column names (order of appearance)
     measScalarNames = [];
     const seenNames = new Set();
     measLinked.forEach(m => {
@@ -1085,17 +1082,17 @@ async function loadMeasurementsTable() {
     document.getElementById('meas-table-panel').style.display = measLinked.length > 0 ? '' : 'none';
 
   } catch(err) {
-    GristHelpers.log('Erreur chargement mesures : ' + err.message, 'err');
+    GristHelpers.log('Error loading measurements: ' + err.message, 'err');
   }
 }
 
 // -------------------------------------------------------------------------
-// Construit l'en-tête du tableau (colonnes fixes + dynamiques)
+// Build the table header (fixed + dynamic columns)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Type Cl⁻', 'Matériau', 'Source',
-                     'Type mat.', 'Type expo.', 'Nature', 'E/C', 'E/L', 'Eau (kg/m³)'];
-  const allCols   = [...fixedCols, ...measScalarNames, 'Courbes'];
+  const fixedCols = ['Test', 'Cl⁻ type', 'Material', 'Source',
+                     'Mat. type', 'Expo. type', 'Nature', 'w/c', 'w/b', 'Water (kg/m³)'];
+  const allCols   = [...fixedCols, ...measScalarNames, 'Curves'];
   const tr = document.querySelector('#meas-thead tr');
   tr.innerHTML = allCols.map((name, i) =>
     `<th onclick="sortMeasTable(${i})" data-col="${i}">${name}<span class="sort-arrow"></span></th>`
@@ -1103,12 +1100,12 @@ function buildMeasTableHeader() {
 }
 
 // -------------------------------------------------------------------------
-// Rendu du tableau (filtre + tri)
+// Render the table (filter + sort)
 // -------------------------------------------------------------------------
 function renderMeasTable() {
   const query = (document.getElementById('meas-search').value || '').toLowerCase();
 
-  // Construire les données de chaque ligne
+  // Build row data
   let rows = measLinked.map(m => {
     const f       = m.fields;
     const test    = allTests.get(f.id_test) || {};
@@ -1149,7 +1146,7 @@ function renderMeasTable() {
     };
   });
 
-  // Filtre texte
+  // Text filter
   if (query) {
     rows = rows.filter(r => {
       const all = [r.test, r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
@@ -1162,22 +1159,22 @@ function renderMeasTable() {
     });
   }
 
-  // Tri
+  // Sort
   if (measSortCol >= 0) {
     const sign = measSortAsc ? 1 : -1;
     rows.sort((a, b) => {
       const av = measRowVal(a, measSortCol);
       const bv = measRowVal(b, measSortCol);
       if (typeof av === 'number' && typeof bv === 'number') return sign * (av - bv);
-      return sign * String(av ?? '').localeCompare(String(bv ?? ''), 'fr');
+      return sign * String(av ?? '').localeCompare(String(bv ?? ''), 'en');
     });
   }
 
   // Stats
   document.getElementById('meas-tbl-stats').textContent =
-    `${rows.length} mesure${rows.length > 1 ? 's' : ''} affichée${rows.length > 1 ? 's' : ''} sur ${measLinked.length}`;
+    `${rows.length} measurement${rows.length > 1 ? 's' : ''} displayed out of ${measLinked.length}`;
 
-  // Rendu
+  // Render
   function fmtScal(val, unit) {
     if (val == null) return '<span class="meas-scal-empty">—</span>';
     let s;
@@ -1189,7 +1186,7 @@ function renderMeasTable() {
   }
 
   function clTag(ct) {
-    const label = ct === 'free_cl' ? 'Cl libre' : ct === 'total_cl' ? 'Cl total' : ct || '';
+    const label = ct === 'free_cl' ? 'Free Cl' : ct === 'total_cl' ? 'Total Cl' : ct || '';
     return ct ? `<span class="tag ${ct}">${label}</span>` : '<span style="color:var(--text-dim)">—</span>';
   }
 
@@ -1221,9 +1218,9 @@ function renderMeasTable() {
   }).join('');
 
   const tbody = document.getElementById('meas-tbl-body');
-  tbody.innerHTML = html || '<tr><td colspan="20" style="text-align:center;padding:16px;color:var(--text-dim)">Aucune mesure.</td></tr>';
+  tbody.innerHTML = html || '<tr><td colspan="20" style="text-align:center;padding:16px;color:var(--text-dim)">No measurement.</td></tr>';
 
-  // Listeners clic
+  // Click listeners
   tbody.querySelectorAll('tr[data-meas-id]').forEach(tr => {
     tr.addEventListener('click', () => selectMeasRow(parseInt(tr.dataset.measId)));
   });
@@ -1254,12 +1251,12 @@ function sortMeasTable(colIdx) {
 }
 
 // -------------------------------------------------------------------------
-// Sélectionner une mesure → afficher le formulaire de détail
+// Select a measurement → display detail form
 // -------------------------------------------------------------------------
 function selectMeasRow(measId) {
   selectedMeasId = measId;
 
-  // Surbrillance
+  // Highlight
   document.querySelectorAll('#meas-tbl-body tr').forEach(tr => {
     tr.classList.toggle('meas-selected', parseInt(tr.dataset.measId) === measId);
   });
@@ -1270,61 +1267,61 @@ function selectMeasRow(measId) {
   const mCurves  = measCurvesByMeas.get(measId)  || [];
   const test     = allTests.get(m.fields.id_test) || {};
 
-  // Charger le formulaire d'édition du matériau de cette mesure
+  // Load the material edit form for this measurement
   const matRecord = allMaterialsArr.find(r => r.id === m.fields.id_material);
   if (matRecord) {
     currentRecord = matRecord;
     loadMaterial(matRecord);
   }
 
-  // Titre du panneau détail
+  // Detail panel title
   const prep   = tsToDateInput(m.fields.preparation_date) || '—';
   const result = tsToDateInput(m.fields.result_date) || '—';
   document.getElementById('meas-detail-subtitle').textContent =
     `${test.name || '?'} · ${prep} → ${result}`;
 
-  // Corps du formulaire
+  // Form body
   const detailBody = document.getElementById('meas-detail-body');
   detailBody.innerHTML = buildDetailForm(m, mScalars, mCurves);
   document.getElementById('meas-detail-panel').style.display = '';
 
-  // Attacher les listeners
+  // Attach listeners
   attachDetailListeners(detailBody, m, mScalars);
 
-  // Scroller vers le formulaire
+  // Scroll to form
   document.getElementById('meas-detail-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // -------------------------------------------------------------------------
-// Construit le HTML du formulaire de détail d'une mesure
+// Build HTML for the measurement detail form
 // -------------------------------------------------------------------------
 function buildDetailForm(m, mScalars, mCurves) {
   const f = m.fields;
 
   const sampleTypeOpts = ['', 'laboratory_sample', 'bridge_pier'].map(v =>
-    `<option value="${v}" ${f.sample_type === v ? 'selected' : ''}>${v || '— choisir —'}</option>`
+    `<option value="${v}" ${f.sample_type === v ? 'selected' : ''}>${v || '— choose —'}</option>`
   ).join('');
 
   const dimValues = ['','cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320',
     'cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'];
   const dimOpts = dimValues.map(v =>
-    `<option value="${v}" ${f.sample_dimensions === v ? 'selected' : ''}>${v || '— choisir —'}</option>`
+    `<option value="${v}" ${f.sample_dimensions === v ? 'selected' : ''}>${v || '— choose —'}</option>`
   ).join('');
 
   const scalarsHtml = mScalars.length > 0
-    ? `<div class="scalar-cols-header"><span>Paramètre</span><span>Valeur</span><span>Unité</span><span></span></div>`
+    ? `<div class="scalar-cols-header"><span>Parameter</span><span>Value</span><span>Unit</span><span></span></div>`
       + mScalars.map(s => `
         <div class="scalar-row" data-scalar-id="${s.id}">
-          <input type="text" value="${s.fields.name || ''}" placeholder="Paramètre"
+          <input type="text" value="${s.fields.name || ''}" placeholder="Parameter"
             data-table="SCALAR" data-field="name" data-scalar-id="${s.id}">
-          <input type="number" step="any" value="${s.fields.value != null ? s.fields.value : ''}" placeholder="Valeur"
+          <input type="number" step="any" value="${s.fields.value != null ? s.fields.value : ''}" placeholder="Value"
             data-table="SCALAR" data-field="value" data-scalar-id="${s.id}">
-          <input type="text" value="${s.fields.unit || ''}" placeholder="Unité"
+          <input type="text" value="${s.fields.unit || ''}" placeholder="Unit"
             data-table="SCALAR" data-field="unit" data-scalar-id="${s.id}">
-          <button class="btn-del" data-scalar-del="${s.id}" title="Supprimer">✕</button>
+          <button class="btn-del" data-scalar-del="${s.id}" title="Remove">✕</button>
         </div>
       `).join('')
-    : '<div class="no-binders" style="margin-bottom:6px;">Aucun scalaire.</div>';
+    : '<div class="no-binders" style="margin-bottom:6px;">No scalar.</div>';
 
   const curvesHtml = mCurves.length > 0
     ? mCurves.map(c => `
@@ -1333,13 +1330,13 @@ function buildDetailForm(m, mScalars, mCurves) {
           <span>${c.fields.x_name || 'X'} (${c.fields.x_unit || '?'}) → ${c.fields.y_name || 'Y'} (${c.fields.y_unit || '?'})</span>
         </div>
       `).join('')
-    : '<div class="no-binders">Aucune courbe.</div>';
+    : '<div class="no-binders">No curve.</div>';
 
   return `
-    <div class="sub-section-title">Mesure</div>
+    <div class="sub-section-title">Measurement</div>
     <div class="field-grid cols-3">
       <div class="field-item">
-        <label>Type échantillon</label>
+        <label>Sample type</label>
         <select data-table="MEASUREMENT" data-field="sample_type">${sampleTypeOpts}</select>
       </div>
       <div class="field-item">
@@ -1347,46 +1344,46 @@ function buildDetailForm(m, mScalars, mCurves) {
         <select data-table="MEASUREMENT" data-field="sample_dimensions">${dimOpts}</select>
       </div>
       <div class="field-item">
-        <label>Opérateur</label>
+        <label>Operator</label>
         <input type="text" value="${f.operator || ''}" data-table="MEASUREMENT" data-field="operator">
       </div>
       <div class="field-item">
-        <label>Date préparation</label>
+        <label>Preparation date</label>
         <input type="date" value="${tsToDateInput(f.preparation_date)}"
           data-table="MEASUREMENT" data-field="preparation_date" data-date="true">
       </div>
       <div class="field-item">
-        <label>Date résultat</label>
+        <label>Result date</label>
         <input type="date" value="${tsToDateInput(f.result_date)}"
           data-table="MEASUREMENT" data-field="result_date" data-date="true">
       </div>
       <div class="field-item">
-        <label>Masse (g)</label>
+        <label>Mass (g)</label>
         <input type="number" step="any" value="${f.sample_mass_g != null ? f.sample_mass_g : ''}"
           data-table="MEASUREMENT" data-field="sample_mass_g">
       </div>
     </div>
 
-    <div class="sub-section-title" style="margin-top:14px;">Scalaires</div>
+    <div class="sub-section-title" style="margin-top:14px;">Scalars</div>
     <div id="scalars-list-${m.id}">${scalarsHtml}</div>
-    <button class="btn-add-inline" onclick="toggleAddScalarRow(${m.id})">+ Scalaire</button>
+    <button class="btn-add-inline" onclick="toggleAddScalarRow(${m.id})">+ Scalar</button>
     <div class="add-scalar-row" id="add-scalar-row-${m.id}" style="display:none;">
-      <input type="text" id="new-scal-name-${m.id}" placeholder="Nom (ex: D, Cs, Rc)">
-      <input type="number" step="any" id="new-scal-val-${m.id}" placeholder="Valeur">
-      <input type="text" id="new-scal-unit-${m.id}" placeholder="Unité">
+      <input type="text" id="new-scal-name-${m.id}" placeholder="Name (e.g.: D, Cs, Rc)">
+      <input type="number" step="any" id="new-scal-val-${m.id}" placeholder="Value">
+      <input type="text" id="new-scal-unit-${m.id}" placeholder="Unit">
       <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;"
-        onclick="confirmAddScalar(${m.id})">Ajouter</button>
+        onclick="confirmAddScalar(${m.id})">Add</button>
     </div>
 
     <div class="sub-section-title" style="margin-top:14px;">
-      Courbes <span style="font-weight:400;font-size:10px;color:var(--text-dim);">(lecture seule)</span>
+      Curves <span style="font-weight:400;font-size:10px;color:var(--text-dim);">(read only)</span>
     </div>
     <div>${curvesHtml}</div>
   `;
 }
 
 // -------------------------------------------------------------------------
-// Attache les listeners sur le formulaire de détail
+// Attach listeners to the detail form
 // -------------------------------------------------------------------------
 function attachDetailListeners(body, m, mScalars) {
   // MEASUREMENT fields
@@ -1449,7 +1446,7 @@ function confirmAddScalar(measId) {
   const val  = valEl.value === '' ? null : parseFloat(valEl.value);
   const unit = unitEl.value.trim() || null;
 
-  if (!name) { alert('Le nom du paramètre est requis.'); return; }
+  if (!name) { alert('Parameter name is required.'); return; }
 
   pendingScalars.toAdd.push({ id_measurement: measId, name, value: val, unit, is_derived: false });
 
@@ -1469,11 +1466,11 @@ function confirmAddScalar(measId) {
   nameEl.value = ''; valEl.value = ''; unitEl.value = '';
   document.getElementById('add-scalar-row-' + measId).style.display = 'none';
   updateSaveBar();
-  renderMeasTable(); // rafraîchit les stats de la ligne dans le tableau
+  renderMeasTable(); // refresh stats in the table row
 }
 
 // =========================================================================
-// Source (1ère mesure)
+// Source (first measurement)
 // =========================================================================
 async function loadSource() {
   const noSrcMsg   = document.getElementById('no-source-msg');
@@ -1523,65 +1520,65 @@ async function loadSource() {
 
     attachListeners(document.getElementById('card-source'), 'SOURCE', srcId);
   } catch(err) {
-    GristHelpers.log('Erreur chargement source : ' + err.message, 'err');
+    GristHelpers.log('Error loading source: ' + err.message, 'err');
   }
 }
 
 // =========================================================================
-// SAUVEGARDE
+// SAVE
 // =========================================================================
 async function saveAll() {
   const actions = [];
 
-  // 1. UpdateRecord pour chaque table/ligne modifiée
+  // 1. UpdateRecord for each modified table/row
   for (const [tableName, rowMap] of pendingChanges) {
     for (const [rowId, fields] of rowMap) {
       actions.push(['UpdateRecord', tableName, parseInt(rowId), fields]);
     }
   }
 
-  // 2. Suppressions de liants
+  // 2. Delete binders
   for (const mbId of pendingBinders.toDelete) {
     actions.push(['RemoveRecord', 'MIX_DESIGN_BINDER', mbId]);
   }
 
-  // 3. Ajouts de liants
+  // 3. Add binders
   for (const fields of pendingBinders.toAdd) {
     actions.push(['AddRecord', 'MIX_DESIGN_BINDER', null, fields]);
   }
 
-  // 4. Suppressions de granulats
+  // 4. Delete aggregates
   for (const maId of pendingAggregates.toDelete) {
     actions.push(['RemoveRecord', 'MIX_DESIGN_AGGREGATE', maId]);
   }
 
-  // 5. Ajouts de granulats
+  // 5. Add aggregates
   for (const fields of pendingAggregates.toAdd) {
     actions.push(['AddRecord', 'MIX_DESIGN_AGGREGATE', null, fields]);
   }
 
-  // 6. Suppressions de scalaires
+  // 6. Delete scalars
   for (const sId of pendingScalars.toDelete) {
     actions.push(['RemoveRecord', 'SCALAR', sId]);
   }
 
-  // 7. Ajouts de scalaires
+  // 7. Add scalars
   for (const fields of pendingScalars.toAdd) {
     actions.push(['AddRecord', 'SCALAR', null, fields]);
   }
 
   if (actions.length === 0) {
-    GristHelpers.log('Aucune modification à enregistrer.', 'warn');
+    GristHelpers.log('No changes to save.', 'warn');
     return;
   }
 
-  GristHelpers.setStatus('Enregistrement…', '');
-  GristHelpers.log('Envoi de ' + actions.length + ' action(s)…');
+  GristHelpers.setStatus('Saving…', '');
+  GristHelpers.log('Sending ' + actions.length + ' action(s)…');
 
   try {
     await grist.docApi.applyUserActions(actions);
-    GristHelpers.log('Enregistré avec succès ✓', 'ok');
-    GristHelpers.setStatus('Enregistré', 'ready');
+    GristHelpers.log('Saved successfully ✓', 'ok');
+    GristHelpers.setStatus('Saved', 'ready');
     const prevMeasId = selectedMeasId;
     pendingChanges    = new Map();
     pendingBinders    = { toAdd: [], toDelete: [] };
@@ -1589,11 +1586,11 @@ async function saveAll() {
     pendingScalars    = { toAdd: [], toDelete: [] };
     updateSaveBar();
     await loadMaterial(currentRecord);
-    // Re-sélectionner la mesure après rechargement
+    // Re-select the measurement after reload
     if (prevMeasId) selectMeasRow(prevMeasId);
   } catch(err) {
-    GristHelpers.setStatus('Erreur', 'error');
-    GristHelpers.log('Erreur enregistrement : ' + err.message, 'err');
+    GristHelpers.setStatus('Error', 'error');
+    GristHelpers.log('Save error: ' + err.message, 'err');
     console.error(err);
   }
 }
@@ -1611,7 +1608,7 @@ function resetChanges() {
 // INIT
 // =========================================================================
 (async function() {
-  GristHelpers.log('Initialisation Éditeur…');
+  GristHelpers.log('Initializing Editor…');
   grist.ready({ requiredAccess: 'full' });
   grist.onRecord(async (record) => {
     await loadMaterial(record);

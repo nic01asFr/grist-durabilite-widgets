@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Carte des Sites — Durabilité</title>
+  <title>Site Map — Durability</title>
 
   <link rel="stylesheet" href="assets/shared-styles.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
@@ -63,13 +63,13 @@
 <body>
 
   <div class="header">
-    <h1><span class="icon">🗺️</span> Carte des Sites</h1>
+    <h1><span class="icon">🗺️</span> Site Map</h1>
     <div style="display:flex; gap:8px; align-items:center;">
-      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Rafraîchir</button>
-      <button class="btn btn-secondary" onclick="toggleLog()">📋 Journal</button>
+      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Refresh</button>
+      <button class="btn btn-secondary" onclick="toggleLog()">📋 Log</button>
       <div class="status" id="status">
         <span class="dot"></span>
-        <span id="status-text">Chargement…</span>
+        <span id="status-text">Loading…</span>
       </div>
     </div>
   </div>
@@ -77,19 +77,19 @@
   <div id="map"></div>
 
   <div class="legend">
-    <h4>Performance Dapp</h4>
+    <h4>Dapp Performance</h4>
     <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>Excellent (&lt; 1×10⁻¹²)</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>Bon (1–5×10⁻¹²)</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Moyen (5×10⁻¹²–1×10⁻¹¹)</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Faible (&gt; 1×10⁻¹¹)</span></div>
-    <div class="legend-item"><div class="legend-dot" style="background:#64748b;"></div><span>Sans données</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>Good (1–5×10⁻¹²)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Average (5×10⁻¹²–1×10⁻¹¹)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Poor (&gt; 1×10⁻¹¹)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#64748b;"></div><span>No data</span></div>
   </div>
 
-  <div class="map-info" id="map-info">0 sites affichés</div>
+  <div class="map-info" id="map-info">0 sites displayed</div>
 
   <div class="log-overlay" id="log-overlay">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <span style="font-size:13px; font-weight:600; color:var(--text-muted);">Journal</span>
+      <span style="font-size:13px; font-weight:600; color:var(--text-muted);">Log</span>
       <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="toggleLog()">✕</button>
     </div>
     <div class="log" id="log"></div>
@@ -104,9 +104,9 @@
 
     const CATEGORIES = [
       { label: 'Excellent', max: 1e-12,    color: '#22c55e' },
-      { label: 'Bon',       max: 5e-12,    color: '#3b82f6' },
-      { label: 'Moyen',     max: 1e-11,    color: '#f59e0b' },
-      { label: 'Faible',    max: Infinity, color: '#ef4444' }
+      { label: 'Good',      max: 5e-12,    color: '#3b82f6' },
+      { label: 'Average',   max: 1e-11,    color: '#f59e0b' },
+      { label: 'Poor',      max: Infinity, color: '#ef4444' }
     ];
 
     function getCategoryColor(dapp) {
@@ -115,7 +115,7 @@
     }
     function getCategoryLabel(dapp) {
       for (const cat of CATEGORIES) { if (dapp < cat.max) return cat.label; }
-      return 'Faible';
+      return 'Poor';
     }
 
     function toggleLog() {
@@ -137,8 +137,8 @@
     // LOAD DATA — SITE + MATERIAL + MEASUREMENT + RESULT(Dapp)
     // =========================================================================
     async function loadAllData() {
-      GristHelpers.log('Chargement des données…');
-      GristHelpers.setStatus('Chargement…', '');
+      GristHelpers.log('Loading data…');
+      GristHelpers.setStatus('Loading…', '');
 
       try {
         const [sites, materials, measurements, scalars] = await Promise.all([
@@ -148,16 +148,16 @@
           GristHelpers.fetchAllRecords('SCALAR'),
         ]);
 
-        GristHelpers.log(`${sites.length} sites, ${materials.length} matériaux, ${measurements.length} mesures, ${scalars.length} scalaires`, 'ok');
+        GristHelpers.log(`${sites.length} sites, ${materials.length} materials, ${measurements.length} measurements, ${scalars.length} scalars`, 'ok');
 
-        // Index D (coefficient de diffusion) par measurement_id
-        // SCALAR.name === 'D', SCALAR.value est numérique
+        // Index D (diffusion coefficient) by measurement_id
+        // SCALAR.name === 'D', SCALAR.value is numeric
         const dappByMeasurement = new Map();
         scalars
           .filter(r => r.fields.name === 'D' && r.fields.value != null && r.fields.value > 0)
           .forEach(r => dappByMeasurement.set(r.fields.id_measurement, r.fields.value));
 
-        // Index durée de vie par measurement_id (si calculée et stockée comme scalaire)
+        // Index service life by measurement_id (if computed and stored as scalar)
         const dureeByMeasurement = new Map();
         scalars
           .filter(r => r.fields.name === 'duree_vie_ans' && r.fields.value != null && r.fields.value > 0)
@@ -210,15 +210,15 @@
           };
         });
 
-        if (skipped > 0) GristHelpers.log(`${skipped} site(s) ignorés (sans coordonnées GPS)`, 'warn');
+        if (skipped > 0) GristHelpers.log(`${skipped} site(s) skipped (no GPS coordinates)`, 'warn');
 
         renderMarkers(siteData);
         const nbSites = Object.keys(siteData).length;
-        document.getElementById('map-info').textContent = `${nbSites} site${nbSites > 1 ? 's' : ''} affiché${nbSites > 1 ? 's' : ''}`;
+        document.getElementById('map-info').textContent = `${nbSites} site${nbSites > 1 ? 's' : ''} displayed`;
         GristHelpers.setStatus(`${nbSites} sites`, 'ready');
       } catch (err) {
-        GristHelpers.log('Erreur : ' + err.message, 'err');
-        GristHelpers.setStatus('Erreur', 'error');
+        GristHelpers.log('Error: ' + err.message, 'err');
+        GristHelpers.setStatus('Error', 'error');
       }
     }
 
@@ -245,14 +245,14 @@
 
         const popupHtml = `
           <div class="popup-title">${site.label}</div>
-          <div class="popup-stat"><span class="label">Matériaux</span><span class="value">${site.nbMaterials}</span></div>
-          <div class="popup-stat"><span class="label">Mesures</span><span class="value">${site.nbMeasures}</span></div>
-          <div class="popup-stat"><span class="label">Dapp moyen</span><span class="value">${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}</span></div>
-          <div class="popup-stat"><span class="label">Durée de vie moy.</span><span class="value">${dureeMoy ? dureeMoy.toFixed(1) + ' ans' : '—'}</span></div>
+          <div class="popup-stat"><span class="label">Materials</span><span class="value">${site.nbMaterials}</span></div>
+          <div class="popup-stat"><span class="label">Measurements</span><span class="value">${site.nbMeasures}</span></div>
+          <div class="popup-stat"><span class="label">Mean Dapp</span><span class="value">${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}</span></div>
+          <div class="popup-stat"><span class="label">Avg. service life</span><span class="value">${dureeMoy ? dureeMoy.toFixed(1) + ' yr' : '—'}</span></div>
           <div class="popup-stat"><span class="label">Performance</span><span class="value" style="color:${color}">${dappMoyen ? getCategoryLabel(dappMoyen) : '—'}</span></div>
           ${site.matNames.length > 0 ? `
           <div class="popup-stat" style="flex-direction:column; gap:2px;">
-            <span class="label">Matériaux</span>
+            <span class="label">Materials</span>
             <span class="value" style="font-size:12px; font-weight:400;">${site.matNames.join(', ')}</span>
           </div>` : ''}
         `;
@@ -262,13 +262,13 @@
         markers.push(marker);
         bounds.push([site.lat, site.lng]);
 
-        GristHelpers.log(`Site "${site.label}" : ${site.nbMaterials} mat., ${site.nbMeasures} mesures, Dapp=${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}`, 'ok');
+        GristHelpers.log(`Site "${site.label}": ${site.nbMaterials} mat., ${site.nbMeasures} measurements, Dapp=${dappMoyen ? GristHelpers.formatDapp(dappMoyen) : '—'}`, 'ok');
       });
 
       if (bounds.length > 0) {
         map.fitBounds(bounds, { padding: [30, 30] });
       } else {
-        GristHelpers.log('Aucun site avec coordonnées GPS trouvé', 'warn');
+        GristHelpers.log('No site with GPS coordinates found', 'warn');
       }
     }
 
@@ -276,10 +276,10 @@
     // INIT
     // =========================================================================
     (async function() {
-      GristHelpers.log('Initialisation Carte des Sites…');
+      GristHelpers.log('Initializing Site Map…');
       initMap();
       grist.ready({ requiredAccess: 'full' });
-      GristHelpers.log('Connecté à Grist ✓', 'ok');
+      GristHelpers.log('Connected to Grist ✓', 'ok');
       await GristHelpers.ensureSchema();
       loadAllData();
     })();

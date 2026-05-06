@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Custom Grist widgets for concrete durability analysis in marine environments, developed at CEREMA Méditerranée. Each widget is a standalone HTML file deployed via GitHub Pages and embedded as an iframe in Grist documents (grist.numerique.gouv.fr).
 
-**Language:** French (UI, comments, variable names, documentation).
+**Language:** English (UI, comments, variable names, documentation).
 
 ## Development
 

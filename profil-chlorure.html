@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Profils Chlorure — Durabilité</title>
+  <title>Chloride Profiles — Durability</title>
 
   <link rel="stylesheet" href="assets/shared-styles.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
@@ -13,7 +13,7 @@
   <style>
     #chart { width: 100%; height: 500px; border-radius: 8px; overflow: hidden; }
 
-    /* Carte de filtres */
+    /* Filter card */
     .filter-card {
       background: var(--surface); border-radius: 10px;
       padding: 10px 14px; margin-bottom: 10px;
@@ -38,7 +38,7 @@
     .filt-row input[type="number"] { width: 68px; }
     .dash { color: var(--text-dim); font-size: 12px; }
 
-    /* Chips (checkboxes stylisés) */
+    /* Chips (styled checkboxes) */
     .chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
     .chip {
       display: inline-flex; align-items: center;
@@ -62,7 +62,7 @@
     #f-binder option { padding: 2px 4px; }
     .binder-hint { font-size: 10px; color: var(--text-dim); }
 
-    /* Carte graphique */
+    /* Chart card */
     .chart-card {
       background: var(--surface); border-radius: 10px; padding: 14px; margin-bottom: 10px;
     }
@@ -75,7 +75,7 @@
     }
     .chart-stats { font-size: 12px; color: var(--text-dim); }
 
-    /* Journal */
+    /* Log */
     .log-overlay {
       position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
       z-index: 1000; width: 420px; max-width: 94vw;
@@ -95,52 +95,52 @@
 <body>
 
   <div class="header">
-    <h1><span class="icon">📈</span> Profils Chlorure</h1>
+    <h1><span class="icon">📈</span> Chloride Profiles</h1>
     <div style="display:flex; gap:8px; align-items:center;">
-      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Rafraîchir</button>
-      <button class="btn btn-secondary" onclick="toggleLog()">📋 Journal</button>
-      <div class="status" id="status"><span class="dot"></span><span id="status-text">Chargement…</span></div>
+      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Refresh</button>
+      <button class="btn btn-secondary" onclick="toggleLog()">📋 Log</button>
+      <div class="status" id="status"><span class="dot"></span><span id="status-text">Loading…</span></div>
     </div>
   </div>
 
-  <!-- ===== FILTRES ===== -->
+  <!-- ===== FILTERS ===== -->
   <div class="filter-card">
 
-    <!-- Affichage -->
+    <!-- Display -->
     <div class="filt-block">
       <div class="filt-row">
-        <span class="filt-lbl">Couleur</span>
+        <span class="filt-lbl">Color</span>
         <select id="f-colorby" onchange="render()">
-          <option value="exposure_nature">Nature exposition</option>
-          <option value="binder_sig">Type d'addition</option>
-          <option value="cl_type">Type Cl⁻ (total / libre)</option>
-          <option value="cement">Ciment principal</option>
+          <option value="exposure_nature">Exposure nature</option>
+          <option value="binder_sig">SCM type</option>
+          <option value="cl_type">Cl⁻ type (total / free)</option>
+          <option value="cement">Primary cement</option>
           <option value="source">Source</option>
-          <option value="wl_ratio">E/L (continu)</option>
-          <option value="wc_ratio">E/C (continu)</option>
-          <option value="duration">Durée exposition (continu)</option>
-          <option value="latitude">Latitude (continu)</option>
-          <option value="cure_duration">Durée de cure (continu)</option>
+          <option value="wl_ratio">w/b (continuous)</option>
+          <option value="wc_ratio">w/c (continuous)</option>
+          <option value="duration">Exposure duration (continuous)</option>
+          <option value="latitude">Latitude (continuous)</option>
+          <option value="cure_duration">Curing duration (continuous)</option>
         </select>
         <div class="filt-sep"></div>
-        <span class="filt-lbl">Type Cl⁻</span>
+        <span class="filt-lbl">Cl⁻ type</span>
         <select id="f-cltype" onchange="render()">
-          <option value="">Les deux</option>
+          <option value="">Both</option>
           <option value="total_cl">Total</option>
-          <option value="free_cl">Libre</option>
+          <option value="free_cl">Free</option>
         </select>
       </div>
     </div>
 
-    <!-- Plages numériques -->
+    <!-- Numeric ranges -->
     <div class="filt-block">
       <div class="filt-row">
-        <span class="filt-lbl">E/L</span>
+        <span class="filt-lbl">w/b</span>
         <input type="number" id="f-wl-min" placeholder="min" min="0" max="2" step="0.05" oninput="render()">
         <span class="dash">—</span>
         <input type="number" id="f-wl-max" placeholder="max" min="0" max="2" step="0.05" oninput="render()">
         <div class="filt-sep"></div>
-        <span class="filt-lbl">Durée (ans)</span>
+        <span class="filt-lbl">Duration (yr)</span>
         <input type="number" id="f-dur-min" placeholder="min" min="0" step="1" oninput="render()">
         <span class="dash">—</span>
         <input type="number" id="f-dur-max" placeholder="max" min="0" step="1" oninput="render()">
@@ -150,40 +150,40 @@
         <span class="dash">—</span>
         <input type="number" id="f-lat-max" placeholder="max" step="1" oninput="render()">
         <div class="filt-sep"></div>
-        <span class="filt-lbl">Cure (jours)</span>
+        <span class="filt-lbl">Curing (days)</span>
         <input type="number" id="f-cure-min" placeholder="min" min="0" step="1" oninput="render()">
         <span class="dash">—</span>
         <input type="number" id="f-cure-max" placeholder="max" min="0" step="1" oninput="render()">
       </div>
     </div>
 
-    <!-- Type d'addition -->
+    <!-- SCM type -->
     <div class="filt-block">
       <div class="filt-row" style="align-items:flex-start;">
-        <span class="filt-lbl" style="padding-top:4px;">Addition</span>
+        <span class="filt-lbl" style="padding-top:4px;">SCM</span>
         <div>
           <select id="f-binder" multiple size="4" onchange="render()"></select>
-          <div class="binder-hint" style="margin-top:3px;">Ctrl+clic = multi · aucune sélection = tous</div>
+          <div class="binder-hint" style="margin-top:3px;">Ctrl+click = multi · no selection = all</div>
         </div>
       </div>
     </div>
 
-    <!-- Nature et type d'exposition -->
+    <!-- Exposure nature and type -->
     <div class="filt-block">
       <div class="filt-row" style="margin-bottom:5px;">
         <span class="filt-lbl">Nature</span>
         <div class="chip-group">
-          <label class="chip"><input type="checkbox" name="nature" value="atmospheric" onchange="render()">Atmosphérique</label>
+          <label class="chip"><input type="checkbox" name="nature" value="atmospheric" onchange="render()">Atmospheric</label>
           <label class="chip"><input type="checkbox" name="nature" value="spray" onchange="render()">Spray</label>
-          <label class="chip"><input type="checkbox" name="nature" value="splash" onchange="render()">Éclaboussures</label>
-          <label class="chip"><input type="checkbox" name="nature" value="tidal" onchange="render()">Marnage</label>
-          <label class="chip"><input type="checkbox" name="nature" value="submerged" onchange="render()">Immergé</label>
+          <label class="chip"><input type="checkbox" name="nature" value="splash" onchange="render()">Splash</label>
+          <label class="chip"><input type="checkbox" name="nature" value="tidal" onchange="render()">Tidal</label>
+          <label class="chip"><input type="checkbox" name="nature" value="submerged" onchange="render()">Submerged</label>
         </div>
       </div>
       <div class="filt-row">
         <span class="filt-lbl">Type</span>
         <div class="chip-group">
-          <label class="chip"><input type="checkbox" name="expotype" value="laboratory" onchange="render()">Laboratoire</label>
+          <label class="chip"><input type="checkbox" name="expotype" value="laboratory" onchange="render()">Laboratory</label>
           <label class="chip"><input type="checkbox" name="expotype" value="in-situ" onchange="render()">In situ</label>
         </div>
       </div>
@@ -191,19 +191,19 @@
 
   </div>
 
-  <!-- ===== GRAPHIQUE ===== -->
+  <!-- ===== CHART ===== -->
   <div class="chart-card">
     <div class="chart-header">
-      <span class="chart-title">Profil en chlorures — Concentration vs Profondeur</span>
+      <span class="chart-title">Chloride profile — Concentration vs Depth</span>
       <span class="chart-stats" id="chart-stats">—</span>
     </div>
-    <div id="chart"><div class="empty-chart">Chargement des données…</div></div>
+    <div id="chart"><div class="empty-chart">Loading data…</div></div>
   </div>
 
-  <!-- ===== JOURNAL ===== -->
+  <!-- ===== LOG ===== -->
   <div class="log-overlay" id="log-overlay">
     <div class="log-overlay-header">
-      <span style="font-size:13px; font-weight:600; color:var(--text-muted);">Journal</span>
+      <span style="font-size:13px; font-weight:600; color:var(--text-muted);">Log</span>
       <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="toggleLog()">✕</button>
     </div>
     <div class="log" id="log"></div>
@@ -224,12 +224,12 @@
       '#14b8a6','#78716c','#b45309','#1d4ed8','#be123c',
     ];
     const SCM_LABELS = {
-      fly_ash: 'FA', silica_fume: 'SF', slag: 'Laitier',
-      metakaolin: 'MK', limestone_filler: 'Calcaire',
-      natural_pozzolan: 'Pouzzolane', zeolite: 'Zéolite', other: 'Autre',
+      fly_ash: 'FA', silica_fume: 'SF', slag: 'Slag',
+      metakaolin: 'MK', limestone_filler: 'Limestone',
+      natural_pozzolan: 'Pozzolan', zeolite: 'Zeolite', other: 'Other',
     };
 
-    // Interpolation continue bleu → rouge
+    // Continuous blue → red interpolation
     function contColor(t) {
       const r = Math.round(59  + (239 -  59) * t);
       const g = Math.round(130 + ( 68 - 130) * t);
@@ -250,12 +250,12 @@
     }
 
     // =========================================================================
-    // CHARGEMENT
+    // LOAD DATA
     // =========================================================================
     async function loadAllData() {
-      GristHelpers.log('Chargement des données…');
-      GristHelpers.setStatus('Chargement…', '');
-      document.getElementById('chart').innerHTML = '<div class="empty-chart">Chargement…</div>';
+      GristHelpers.log('Loading data…');
+      GristHelpers.setStatus('Loading…', '');
+      document.getElementById('chart').innerHTML = '<div class="empty-chart">Loading…</div>';
       chartRendered = false;
 
       try {
@@ -278,8 +278,8 @@
         ]);
 
         GristHelpers.log(
-          `${dataPoints.length} pts · ${curves.length} courbes · ` +
-          `${materials.length} matériaux · ${binders.length} liants`, 'ok');
+          `${dataPoints.length} pts · ${curves.length} curves · ` +
+          `${materials.length} materials · ${binders.length} binders`, 'ok');
 
         testMap = new Map(tests.map(t => [t.id, t.fields]));
 
@@ -294,27 +294,27 @@
         );
 
         profiles = allProfiles.filter(p => clTestIds.has(p.measurement.id_test));
-        GristHelpers.log(`${profiles.length} profils Cl⁻ valides`, 'ok');
+        GristHelpers.log(`${profiles.length} valid Cl⁻ profiles`, 'ok');
 
         buildBinderFilter();
         catIndex.clear();
         render();
-        GristHelpers.setStatus(`${profiles.length} profils`, 'ready');
+        GristHelpers.setStatus(`${profiles.length} profiles`, 'ready');
       } catch (err) {
-        GristHelpers.log('Erreur : ' + err.message, 'err');
-        GristHelpers.setStatus('Erreur', 'error');
+        GristHelpers.log('Error: ' + err.message, 'err');
+        GristHelpers.setStatus('Error', 'error');
       }
     }
 
     // =========================================================================
-    // FILTRE TYPE D'ADDITION — construit dynamiquement
+    // SCM FILTER — built dynamically
     // =========================================================================
     function buildBinderFilter() {
       const sigs = [...new Set(profiles.map(getBinderSignature))].sort();
       const sel  = document.getElementById('f-binder');
       const prev = [...sel.selectedOptions].map(o => o.value);
       sel.innerHTML = sigs.map(s => `<option value="${s}">${s}</option>`).join('');
-      // Restaurer la sélection précédente si possible
+      // Restore previous selection if possible
       for (const opt of sel.options) {
         if (prev.includes(opt.value)) opt.selected = true;
       }
@@ -322,14 +322,14 @@
     }
 
     // =========================================================================
-    // UTILITAIRES
+    // UTILITIES
     // =========================================================================
     function getBinderSignature(p) {
-      if (!p.binders || p.binders.length === 0) return 'Inconnu';
+      if (!p.binders || p.binders.length === 0) return 'Unknown';
       const scms = p.binders.filter(b =>
         b.binder_type !== 'portland_cement' && b.binder_type !== 'blended_cement'
       );
-      if (scms.length === 0) return 'Portland seul';
+      if (scms.length === 0) return 'Portland only';
       const labels = scms.map(b => SCM_LABELS[b.binder_type] || b.binder_type);
       return 'Portland + ' + labels.join(' + ');
     }
@@ -346,15 +346,15 @@
       return (testMap.get(p.measurement.id_test) || {}).test_type || '';
     }
 
-    // Retourne un Set des valeurs cochées pour les checkboxes d'un name donné
-    // Si rien n'est coché, retourne null (= pas de filtre)
+    // Returns a Set of checked values for checkboxes with a given name
+    // If nothing is checked, returns null (= no filter)
     function getChecked(name) {
       const vals = [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
       return vals.length === 0 ? null : new Set(vals);
     }
 
-    // Retourne un Set des options sélectionnées dans un <select multiple>
-    // Si rien n'est sélectionné, retourne null (= pas de filtre)
+    // Returns a Set of selected options in a <select multiple>
+    // If nothing is selected, returns null (= no filter)
     function getMultiSelect(id) {
       const vals = [...document.getElementById(id).selectedOptions].map(o => o.value);
       return vals.length === 0 ? null : new Set(vals);
@@ -367,37 +367,37 @@
       const expo = [p.exposure.exposure_nature, p.exposure.exposure_type]
         .filter(Boolean).join(' / ');
       const dur = p.scalars.exposure_duration != null
-        ? p.scalars.exposure_duration.toFixed(1) + ' ans' : '?';
+        ? p.scalars.exposure_duration.toFixed(1) + ' yr' : '?';
       const ec  = p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?';
       const el  = (p.mix.wl_ratio ?? p.mix.wc_ratio) != null
         ? (p.mix.wl_ratio ?? p.mix.wc_ratio).toFixed(2) : '?';
       const D   = p.scalars.D      != null ? GristHelpers.formatDapp(p.scalars.D) : '?';
       const Cs  = p.scalars.Cs     != null ? p.scalars.Cs.toFixed(3) + ' %' : '?';
       const lat  = p.site.latitude  != null ? p.site.latitude.toFixed(2) + '°N' : '?';
-      const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' j' : '?';
+      const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' d' : '?';
       const cem  = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
-      const cltype = getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
-      return `<b>${p.material.name || 'Matériau'}</b> — ${cltype}<br>` +
-             `Source : ${src}<br>` +
-             `Exposition : ${expo}<br>` +
-             `Durée : ${dur} · Latitude : ${lat} · Cure : ${cure}<br>` +
-             `Liants : ${cem}<br>` +
-             `Addition : ${getBinderSignature(p)}<br>` +
-             `E/C : ${ec} · E/L : ${el} · Dapp : ${D} · Cs : ${Cs}`;
+      const cltype = getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
+      return `<b>${p.material.name || 'Material'}</b> — ${cltype}<br>` +
+             `Source: ${src}<br>` +
+             `Exposure: ${expo}<br>` +
+             `Duration: ${dur} · Latitude: ${lat} · Curing: ${cure}<br>` +
+             `Binders: ${cem}<br>` +
+             `SCM: ${getBinderSignature(p)}<br>` +
+             `w/c: ${ec} · w/b: ${el} · Dapp: ${D} · Cs: ${Cs}`;
     }
 
     // =========================================================================
-    // COULEUR PAR CRITÈRE
+    // COLOR BY CRITERION
     // =========================================================================
     function getColor(p, colorBy, contVals) {
       switch (colorBy) {
         case 'exposure_nature': return COLORS_NATURE[p.exposure.exposure_nature] || '#94a3b8';
         case 'cl_type':         return COLORS_CLTYPE[getTestType(p)] || '#94a3b8';
         case 'binder_sig':      return catColor(getBinderSignature(p));
-        case 'cement':          return catColor(primaryCementName(p) || 'Inconnu');
+        case 'cement':          return catColor(primaryCementName(p) || 'Unknown');
         case 'source':          return catColor(
           p.source.designation ||
-          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu'));
+          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Unknown'));
         case 'wl_ratio': {
           const v = p.mix.wl_ratio ?? p.mix.wc_ratio;
           return contScale(v, contVals);
@@ -424,28 +424,28 @@
 
     function getLegendKey(p, colorBy) {
       switch (colorBy) {
-        case 'exposure_nature': return p.exposure.exposure_nature || 'Inconnu';
-        case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
+        case 'exposure_nature': return p.exposure.exposure_nature || 'Unknown';
+        case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
         case 'binder_sig':      return getBinderSignature(p);
-        case 'cement':          return primaryCementName(p) || 'Inconnu';
+        case 'cement':          return primaryCementName(p) || 'Unknown';
         case 'source':          return p.source.designation ||
-          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu');
+          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Unknown');
         case 'wl_ratio': {
           const v = p.mix.wl_ratio ?? p.mix.wc_ratio;
-          return v != null ? `E/L = ${v.toFixed(2)}` : '?';
+          return v != null ? `w/b = ${v.toFixed(2)}` : '?';
         }
         case 'wc_ratio':
-          return p.mix.wc_ratio != null ? `E/C = ${p.mix.wc_ratio.toFixed(2)}` : '?';
+          return p.mix.wc_ratio != null ? `w/c = ${p.mix.wc_ratio.toFixed(2)}` : '?';
         case 'duration':
           return p.scalars.exposure_duration != null
-            ? `${p.scalars.exposure_duration.toFixed(0)} ans` : '?';
+            ? `${p.scalars.exposure_duration.toFixed(0)} yr` : '?';
         case 'latitude':
           return p.site.latitude != null ? `${p.site.latitude.toFixed(1)}°N` : '?';
         case 'cure_duration':
           return p.curing.curing_duration_days != null
-            ? `${p.curing.curing_duration_days} j` : '?';
+            ? `${p.curing.curing_duration_days} d` : '?';
       }
-      return 'Inconnu';
+      return 'Unknown';
     }
 
     function catColor(key) {
@@ -464,13 +464,13 @@
     }
 
     // =========================================================================
-    // RENDU PLOTLY
+    // PLOTLY RENDER
     // =========================================================================
     function render() {
       if (profiles.length === 0) {
         document.getElementById('chart').innerHTML =
-          '<div class="empty-chart">Aucune donnée — remplissez la base via le widget Saisie.</div>';
-        document.getElementById('chart-stats').textContent = '0 profil';
+          '<div class="empty-chart">No data — populate the database using the Data Entry widget.</div>';
+        document.getElementById('chart-stats').textContent = '0 profiles';
         return;
       }
 
@@ -491,7 +491,7 @@
       const latMinF = isNaN(latMin) ? null : latMin;
       const latMaxF = isNaN(latMax) ? null : latMax;
 
-      // Filtrage
+      // Filtering
       const filtered = profiles.filter(p => {
         if (clType    && getTestType(p)                 !== clType)    return false;
         if (natures   && !natures.has(p.exposure.exposure_nature))     return false;
@@ -515,18 +515,18 @@
       const nbSites   = new Set(filtered.map(p => p.site.country_region || '')).size;
       const nbSources = new Set(filtered.map(p => p.source.designation || p.source.id)).size;
       document.getElementById('chart-stats').textContent =
-        `${filtered.length} profil${filtered.length > 1 ? 's' : ''} · ` +
+        `${filtered.length} profile${filtered.length > 1 ? 's' : ''} · ` +
         `${nbSites} site${nbSites > 1 ? 's' : ''} · ` +
         `${nbSources} source${nbSources > 1 ? 's' : ''}`;
 
       if (filtered.length === 0) {
         document.getElementById('chart').innerHTML =
-          '<div class="empty-chart">Aucun profil ne correspond aux filtres.</div>';
+          '<div class="empty-chart">No profiles match the current filters.</div>';
         chartRendered = false;
         return;
       }
 
-      // Plage pour couleurs continues (calculée sur les profils filtrés)
+      // Range for continuous colors (computed on filtered profiles)
       const contVals = (() => {
         if (colorBy === 'wl_ratio')
           return contRange(filtered.map(p => p.mix.wl_ratio ?? p.mix.wc_ratio));
@@ -541,7 +541,7 @@
         return { min: 0, max: 1 };
       })();
 
-      // Grouper les profils par legendgroup (null-separated dans la même trace)
+      // Group profiles by legend key (null-separated within the same trace)
       const groups   = new Map();
       const seenKeys = new Set();
 
@@ -577,8 +577,8 @@
       }
 
       const layout = GristHelpers.plotlyDarkLayout({
-        xaxis: GristHelpers.plotlyDarkAxis('Profondeur (mm)'),
-        yaxis: GristHelpers.plotlyDarkAxis('Teneur en Cl⁻ (% masse liants)'),
+        xaxis: GristHelpers.plotlyDarkAxis('Depth (mm)'),
+        yaxis: GristHelpers.plotlyDarkAxis('Cl⁻ content (% binder mass)'),
         margin: { t: 10, r: 20, b: 50, l: 65 },
         legend: {
           bgcolor: 'rgba(255,255,255,0.92)', bordercolor: '#e2e8f0',
@@ -600,7 +600,7 @@
     // INIT
     // =========================================================================
     (async function () {
-      GristHelpers.log('Initialisation Profils Chlorure…');
+      GristHelpers.log('Initializing Chloride Profiles…');
       grist.ready({ requiredAccess: 'full' });
       await GristHelpers.ensureSchema();
       loadAllData();

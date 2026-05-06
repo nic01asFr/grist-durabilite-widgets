@@ -1,65 +1,65 @@
 // =========================================================================
-// GristHelpers — Utilitaires partagés pour les widgets durabilité
-// Schéma v2.4 — 15 tables, 11 enums (architecture générique)
-// Résultats : SCALAR (scalaires 0..n) + CURVE+DATA_CURVE (courbes 0..n)
-//             directement liés à MEASUREMENT (plus de table RESULT)
-// Granulats par coupure : MIX_DESIGN_AGGREGATE (table de jonction)
+// GristHelpers — Shared utilities for durability widgets
+// Schema v2.4 — 15 tables, 11 enums (generic architecture)
+// Results: SCALAR (scalars 0..n) + CURVE+DATA_CURVE (curves 0..n)
+//          directly linked to MEASUREMENT (no RESULT table)
+// Aggregates by fraction: MIX_DESIGN_AGGREGATE (junction table)
 // =========================================================================
 const GristHelpers = {
 
   // =========================================================================
-  // SCHEMA — Définition complète des 13 tables
+  // SCHEMA — Complete definition of 13 tables
   // =========================================================================
   SCHEMA: {
 
-    // --- Sites géographiques ---
+    // --- Geographic sites ---
     SITE: {
       columns: [
         { id: 'latitude',       fields: { type: 'Numeric', label: 'Latitude' } },
         { id: 'longitude',      fields: { type: 'Numeric',    label: 'Longitude' } },
-        { id: 'country_region', fields: { type: 'Text',    label: 'Pays / Région' } },
+        { id: 'country_region', fields: { type: 'Text',    label: 'Country / Region' } },
       ]
     },
 
-    // --- Conditions d'exposition ---
+    // --- Exposure conditions ---
     EXPOSURE: {
       columns: [
-        { id: 'exposure_type',        fields: { type: 'Choice',  label: "Type d'exposition",   widgetOptions: '{"choices":["laboratory","in-situ"]}' } },
-        { id: 'exposure_nature',      fields: { type: 'Choice',  label: "Nature d'exposition", widgetOptions: '{"choices":["atmospheric","spray","splash","tidal","submerged"]}' } },
-        { id: 'wetting_duration_pct', fields: { type: 'Numeric', label: 'Mouillage (%)' } },
-        { id: 'drying_duration_pct',  fields: { type: 'Numeric', label: 'Séchage (%)' } },
+        { id: 'exposure_type',        fields: { type: 'Choice',  label: 'Exposure type',   widgetOptions: '{"choices":["laboratory","in-situ"]}' } },
+        { id: 'exposure_nature',      fields: { type: 'Choice',  label: 'Exposure nature', widgetOptions: '{"choices":["atmospheric","spray","splash","tidal","submerged"]}' } },
+        { id: 'wetting_duration_pct', fields: { type: 'Numeric', label: 'Wetting (%)' } },
+        { id: 'drying_duration_pct',  fields: { type: 'Numeric', label: 'Drying (%)' } },
       ]
     },
 
-    // --- Références bibliographiques ---
+    // --- Bibliographic references ---
     SOURCE: {
       columns: [
-        { id: 'title',       fields: { type: 'Text', label: 'Titre' } },
-        { id: 'authors',     fields: { type: 'Text', label: 'Auteurs' } },
+        { id: 'title',       fields: { type: 'Text', label: 'Title' } },
+        { id: 'authors',     fields: { type: 'Text', label: 'Authors' } },
         { id: 'doi',         fields: { type: 'Text', label: 'DOI' } },
         { id: 'url',         fields: { type: 'Text', label: 'URL' } },
-        { id: 'year',        fields: { type: 'Int',  label: 'Année' } },
-        { id: 'journal',     fields: { type: 'Text', label: 'Revue' } },
+        { id: 'year',        fields: { type: 'Int',  label: 'Year' } },
+        { id: 'journal',     fields: { type: 'Text', label: 'Journal' } },
         { id: 'notes',       fields: { type: 'Text', label: 'Notes' } },
-        { id: 'designation', fields: { type: 'Text', label: 'Désignation' } },
+        { id: 'designation', fields: { type: 'Text', label: 'Designation' } },
       ]
     },
 
-    // --- Liants : ciments, additions minérales ---
+    // --- Binders: cements, mineral additions ---
     BINDER: {
       columns: [
-        { id: 'name',             fields: { type: 'Text',    label: 'Nom' } },
-        { id: 'binder_type',      fields: { type: 'Choice',  label: 'Type liant', widgetOptions: '{"choices":["portland_cement","blended_cement","fly_ash","slag","silica_fume","limestone_filler","natural_pozzolan","other"]}' } },
-        { id: 'density_kg_m3',    fields: { type: 'Numeric', label: 'Masse volumique (kg/m³)' } },
-        { id: 'specific_surface', fields: { type: 'Numeric', label: 'Finesse Blaine (cm²/g)' } },
-        { id: 'loss_on_ignition', fields: { type: 'Numeric', label: 'PAF (%)' } },
-        // Composition Bogue
+        { id: 'name',             fields: { type: 'Text',    label: 'Name' } },
+        { id: 'binder_type',      fields: { type: 'Choice',  label: 'Binder type', widgetOptions: '{"choices":["portland_cement","blended_cement","fly_ash","slag","silica_fume","limestone_filler","natural_pozzolan","other"]}' } },
+        { id: 'density_kg_m3',    fields: { type: 'Numeric', label: 'Density (kg/m³)' } },
+        { id: 'specific_surface', fields: { type: 'Numeric', label: 'Blaine fineness (cm²/g)' } },
+        { id: 'loss_on_ignition', fields: { type: 'Numeric', label: 'LOI (%)' } },
+        // Bogue composition
         { id: 'C3S',              fields: { type: 'Numeric', label: 'C₃S (%)' } },
         { id: 'C2S',              fields: { type: 'Numeric', label: 'C₂S (%)' } },
         { id: 'C3A',              fields: { type: 'Numeric', label: 'C₃A (%)' } },
         { id: 'C4AF',             fields: { type: 'Numeric', label: 'C₄AF (%)' } },
-        { id: 'Gp',               fields: { type: 'Numeric', label: 'Gypse (%)' } },
-        // Composition oxyde
+        { id: 'Gp',               fields: { type: 'Numeric', label: 'Gypsum (%)' } },
+        // Oxide composition
         { id: 'SiO2',             fields: { type: 'Numeric', label: 'SiO₂ (%)' } },
         { id: 'Al2O3',            fields: { type: 'Numeric', label: 'Al₂O₃ (%)' } },
         { id: 'Fe2O3',            fields: { type: 'Numeric', label: 'Fe₂O₃ (%)' } },
@@ -72,132 +72,132 @@ const GristHelpers = {
       ]
     },
 
-    // --- Granulats : sables, graviers ---
+    // --- Aggregates: sands, gravels ---
     AGGREGATE: {
       columns: [
-        { id: 'name',                 fields: { type: 'Text',    label: 'Nom' } },
-        { id: 'aggregate_type',       fields: { type: 'Choice',  label: 'Type granulat', widgetOptions: '{"choices":["sand","gravel","crushed_stone","lightweight","recycled"]}' } },
+        { id: 'name',                 fields: { type: 'Text',    label: 'Name' } },
+        { id: 'aggregate_type',       fields: { type: 'Choice',  label: 'Aggregate type', widgetOptions: '{"choices":["sand","gravel","crushed_stone","lightweight","recycled"]}' } },
         { id: 'size_min_mm',          fields: { type: 'Numeric', label: 'D min (mm)' } },
         { id: 'size_max_mm',          fields: { type: 'Numeric', label: 'D max (mm)' } },
-        { id: 'density_kg_m3',        fields: { type: 'Numeric', label: 'Masse volumique (kg/m³)' } },
-        { id: 'water_absorption_pct', fields: { type: 'Numeric', label: 'Absorption eau (%)' } },
+        { id: 'density_kg_m3',        fields: { type: 'Numeric', label: 'Density (kg/m³)' } },
+        { id: 'water_absorption_pct', fields: { type: 'Numeric', label: 'Water absorption (%)' } },
         { id: 'notes',                fields: { type: 'Text',    label: 'Notes' } },
       ]
     },
 
-    // --- Formulation du béton ---
+    // --- Concrete mix design ---
     MIX_DESIGN: {
       columns: [
-        { id: 'water_type',                          fields: { type: 'Choice',  label: "Type d'eau", widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
-        { id: 'water_content_kg',                    fields: { type: 'Numeric', label: 'Eau (kg/m³)' } },
-        { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric', label: 'GWP (kg éq. CO₂/m³)' } },
-        { id: 'wc_ratio',                            fields: { type: 'Numeric', label: 'E/C' } },
-        { id: 'wl_ratio',                            fields: { type: 'Numeric', label: 'E/L' } },
-        { id: 'admix_type',                          fields: { type: 'Text',    label: 'Type adjuvant' } },
-        { id: 'adjuvant_content',                    fields: { type: 'Numeric', label: 'Adjuvant (kg/m³)' } },
-        { id: 'entrained_air',                       fields: { type: 'Numeric', label: 'Air entraîné (%)' } },
+        { id: 'water_type',                          fields: { type: 'Choice',  label: 'Water type', widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
+        { id: 'water_content_kg',                    fields: { type: 'Numeric', label: 'Water (kg/m³)' } },
+        { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric', label: 'GWP (kg CO₂-eq/m³)' } },
+        { id: 'wc_ratio',                            fields: { type: 'Numeric', label: 'w/c' } },
+        { id: 'wl_ratio',                            fields: { type: 'Numeric', label: 'w/b' } },
+        { id: 'admix_type',                          fields: { type: 'Text',    label: 'Admixture type' } },
+        { id: 'adjuvant_content',                    fields: { type: 'Numeric', label: 'Admixture (kg/m³)' } },
+        { id: 'entrained_air',                       fields: { type: 'Numeric', label: 'Entrained air (%)' } },
       ]
     },
 
-    // --- Liaisons liant ↔ formulation (1 liant = 1 ligne) ---
+    // --- Binder ↔ mix design links (1 binder = 1 row) ---
     MIX_DESIGN_BINDER: {
       columns: [
-        { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN', label: 'Formulation' } },
-        { id: 'id_binder',     fields: { type: 'Ref:BINDER',     label: 'Liant' } },
-        { id: 'content_kg_m3', fields: { type: 'Numeric',        label: 'Dosage (kg/m³)' } },
+        { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN', label: 'Mix design' } },
+        { id: 'id_binder',     fields: { type: 'Ref:BINDER',     label: 'Binder' } },
+        { id: 'content_kg_m3', fields: { type: 'Numeric',        label: 'Content (kg/m³)' } },
       ]
     },
 
-    // --- Liaisons granulat ↔ formulation (1 coupure = 1 ligne) ---
+    // --- Aggregate ↔ mix design links (1 fraction = 1 row) ---
     MIX_DESIGN_AGGREGATE: {
       columns: [
-        { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN',  label: 'Formulation' } },
-        { id: 'id_aggregate',  fields: { type: 'Ref:AGGREGATE',   label: 'Granulat' } },
-        { id: 'content_kg_m3', fields: { type: 'Numeric',         label: 'Dosage (kg/m³)' } },
+        { id: 'id_mix_design', fields: { type: 'Ref:MIX_DESIGN',  label: 'Mix design' } },
+        { id: 'id_aggregate',  fields: { type: 'Ref:AGGREGATE',   label: 'Aggregate' } },
+        { id: 'content_kg_m3', fields: { type: 'Numeric',         label: 'Content (kg/m³)' } },
       ]
     },
 
-    // --- Conditions de cure ---
+    // --- Curing conditions ---
     CURING_CONDITION: {
       columns: [
-        { id: 'temperature_c',        fields: { type: 'Numeric', label: 'Température (°C)' } },
-        { id: 'humidity_pct',         fields: { type: 'Numeric', label: 'Humidité (%)' } },
-        { id: 'wind_protection',      fields: { type: 'Bool',    label: 'Protection vent' } },
-        { id: 'solar_protection',     fields: { type: 'Bool',    label: 'Protection solaire' } },
-        { id: 'curing_method',        fields: { type: 'Choice',  label: 'Méthode de cure', widgetOptions: '{"choices":["water_spraying","wet_covering","curing_compounds","forms_left_in_place","wet_curing","water_immersion"]}' } },
-        { id: 'curing_duration_days', fields: { type: 'Numeric', label: 'Durée de cure (jours)' } },
-        { id: 'standard_name',        fields: { type: 'Text',    label: 'Norme' } },
+        { id: 'temperature_c',        fields: { type: 'Numeric', label: 'Temperature (°C)' } },
+        { id: 'humidity_pct',         fields: { type: 'Numeric', label: 'Humidity (%)' } },
+        { id: 'wind_protection',      fields: { type: 'Bool',    label: 'Wind protection' } },
+        { id: 'solar_protection',     fields: { type: 'Bool',    label: 'Solar protection' } },
+        { id: 'curing_method',        fields: { type: 'Choice',  label: 'Curing method', widgetOptions: '{"choices":["water_spraying","wet_covering","curing_compounds","forms_left_in_place","wet_curing","water_immersion"]}' } },
+        { id: 'curing_duration_days', fields: { type: 'Numeric', label: 'Curing duration (days)' } },
+        { id: 'standard_name',        fields: { type: 'Text',    label: 'Standard' } },
       ]
     },
 
-    // --- Définition des tests (indépendant du matériau) ---
+    // --- Test definitions (independent of material) ---
+    // id_test: the test type is set at campaign creation
     TEST: {
       columns: [
-        { id: 'name',                fields: { type: 'Choice',  label: 'Propriété mesurée', widgetOptions: '{"choices":["calorimetry","carbonation","cl_profil","diffusivity","Rc","gas_permeability","sorptivity","porosity","total_porosity","resistivity","org_density"]}' } },
-        { id: 'standard_name',       fields: { type: 'Text',    label: 'Norme' } },
-        { id: 'experiment_duration', fields: { type: 'Numeric', label: "Durée d'essai (jours)" } },
-        { id: 'test_type',           fields: { type: 'Choice',  label: "Type d'essai", widgetOptions: '{"choices":["natural","accelerated","total_cl","free_cl"]}' } },
+        { id: 'name',                fields: { type: 'Choice',  label: 'Measured property', widgetOptions: '{"choices":["calorimetry","carbonation","cl_profil","diffusivity","Rc","gas_permeability","sorptivity","porosity","total_porosity","resistivity","org_density"]}' } },
+        { id: 'standard_name',       fields: { type: 'Text',    label: 'Standard' } },
+        { id: 'experiment_duration', fields: { type: 'Numeric', label: 'Test duration (days)' } },
+        { id: 'test_type',           fields: { type: 'Choice',  label: 'Test type', widgetOptions: '{"choices":["natural","accelerated","total_cl","free_cl"]}' } },
       ]
     },
 
-    // --- Matériau cimentaire étudié ---
+    // --- Cementitious material under study ---
     MATERIAL: {
       columns: [
         { id: 'id_site',             fields: { type: 'Ref:SITE',             label: 'Site' } },
-        { id: 'id_exposure',         fields: { type: 'Ref:EXPOSURE',         label: 'Exposition' } },
-        { id: 'id_mix_design',       fields: { type: 'Ref:MIX_DESIGN',       label: 'Formulation' } },
-        { id: 'id_curing_condition', fields: { type: 'Ref:CURING_CONDITION', label: 'Cure' } },
-        { id: 'manufacturing_date',  fields: { type: 'Date',                 label: 'Date fabrication' } },
-        { id: 'demolding_date',      fields: { type: 'Date',                 label: 'Date décoffrage' } },
-        { id: 'name',                fields: { type: 'Text',                 label: 'Nom' } },
-        { id: 'material_type',       fields: { type: 'Choice',               label: 'Type matériau', widgetOptions: '{"choices":["cement_paste","mortar","concrete"]}' } },
+        { id: 'id_exposure',         fields: { type: 'Ref:EXPOSURE',         label: 'Exposure' } },
+        { id: 'id_mix_design',       fields: { type: 'Ref:MIX_DESIGN',       label: 'Mix design' } },
+        { id: 'id_curing_condition', fields: { type: 'Ref:CURING_CONDITION', label: 'Curing' } },
+        { id: 'manufacturing_date',  fields: { type: 'Date',                 label: 'Manufacturing date' } },
+        { id: 'demolding_date',      fields: { type: 'Date',                 label: 'Demolding date' } },
+        { id: 'name',                fields: { type: 'Text',                 label: 'Name' } },
+        { id: 'material_type',       fields: { type: 'Choice',               label: 'Material type', widgetOptions: '{"choices":["cement_paste","mortar","concrete"]}' } },
       ]
     },
 
-    // --- Campagne de mesure (qui/quoi/quand) ---
-    // id_test : le type de test est fixé à la création de la campagne
+    // --- Measurement campaign (who/what/when) ---
     MEASUREMENT: {
       columns: [
-        { id: 'id_material',       fields: { type: 'Ref:MATERIAL', label: 'Matériau' } },
+        { id: 'id_material',       fields: { type: 'Ref:MATERIAL', label: 'Material' } },
         { id: 'id_source',         fields: { type: 'Ref:SOURCE',   label: 'Source' } },
         { id: 'id_test',           fields: { type: 'Ref:TEST',     label: 'Test' } },
-        { id: 'sample_type',       fields: { type: 'Choice',       label: "Type d'échantillon", widgetOptions: '{"choices":["laboratory_sample","bridge_pier"]}' } },
-        { id: 'sample_dimensions', fields: { type: 'Choice',       label: 'Dimensions échantillon', widgetOptions: '{"choices":["cylinder_100x200","cylinder_110x220","cylinder_150x300","cylinder_160x320","cube_100","cube_150","cube_200","prism_40x40x160","prism_70x70x280","prism_100x100x400","powder","other"]}' } },
-        { id: 'preparation_date',  fields: { type: 'Date',         label: 'Date préparation' } },
-        { id: 'result_date',       fields: { type: 'Date',         label: 'Date résultat' } },
-        { id: 'sample_mass_g',     fields: { type: 'Numeric',      label: 'Masse (g)' } },
-        { id: 'operator',          fields: { type: 'Text',         label: 'Opérateur' } },
+        { id: 'sample_type',       fields: { type: 'Choice',       label: 'Sample type', widgetOptions: '{"choices":["laboratory_sample","bridge_pier"]}' } },
+        { id: 'sample_dimensions', fields: { type: 'Choice',       label: 'Sample dimensions', widgetOptions: '{"choices":["cylinder_100x200","cylinder_110x220","cylinder_150x300","cylinder_160x320","cube_100","cube_150","cube_200","prism_40x40x160","prism_70x70x280","prism_100x100x400","powder","other"]}' } },
+        { id: 'preparation_date',  fields: { type: 'Date',         label: 'Preparation date' } },
+        { id: 'result_date',       fields: { type: 'Date',         label: 'Result date' } },
+        { id: 'sample_mass_g',     fields: { type: 'Numeric',      label: 'Mass (g)' } },
+        { id: 'operator',          fields: { type: 'Text',         label: 'Operator' } },
       ]
     },
 
-    // --- Résultats scalaires (0..n par MEASUREMENT) ---
-    // Exemples : name='D' (m²/s), name='Cs' (%), name='mean_depth' (mm), name='depth_1' (mm)
+    // --- Scalar results (0..n per MEASUREMENT) ---
+    // Examples: name='D' (m²/s), name='Cs' (%), name='mean_depth' (mm), name='depth_1' (mm)
     SCALAR: {
       columns: [
-        { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Mesure' } },
-        { id: 'name',           fields: { type: 'Text',            label: 'Nom paramètre' } },
-        { id: 'value',          fields: { type: 'Numeric',         label: 'Valeur' } },
-        { id: 'unit',           fields: { type: 'Text',            label: 'Unité' } },
-        { id: 'is_derived',     fields: { type: 'Bool',            label: 'Dérivé (calculé)' } },
+        { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Measurement' } },
+        { id: 'name',           fields: { type: 'Text',            label: 'Parameter name' } },
+        { id: 'value',          fields: { type: 'Numeric',         label: 'Value' } },
+        { id: 'unit',           fields: { type: 'Text',            label: 'Unit' } },
+        { id: 'is_derived',     fields: { type: 'Bool',            label: 'Derived (computed)' } },
         { id: 'notes',          fields: { type: 'Text',            label: 'Notes' } },
       ]
     },
 
-    // --- Résultats sous forme de courbe (0..n par MEASUREMENT) ---
+    // --- Curve results (0..n per MEASUREMENT) ---
     CURVE: {
       columns: [
-        { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Mesure' } },
-        { id: 'x_name',         fields: { type: 'Text',            label: 'Axe X' } },
-        { id: 'y_name',         fields: { type: 'Text',            label: 'Axe Y' } },
-        { id: 'x_unit',         fields: { type: 'Text',            label: 'Unité X' } },
-        { id: 'y_unit',         fields: { type: 'Text',            label: 'Unité Y' } },
+        { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Measurement' } },
+        { id: 'x_name',         fields: { type: 'Text',            label: 'X axis' } },
+        { id: 'y_name',         fields: { type: 'Text',            label: 'Y axis' } },
+        { id: 'x_unit',         fields: { type: 'Text',            label: 'Unit X' } },
+        { id: 'y_unit',         fields: { type: 'Text',            label: 'Unit Y' } },
       ]
     },
 
-    // --- Points de données d'une courbe ---
+    // --- Data points of a curve ---
     DATA_CURVE: {
       columns: [
-        { id: 'id_curve', fields: { type: 'Ref:CURVE', label: 'Courbe' } },
+        { id: 'id_curve', fields: { type: 'Ref:CURVE', label: 'Curve' } },
         { id: 'x',        fields: { type: 'Numeric',   label: 'X' } },
         { id: 'y',        fields: { type: 'Numeric',   label: 'Y' } },
       ]
@@ -205,7 +205,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // ENUMS — Valeurs autorisées pour les colonnes Choice
+  // ENUMS — Allowed values for Choice columns
   // =========================================================================
   ENUMS: {
     exposure_type:      ['laboratory', 'in-situ'],
@@ -222,11 +222,11 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // ENSURE SCHEMA — Crée tables + colonnes manquantes à l'initialisation
+  // ENSURE SCHEMA — Creates missing tables + columns on initialization
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
-    log('Vérification du schéma Grist (15 tables)…');
+    log('Checking Grist schema (15 tables)…');
 
     try {
       const [metaTables, metaCols] = await Promise.all([
@@ -251,27 +251,27 @@ const GristHelpers = {
 
       for (const [tableName, tableDef] of Object.entries(GristHelpers.SCHEMA)) {
         if (!existingTables.has(tableName)) {
-          log(`Création de la table ${tableName}…`);
+          log(`Creating table ${tableName}…`);
           const cols = tableDef.columns.map(c => ({ id: c.id, ...c.fields }));
           await grist.docApi.applyUserActions([['AddTable', tableName, cols]]);
-          log(`Table ${tableName} créée ✓ (${cols.length} colonnes)`, 'ok');
+          log(`Table ${tableName} created ✓ (${cols.length} columns)`, 'ok');
           created++;
         } else {
           const existingColSet = existingColumns[tableName] || new Set();
           const missingCols = tableDef.columns.filter(c => !existingColSet.has(c.id));
           if (missingCols.length > 0) {
-            log(`Ajout de ${missingCols.length} colonne(s) à ${tableName}…`);
+            log(`Adding ${missingCols.length} column(s) to ${tableName}…`);
             const actions = missingCols.map(c => ['AddColumn', tableName, c.id, c.fields]);
             await grist.docApi.applyUserActions(actions);
-            log(`${tableName} : +${missingCols.length} colonne(s) ✓`, 'ok');
+            log(`${tableName}: +${missingCols.length} column(s) ✓`, 'ok');
             updated++;
           }
         }
       }
 
-      log(`Schéma vérifié ✓ (${created} tables créées, ${updated} tables mises à jour)`, 'ok');
+      log(`Schema verified ✓ (${created} tables created, ${updated} tables updated)`, 'ok');
     } catch (err) {
-      log('Erreur vérification schéma : ' + err.message, 'err');
+      log('Schema verification error: ' + err.message, 'err');
     }
   },
 
@@ -281,7 +281,7 @@ const GristHelpers = {
   log(msg, cls = '') {
     const el = document.getElementById('log');
     if (!el) return;
-    const time = new Date().toLocaleTimeString('fr-FR', {
+    const time = new Date().toLocaleTimeString('en-US', {
       hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
     const span = cls ? `<span class="${cls}">${msg}</span>` : msg;
@@ -300,7 +300,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // GRIST API — Lecture
+  // GRIST API — Read
   // =========================================================================
   async fetchAllRecords(tableName) {
     const tableData = await grist.docApi.fetchTable(tableName);
@@ -315,7 +315,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // GRIST API — Écriture
+  // GRIST API — Write
   // =========================================================================
   async createRecord(tableName, fields) {
     const result = await grist.docApi.applyUserActions([
@@ -337,9 +337,9 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // JOINTURES — scalar ← measurement ← material + test + source
-  // Retourne chaque scalaire enrichi de sa mesure, son matériau, son test
-  // et sa source bibliographique.
+  // JOINS — scalar ← measurement ← material + test + source
+  // Returns each scalar enriched with its measurement, material, test
+  // and bibliographic source.
   // =========================================================================
   joinScalarData(scalars, measurements, materials, tests, sources, mixes, exposures) {
     const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
@@ -372,7 +372,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // JOINTURES — data_curve ← curve ← measurement ← material
+  // JOINS — data_curve ← curve ← measurement ← material
   // =========================================================================
   joinCurvePoints(dataPoints, curves, measurements, materials) {
     const curveMap    = new Map(curves.map(c => [c.id, c.fields]));
@@ -396,11 +396,11 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // JOINTURES — profils chlorures complets
+  // JOINS — complete chloride profiles
   // DATA_CURVE ← CURVE ← MEASUREMENT ← MATERIAL
   //   ← MIX_DESIGN ← MIX_DESIGN_BINDER ← BINDER
   //   ← EXPOSURE, SITE, SOURCE, SCALAR
-  // Retourne un tableau de profils enrichis, triés par profondeur croissante.
+  // Returns an array of enriched profiles, sorted by increasing depth.
   // =========================================================================
   joinChlorideProfiles(dataPoints, curves, measurements, materials,
                        mixDesigns, mixBinders, binders,
@@ -415,7 +415,7 @@ const GristHelpers = {
     const binderMap   = new Map(binders.map(b          => [b.id, b.fields]));
     const curingMap   = new Map(curingConditions.map(c => [c.id, c.fields]));
 
-    // Index scalaires par measurement_id → { name: value }
+    // Index scalars by measurement_id → { name: value }
     const scalByMeas = new Map();
     scalars.forEach(s => {
       const mid = s.fields.id_measurement;
@@ -423,7 +423,7 @@ const GristHelpers = {
       scalByMeas.get(mid)[s.fields.name] = s.fields.value;
     });
 
-    // Index liants par mix_design_id → [{...binder, content_kg_m3}]
+    // Index binders by mix_design_id → [{...binder, content_kg_m3}]
     const bindersByMix = new Map();
     mixBinders.forEach(mb => {
       const mid = mb.fields.id_mix_design;
@@ -432,7 +432,7 @@ const GristHelpers = {
       bindersByMix.get(mid).push({ ...b, content_kg_m3: mb.fields.content_kg_m3 });
     });
 
-    // Grouper les points par curve_id
+    // Group points by curve_id
     const ptsByCurve = new Map();
     dataPoints.forEach(p => {
       const cid = p.fields.id_curve;
@@ -474,7 +474,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // PLOTLY — Thème clair
+  // PLOTLY — Light theme
   // =========================================================================
   plotlyDarkLayout(overrides = {}) {
     return Object.assign({
@@ -502,7 +502,7 @@ const GristHelpers = {
   },
 
   // =========================================================================
-  // FORMATAGE
+  // FORMATTING
   // =========================================================================
   formatDapp(dapp) {
     return dapp != null ? dapp.toExponential(2) : '—';
@@ -511,11 +511,11 @@ const GristHelpers = {
   formatKcarb(kcarb) {
     if (kcarb == null) return '—';
     const kAn = kcarb * Math.sqrt(365.25);
-    return kAn.toFixed(2) + ' mm/√an';
+    return kAn.toFixed(2) + ' mm/√yr';
   },
 
   formatDureeVie(ans) {
     if (ans == null || ans < 0) return '∞';
-    return ans.toFixed(1) + ' ans';
+    return ans.toFixed(1) + ' yr';
   }
 };

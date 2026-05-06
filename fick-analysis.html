@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chlorures — Profils &amp; Analyse Fick</title>
+  <title>Chlorides — Profiles &amp; Fick Analysis</title>
 
   <link rel="stylesheet" href="assets/shared-styles.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
@@ -12,7 +12,7 @@
   <script src="assets/grist-helpers.js"></script>
 
   <style>
-    /* ── Onglets ─────────────────────────────────────────────────────────── */
+    /* ── Tabs ────────────────────────────────────────────────────────────── */
     .tabs {
       display: flex; gap: 4px; padding: 10px 14px 0;
       border-bottom: 1px solid var(--surface2);
@@ -32,12 +32,12 @@
     .tab-pane { display: none; padding: 10px 14px; }
     .tab-pane.active { display: block; }
 
-    /* ── Analyse Fick ────────────────────────────────────────────────────── */
+    /* ── Fick Analysis ───────────────────────────────────────────────────── */
     #chart-fick { width: 100%; min-height: 340px; border-radius: 8px; overflow: hidden; }
     .param-group input[type="number"] { width: 80px; }
     #direct-input-card .param-group input[type="number"] { width: 120px; }
 
-    /* ── Profils globaux ─────────────────────────────────────────────────── */
+    /* ── Global profiles ─────────────────────────────────────────────────── */
     #chart-profils { width: 100%; height: 480px; border-radius: 8px; overflow: hidden; }
     .filter-card {
       background: var(--surface); border-radius: 10px;
@@ -86,7 +86,7 @@
     }
     .chart-stats { font-size: 12px; color: var(--text-dim); }
 
-    /* ── Tableau ─────────────────────────────────────────────────────────── */
+    /* ── Table ───────────────────────────────────────────────────────────── */
     #tbl-search {
       width: 100%; padding: 7px 10px; margin-bottom: 10px;
       background: var(--surface); border: 1px solid var(--surface2);
@@ -130,38 +130,38 @@
 </head>
 <body>
 
-  <!-- ===== EN-TÊTE ===== -->
+  <!-- ===== HEADER ===== -->
   <div class="header">
-    <h1><span class="icon">📈</span> Chlorures</h1>
+    <h1><span class="icon">📈</span> Chlorides</h1>
     <div style="display:flex; gap:8px; align-items:center;">
-      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Rafraîchir</button>
+      <button class="btn btn-secondary" onclick="loadAllData()">🔄 Refresh</button>
       <div class="status" id="status">
         <span class="dot"></span>
-        <span id="status-text">Chargement…</span>
+        <span id="status-text">Loading…</span>
       </div>
     </div>
   </div>
 
-  <!-- ===== ONGLETS ===== -->
+  <!-- ===== TABS ===== -->
   <div class="tabs">
-    <button class="tab-btn active" id="tab-btn-fick"    onclick="switchTab('fick')">📊 Analyse Fick</button>
-    <button class="tab-btn"        id="tab-btn-profils" onclick="switchTab('profils')">📈 Profils globaux</button>
-    <button class="tab-btn"        id="tab-btn-table"   onclick="switchTab('table')">🗂 Tableau</button>
+    <button class="tab-btn active" id="tab-btn-fick"    onclick="switchTab('fick')">📊 Fick Analysis</button>
+    <button class="tab-btn"        id="tab-btn-profils" onclick="switchTab('profils')">📈 Global profiles</button>
+    <button class="tab-btn"        id="tab-btn-table"   onclick="switchTab('table')">🗂 Table</button>
   </div>
 
   <!-- ===================================================================== -->
-  <!-- ONGLET 1 — ANALYSE FICK                                               -->
+  <!-- TAB 1 — FICK ANALYSIS                                                 -->
   <!-- ===================================================================== -->
   <div class="tab-pane active" id="pane-fick">
 
     <div class="card" id="measurement-selector-card">
-      <div class="card-title" style="margin-bottom:8px;">Sélectionner un profil</div>
+      <div class="card-title" style="margin-bottom:8px;">Select a profile</div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <select id="fick-measurement-select" onchange="onFickMeasurementSelect(this.value)"
                 style="flex:1; min-width:200px; padding:6px 9px;
                        background:var(--bg); border:1px solid var(--surface2);
                        border-radius:6px; color:var(--text); font-size:12px;">
-          <option value="">— Chargement des données… —</option>
+          <option value="">— Loading data… —</option>
         </select>
         <span id="fick-select-count" style="font-size:11px; color:var(--text-dim); white-space:nowrap;"></span>
       </div>
@@ -169,160 +169,160 @@
 
     <div id="empty-state" class="empty-state">
       <div class="icon">🧪</div>
-      <h3>En attente de données</h3>
-      <p>Choisissez un profil dans le menu ci-dessus, ou sélectionnez une ligne <strong>MEASUREMENT</strong> dans Grist.</p>
+      <h3>Waiting for data</h3>
+      <p>Choose a profile from the menu above, or select a <strong>MEASUREMENT</strong> row in Grist.</p>
     </div>
 
     <div id="fick-content" style="display:none">
 
       <div class="card">
-        <div class="card-title">Contexte</div>
+        <div class="card-title">Context</div>
         <div class="info-grid" id="context-info"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">Mode d'entrée</div>
+        <div class="card-title">Input mode</div>
         <div class="mode-selector">
           <button class="mode-btn active" id="mode-profile" onclick="setMode('profile')">
-            📈 Profil de chlorures
+            📈 Chloride profile
           </button>
           <button class="mode-btn" id="mode-direct" onclick="setMode('direct')">
-            🔢 Saisie directe Dapp
+            🔢 Direct Dapp input
           </button>
         </div>
       </div>
 
       <div class="card" id="chart-card">
         <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Profil de chlorures</span>
+          <span>Chloride profile</span>
           <span id="nb-points" style="font-size:11px; color:var(--text-dim); text-transform:none; letter-spacing:0;"></span>
         </div>
         <div id="chart-fick"></div>
       </div>
 
       <div class="card" id="fitting-controls-card">
-        <div class="card-title">Paramètres de fitting</div>
+        <div class="card-title">Fitting parameters</div>
         <div class="param-row" style="margin-bottom:12px;">
           <div class="param-group">
-            <label>Seuil Cl⁻ critique :</label>
+            <label>Critical Cl⁻ threshold:</label>
             <input type="number" id="seuil-cl" value="0.4" step="0.05" min="0.05" max="2.0">
-            <label>% liant</label>
+            <label>% binder</label>
           </div>
           <div class="param-group">
-            <label>Enrobage :</label>
+            <label>Cover depth:</label>
             <input type="number" id="enrobage" value="50" step="5" min="10" max="120">
             <label>mm</label>
           </div>
           <div class="param-group">
-            <label>Age :</label>
+            <label>Age:</label>
             <input type="number" id="age-jours" value="365" step="1" min="1">
-            <label>jours</label>
+            <label>days</label>
           </div>
         </div>
         <div class="controls">
           <button class="btn btn-primary" id="btn-fit" disabled onclick="runFitting()">
-            ⚙️ Lancer le fitting
+            ⚙️ Run fitting
           </button>
           <button class="btn btn-secondary" id="btn-save" disabled onclick="saveResults()">
-            💾 Enregistrer
+            💾 Save
           </button>
         </div>
       </div>
 
       <div class="card" id="direct-input-card" style="display:none">
-        <div class="card-title">Saisie directe des paramètres</div>
+        <div class="card-title">Direct parameter input</div>
         <div class="param-row" style="margin-bottom:12px;">
           <div class="param-group">
-            <label>Dapp :</label>
+            <label>Dapp:</label>
             <input type="number" id="direct-dapp" step="1e-13" value="1e-12">
             <label>m²/s</label>
           </div>
           <div class="param-group">
-            <label>Cs :</label>
+            <label>Cs:</label>
             <input type="number" id="direct-cs" step="0.1" value="3.0">
-            <label>% liant</label>
+            <label>% binder</label>
           </div>
           <div class="param-group">
-            <label>Âge :</label>
+            <label>Age:</label>
             <input type="number" id="direct-age" step="1" value="365" style="width:80px">
-            <label>jours</label>
+            <label>days</label>
           </div>
         </div>
         <div class="param-row" style="margin-bottom:12px;">
           <div class="param-group">
-            <label>Seuil Cl⁻ critique :</label>
+            <label>Critical Cl⁻ threshold:</label>
             <input type="number" id="direct-seuil" value="0.4" step="0.05" min="0.05" max="2.0">
-            <label>% liant</label>
+            <label>% binder</label>
           </div>
           <div class="param-group">
-            <label>Enrobage :</label>
+            <label>Cover depth:</label>
             <input type="number" id="direct-enrobage" value="50" step="5" min="10" max="120">
             <label>mm</label>
           </div>
         </div>
         <div class="controls">
           <button class="btn btn-primary" id="btn-calc-direct" disabled onclick="calcDirect()">
-            ⚙️ Calculer durée de vie
+            ⚙️ Calculate service life
           </button>
           <button class="btn btn-secondary" id="btn-save-direct" disabled onclick="saveResults()">
-            💾 Enregistrer
+            💾 Save
           </button>
         </div>
       </div>
 
       <div class="card" id="results-card" style="display:none">
-        <div class="card-title">Résultats</div>
+        <div class="card-title">Results</div>
         <div class="info-grid" id="results-info"></div>
       </div>
 
     </div><!-- /fick-content -->
 
     <div class="card">
-      <div class="card-title">Journal</div>
+      <div class="card-title">Log</div>
       <div class="log" id="log"></div>
     </div>
 
   </div><!-- /pane-fick -->
 
   <!-- ===================================================================== -->
-  <!-- ONGLET 2 — PROFILS GLOBAUX                                            -->
+  <!-- TAB 2 — GLOBAL PROFILES                                               -->
   <!-- ===================================================================== -->
   <div class="tab-pane" id="pane-profils">
 
-    <!-- Filtres -->
+    <!-- Filters -->
     <div class="filter-card">
       <div class="filt-block">
         <div class="filt-row">
-          <span class="filt-lbl">Couleur</span>
+          <span class="filt-lbl">Color</span>
           <select id="f-colorby" onchange="renderProfils()">
-            <option value="exposure_nature">Nature exposition</option>
-            <option value="binder_sig">Type d'addition</option>
-            <option value="cl_type">Type Cl⁻ (total / libre)</option>
-            <option value="cement">Ciment principal</option>
+            <option value="exposure_nature">Exposure nature</option>
+            <option value="binder_sig">SCM type</option>
+            <option value="cl_type">Cl⁻ type (total / free)</option>
+            <option value="cement">Primary cement</option>
             <option value="source">Source</option>
-            <option value="wl_ratio">E/L (continu)</option>
-            <option value="wc_ratio">E/C (continu)</option>
-            <option value="duration">Durée exposition (continu)</option>
-            <option value="latitude">Latitude (continu)</option>
-            <option value="cure_duration">Durée de cure (continu)</option>
+            <option value="wl_ratio">w/b (continuous)</option>
+            <option value="wc_ratio">w/c (continuous)</option>
+            <option value="duration">Exposure duration (continuous)</option>
+            <option value="latitude">Latitude (continuous)</option>
+            <option value="cure_duration">Curing duration (continuous)</option>
           </select>
           <div class="filt-sep"></div>
-          <span class="filt-lbl">Type Cl⁻</span>
+          <span class="filt-lbl">Cl⁻ type</span>
           <select id="f-cltype" onchange="renderProfils()">
-            <option value="">Les deux</option>
+            <option value="">Both</option>
             <option value="total_cl">Total</option>
-            <option value="free_cl">Libre</option>
+            <option value="free_cl">Free</option>
           </select>
         </div>
       </div>
       <div class="filt-block">
         <div class="filt-row">
-          <span class="filt-lbl">E/L</span>
+          <span class="filt-lbl">w/b</span>
           <input type="number" id="f-wl-min" placeholder="min" min="0" max="2" step="0.05" oninput="renderProfils()">
           <span class="dash">—</span>
           <input type="number" id="f-wl-max" placeholder="max" min="0" max="2" step="0.05" oninput="renderProfils()">
           <div class="filt-sep"></div>
-          <span class="filt-lbl">Durée (ans)</span>
+          <span class="filt-lbl">Duration (yr)</span>
           <input type="number" id="f-dur-min" placeholder="min" min="0" step="1" oninput="renderProfils()">
           <span class="dash">—</span>
           <input type="number" id="f-dur-max" placeholder="max" min="0" step="1" oninput="renderProfils()">
@@ -332,7 +332,7 @@
           <span class="dash">—</span>
           <input type="number" id="f-lat-max" placeholder="max" step="1" oninput="renderProfils()">
           <div class="filt-sep"></div>
-          <span class="filt-lbl">Cure (jours)</span>
+          <span class="filt-lbl">Curing (days)</span>
           <input type="number" id="f-cure-min" placeholder="min" min="0" step="1" oninput="renderProfils()">
           <span class="dash">—</span>
           <input type="number" id="f-cure-max" placeholder="max" min="0" step="1" oninput="renderProfils()">
@@ -340,10 +340,10 @@
       </div>
       <div class="filt-block">
         <div class="filt-row" style="align-items:flex-start;">
-          <span class="filt-lbl" style="padding-top:4px;">Addition</span>
+          <span class="filt-lbl" style="padding-top:4px;">SCM</span>
           <div>
             <select id="f-binder" multiple size="4" onchange="renderProfils()"></select>
-            <div class="binder-hint" style="margin-top:3px;">Ctrl+clic = multi · aucune sélection = tous</div>
+            <div class="binder-hint" style="margin-top:3px;">Ctrl+click = multi · no selection = all</div>
           </div>
         </div>
       </div>
@@ -351,17 +351,17 @@
         <div class="filt-row" style="margin-bottom:5px;">
           <span class="filt-lbl">Nature</span>
           <div class="chip-group">
-            <label class="chip"><input type="checkbox" name="nature" value="atmospheric" onchange="renderProfils()">Atmosphérique</label>
+            <label class="chip"><input type="checkbox" name="nature" value="atmospheric" onchange="renderProfils()">Atmospheric</label>
             <label class="chip"><input type="checkbox" name="nature" value="spray"       onchange="renderProfils()">Spray</label>
-            <label class="chip"><input type="checkbox" name="nature" value="splash"      onchange="renderProfils()">Éclaboussures</label>
-            <label class="chip"><input type="checkbox" name="nature" value="tidal"       onchange="renderProfils()">Marnage</label>
-            <label class="chip"><input type="checkbox" name="nature" value="submerged"   onchange="renderProfils()">Immergé</label>
+            <label class="chip"><input type="checkbox" name="nature" value="splash"      onchange="renderProfils()">Splash</label>
+            <label class="chip"><input type="checkbox" name="nature" value="tidal"       onchange="renderProfils()">Tidal</label>
+            <label class="chip"><input type="checkbox" name="nature" value="submerged"   onchange="renderProfils()">Submerged</label>
           </div>
         </div>
         <div class="filt-row">
           <span class="filt-lbl">Type</span>
           <div class="chip-group">
-            <label class="chip"><input type="checkbox" name="expotype" value="laboratory" onchange="renderProfils()">Laboratoire</label>
+            <label class="chip"><input type="checkbox" name="expotype" value="laboratory" onchange="renderProfils()">Laboratory</label>
             <label class="chip"><input type="checkbox" name="expotype" value="in-situ"    onchange="renderProfils()">In situ</label>
           </div>
         </div>
@@ -370,41 +370,41 @@
 
     <div class="card" style="padding:14px;">
       <div class="chart-header">
-        <span class="chart-title">Profil en chlorures — Concentration vs Profondeur</span>
+        <span class="chart-title">Chloride profile — Concentration vs Depth</span>
         <span class="chart-stats" id="chart-stats">—</span>
       </div>
-      <div id="chart-profils"><div class="empty-chart">Chargement des données…</div></div>
+      <div id="chart-profils"><div class="empty-chart">Loading data…</div></div>
     </div>
 
   </div><!-- /pane-profils -->
 
   <!-- ===================================================================== -->
-  <!-- ONGLET 3 — TABLEAU                                                    -->
+  <!-- TAB 3 — TABLE                                                         -->
   <!-- ===================================================================== -->
   <div class="tab-pane" id="pane-table">
-    <input type="text" id="tbl-search" placeholder="🔍 Rechercher dans le tableau…" oninput="renderTable()">
+    <input type="text" id="tbl-search" placeholder="🔍 Search in table…" oninput="renderTable()">
     <div class="tbl-stats" id="tbl-stats">—</div>
     <div class="tbl-wrap">
       <table id="data-table">
         <thead>
           <tr>
             <th onclick="sortTable(0)"  data-col="0">Source<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(1)"  data-col="1">Matériau<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(2)"  data-col="2">Type mat.<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(1)"  data-col="1">Material<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(2)"  data-col="2">Mat. type<span class="sort-arrow"></span></th>
             <th onclick="sortTable(3)"  data-col="3">Site<span class="sort-arrow"></span></th>
             <th onclick="sortTable(4)"  data-col="4">Lat (°N)<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(5)"  data-col="5">Exposition<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(5)"  data-col="5">Exposure<span class="sort-arrow"></span></th>
             <th onclick="sortTable(6)"  data-col="6">Nature<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(7)"  data-col="7">Liants<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(8)"  data-col="8">E/C<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(9)"  data-col="9">E/L<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(10)" data-col="10">Eau (kg/m³)<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(11)" data-col="11">Cure (j)<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(12)" data-col="12">Type Cl⁻<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(13)" data-col="13">Durée (ans)<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(7)"  data-col="7">Binders<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(8)"  data-col="8">w/c<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(9)"  data-col="9">w/b<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(10)" data-col="10">Water (kg/m³)<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(11)" data-col="11">Curing (d)<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(12)" data-col="12">Cl⁻ type<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(13)" data-col="13">Duration (yr)<span class="sort-arrow"></span></th>
             <th onclick="sortTable(14)" data-col="14">Dapp (m²/s)<span class="sort-arrow"></span></th>
             <th onclick="sortTable(15)" data-col="15">Cs (%)<span class="sort-arrow"></span></th>
-            <th onclick="sortTable(16)" data-col="16">Pts profil<span class="sort-arrow"></span></th>
+            <th onclick="sortTable(16)" data-col="16">Profile pts<span class="sort-arrow"></span></th>
           </tr>
         </thead>
         <tbody id="tbl-body"></tbody>
@@ -414,7 +414,7 @@
 
   <script>
     // =========================================================================
-    // NAVIGATION ONGLETS
+    // TAB NAVIGATION
     // =========================================================================
     let activeTab = 'fick';
     let profilesChartRendered = false;
@@ -435,14 +435,14 @@
     }
 
     // =========================================================================
-    // STATE PARTAGÉ
+    // SHARED STATE
     // =========================================================================
     let pyodide = null;
     let pyodideReady = false;
     let gristReady   = false;
     let currentMode  = 'profile';
 
-    // Onglet Fick
+    // Fick tab
     let currentMeasurement   = null;
     let currentMaterial      = null;
     let currentMix           = null;
@@ -450,12 +450,12 @@
     let currentProfilePoints = null;
     let lastFitResult        = null;
 
-    // Onglets globaux
+    // Global tabs
     let allProfiles      = [];
     let testMapGlobal    = new Map();
     let catIndexGlobal   = new Map();
 
-    // Données brutes (partagées entre onglets profils + tableau)
+    // Raw data (shared between profiles and table tabs)
     let rawData = null;
 
     // =========================================================================
@@ -472,9 +472,9 @@
       '#14b8a6','#78716c','#b45309','#1d4ed8','#be123c',
     ];
     const SCM_LABELS = {
-      fly_ash: 'FA', silica_fume: 'SF', slag: 'Laitier',
-      metakaolin: 'MK', limestone_filler: 'Calcaire',
-      natural_pozzolan: 'Pouzzolane', zeolite: 'Zéolite', other: 'Autre',
+      fly_ash: 'FA', silica_fume: 'SF', slag: 'Slag',
+      metakaolin: 'MK', limestone_filler: 'Limestone',
+      natural_pozzolan: 'Pozzolan', zeolite: 'Zeolite', other: 'Other',
     };
 
     function contColor(t) {
@@ -485,13 +485,13 @@
     }
 
     // =========================================================================
-    // CHARGEMENT GLOBAL
+    // GLOBAL LOAD
     // =========================================================================
     async function loadAllData() {
-      GristHelpers.log('Chargement des données…');
-      GristHelpers.setStatus('Chargement…', '');
+      GristHelpers.log('Loading data…');
+      GristHelpers.setStatus('Loading…', '');
       if (activeTab === 'profils') {
-        document.getElementById('chart-profils').innerHTML = '<div class="empty-chart">Chargement…</div>';
+        document.getElementById('chart-profils').innerHTML = '<div class="empty-chart">Loading…</div>';
         profilesChartRendered = false;
       }
 
@@ -519,8 +519,8 @@
                     exposures, sites, sources, scalars, tests, curings };
 
         GristHelpers.log(
-          `${dataPoints.length} pts · ${curves.length} courbes · ` +
-          `${materials.length} matériaux · ${binders.length} liants`, 'ok');
+          `${dataPoints.length} pts · ${curves.length} curves · ` +
+          `${materials.length} materials · ${binders.length} binders`, 'ok');
 
         testMapGlobal = new Map(tests.map(t => [t.id, t.fields]));
 
@@ -535,7 +535,7 @@
         );
 
         allProfiles = all.filter(p => clTestIds.has(p.measurement.id_test));
-        GristHelpers.log(`${allProfiles.length} profils Cl⁻ valides`, 'ok');
+        GristHelpers.log(`${allProfiles.length} valid Cl⁻ profiles`, 'ok');
 
         buildBinderFilter();
         catIndexGlobal.clear();
@@ -544,22 +544,22 @@
         if (activeTab === 'profils') renderProfils();
         if (activeTab === 'table')   renderTable();
 
-        GristHelpers.setStatus(`${allProfiles.length} profils`, 'ready');
+        GristHelpers.setStatus(`${allProfiles.length} profiles`, 'ready');
       } catch (err) {
-        GristHelpers.log('Erreur chargement : ' + err.message, 'err');
-        GristHelpers.setStatus('Erreur', 'error');
+        GristHelpers.log('Load error: ' + err.message, 'err');
+        GristHelpers.setStatus('Error', 'error');
       }
     }
 
     // =========================================================================
-    // UTILITAIRES PROFILS
+    // PROFILE UTILITIES
     // =========================================================================
     function getBinderSignature(p) {
-      if (!p.binders || p.binders.length === 0) return 'Inconnu';
+      if (!p.binders || p.binders.length === 0) return 'Unknown';
       const scms = p.binders.filter(b =>
         b.binder_type !== 'portland_cement' && b.binder_type !== 'blended_cement'
       );
-      if (scms.length === 0) return 'Portland seul';
+      if (scms.length === 0) return 'Portland only';
       return 'Portland + ' + scms.map(b => SCM_LABELS[b.binder_type] || b.binder_type).join(' + ');
     }
 
@@ -615,9 +615,9 @@
         case 'exposure_nature': return COLORS_NATURE[p.exposure.exposure_nature] || '#94a3b8';
         case 'cl_type':         return COLORS_CLTYPE[getTestType(p)] || '#94a3b8';
         case 'binder_sig':      return catColor(getBinderSignature(p));
-        case 'cement':          return catColor(primaryCementName(p) || 'Inconnu');
+        case 'cement':          return catColor(primaryCementName(p) || 'Unknown');
         case 'source':          return catColor(
-          p.source.designation || (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu'));
+          p.source.designation || (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Unknown'));
         case 'wl_ratio':        return contScale(p.mix.wl_ratio ?? p.mix.wc_ratio, contVals);
         case 'wc_ratio':        return contScale(p.mix.wc_ratio, contVals);
         case 'duration':        return contScale(p.scalars.exposure_duration, contVals);
@@ -629,19 +629,19 @@
 
     function getLegendKey(p, colorBy) {
       switch (colorBy) {
-        case 'exposure_nature': return p.exposure.exposure_nature || 'Inconnu';
-        case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
+        case 'exposure_nature': return p.exposure.exposure_nature || 'Unknown';
+        case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
         case 'binder_sig':      return getBinderSignature(p);
-        case 'cement':          return primaryCementName(p) || 'Inconnu';
+        case 'cement':          return primaryCementName(p) || 'Unknown';
         case 'source': return p.source.designation ||
-          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Inconnu');
-        case 'wl_ratio': { const v = p.mix.wl_ratio ?? p.mix.wc_ratio; return v != null ? `E/L = ${v.toFixed(2)}` : '?'; }
-        case 'wc_ratio':      return p.mix.wc_ratio != null ? `E/C = ${p.mix.wc_ratio.toFixed(2)}` : '?';
-        case 'duration':      return p.scalars.exposure_duration != null ? `${p.scalars.exposure_duration.toFixed(0)} ans` : '?';
+          (p.source.authors ? p.source.authors.split(',')[0].trim() : 'Unknown');
+        case 'wl_ratio': { const v = p.mix.wl_ratio ?? p.mix.wc_ratio; return v != null ? `w/b = ${v.toFixed(2)}` : '?'; }
+        case 'wc_ratio':      return p.mix.wc_ratio != null ? `w/c = ${p.mix.wc_ratio.toFixed(2)}` : '?';
+        case 'duration':      return p.scalars.exposure_duration != null ? `${p.scalars.exposure_duration.toFixed(0)} yr` : '?';
         case 'latitude':      return p.site.latitude != null ? `${p.site.latitude.toFixed(1)}°N` : '?';
-        case 'cure_duration': return p.curing.curing_duration_days != null ? `${p.curing.curing_duration_days} j` : '?';
+        case 'cure_duration': return p.curing.curing_duration_days != null ? `${p.curing.curing_duration_days} d` : '?';
       }
-      return 'Inconnu';
+      return 'Unknown';
     }
 
     function hoverText(p) {
@@ -649,24 +649,24 @@
         (p.source.authors ? p.source.authors.split(',')[0].trim() +
           (p.source.year ? ' ' + p.source.year : '') : '?');
       const expo = [p.exposure.exposure_nature, p.exposure.exposure_type].filter(Boolean).join(' / ');
-      const dur  = p.scalars.exposure_duration != null ? p.scalars.exposure_duration.toFixed(1) + ' ans' : '?';
+      const dur  = p.scalars.exposure_duration != null ? p.scalars.exposure_duration.toFixed(1) + ' yr' : '?';
       const ec   = p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?';
       const el   = (p.mix.wl_ratio ?? p.mix.wc_ratio) != null ? (p.mix.wl_ratio ?? p.mix.wc_ratio).toFixed(2) : '?';
       const D    = p.scalars.D  != null ? GristHelpers.formatDapp(p.scalars.D) : '?';
       const Cs   = p.scalars.Cs != null ? p.scalars.Cs.toFixed(3) + ' %' : '?';
       const lat  = p.site.latitude != null ? p.site.latitude.toFixed(2) + '°N' : '?';
-      const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' j' : '?';
+      const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' d' : '?';
       const cem  = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
-      const cltype = getTestType(p) === 'free_cl' ? 'Cl libre' : 'Cl total';
-      return `<b>${p.material.name || 'Matériau'}</b> — ${cltype}<br>` +
-             `Source : ${src}<br>Exposition : ${expo}<br>` +
-             `Durée : ${dur} · Latitude : ${lat} · Cure : ${cure}<br>` +
-             `Liants : ${cem}<br>Addition : ${getBinderSignature(p)}<br>` +
-             `E/C : ${ec} · E/L : ${el} · Dapp : ${D} · Cs : ${Cs}`;
+      const cltype = getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
+      return `<b>${p.material.name || 'Material'}</b> — ${cltype}<br>` +
+             `Source: ${src}<br>Exposure: ${expo}<br>` +
+             `Duration: ${dur} · Latitude: ${lat} · Curing: ${cure}<br>` +
+             `Binders: ${cem}<br>SCM: ${getBinderSignature(p)}<br>` +
+             `w/c: ${ec} · w/b: ${el} · Dapp: ${D} · Cs: ${Cs}`;
     }
 
     // =========================================================================
-    // RENDU PROFILS GLOBAUX
+    // RENDER GLOBAL PROFILES
     // =========================================================================
     function filterProfiles() {
       const clType  = document.getElementById('f-cltype').value;
@@ -708,8 +708,8 @@
     function renderProfils() {
       if (allProfiles.length === 0) {
         document.getElementById('chart-profils').innerHTML =
-          '<div class="empty-chart">Aucune donnée — cliquez sur Rafraîchir.</div>';
-        document.getElementById('chart-stats').textContent = '0 profil';
+          '<div class="empty-chart">No data — click Refresh.</div>';
+        document.getElementById('chart-stats').textContent = '0 profiles';
         return;
       }
 
@@ -719,13 +719,13 @@
       const nbSites   = new Set(filtered.map(p => p.site.country_region || '')).size;
       const nbSources = new Set(filtered.map(p => p.source.designation || p.source.id)).size;
       document.getElementById('chart-stats').textContent =
-        `${filtered.length} profil${filtered.length > 1 ? 's' : ''} · ` +
+        `${filtered.length} profile${filtered.length > 1 ? 's' : ''} · ` +
         `${nbSites} site${nbSites > 1 ? 's' : ''} · ` +
         `${nbSources} source${nbSources > 1 ? 's' : ''}`;
 
       if (filtered.length === 0) {
         document.getElementById('chart-profils').innerHTML =
-          '<div class="empty-chart">Aucun profil ne correspond aux filtres.</div>';
+          '<div class="empty-chart">No profiles match the current filters.</div>';
         profilesChartRendered = false;
         return;
       }
@@ -766,8 +766,8 @@
       }
 
       const layout = GristHelpers.plotlyDarkLayout({
-        xaxis: GristHelpers.plotlyDarkAxis('Profondeur (mm)'),
-        yaxis: GristHelpers.plotlyDarkAxis('Teneur en Cl⁻ (% masse liants)'),
+        xaxis: GristHelpers.plotlyDarkAxis('Depth (mm)'),
+        yaxis: GristHelpers.plotlyDarkAxis('Cl⁻ content (% binder mass)'),
         margin: { t: 10, r: 20, b: 50, l: 65 },
         legend: { bgcolor: 'rgba(255,255,255,0.92)', bordercolor: '#e2e8f0', borderwidth: 1, font: { size: 11 } },
         hovermode: 'closest',
@@ -783,12 +783,12 @@
     }
 
     // =========================================================================
-    // TABLEAU
+    // TABLE
     // =========================================================================
     let tblSortCol = -1;
     let tblSortAsc = true;
 
-    // Extrait une ligne de tableau pour un profil
+    // Extract a table row for a profile
     function profileToRow(p) {
       const src = p.source.designation ||
         (p.source.authors ? p.source.authors.split(',')[0].trim() +
@@ -822,7 +822,7 @@
         dapp:         D    ?? null,
         cs:           Cs   ?? null,
         nb_points:    p.points.length,
-        // Valeur brute pour tri
+        // Raw values for sorting
         _src_raw:   src,
         _lat_raw:   p.site.latitude ?? -999,
         _wc_raw:    p.mix.wc_ratio  ?? -1,
@@ -858,15 +858,15 @@
     function renderTable() {
       if (allProfiles.length === 0) {
         document.getElementById('tbl-body').innerHTML =
-          '<tr><td colspan="17" style="text-align:center;padding:20px;color:var(--text-dim)">Aucune donnée — cliquez sur Rafraîchir.</td></tr>';
-        document.getElementById('tbl-stats').textContent = '0 profil';
+          '<tr><td colspan="17" style="text-align:center;padding:20px;color:var(--text-dim)">No data — click Refresh.</td></tr>';
+        document.getElementById('tbl-stats').textContent = '0 profiles';
         return;
       }
 
       const query = (document.getElementById('tbl-search').value || '').toLowerCase();
       let rows = allProfiles.map(profileToRow);
 
-      // Filtre texte
+      // Text filter
       if (query) {
         rows = rows.filter(r =>
           COL_KEYS.some(k => {
@@ -877,7 +877,7 @@
         );
       }
 
-      // Tri
+      // Sort
       if (tblSortCol >= 0 && tblSortCol < COL_KEYS.length) {
         const key = COL_KEYS[tblSortCol];
         const sign = tblSortAsc ? 1 : -1;
@@ -885,12 +885,12 @@
           const av = a[key] ?? '';
           const bv = b[key] ?? '';
           if (typeof av === 'number' && typeof bv === 'number') return sign * (av - bv);
-          return sign * String(av).localeCompare(String(bv), 'fr');
+          return sign * String(av).localeCompare(String(bv), 'en');
         });
       }
 
       document.getElementById('tbl-stats').textContent =
-        `${rows.length} profil${rows.length > 1 ? 's' : ''} affiché${rows.length > 1 ? 's' : ''} sur ${allProfiles.length}`;
+        `${rows.length} profile${rows.length > 1 ? 's' : ''} displayed out of ${allProfiles.length}`;
 
       function fmt(v, digits = 2) {
         return v != null ? Number(v).toFixed(digits) : '<span style="color:var(--text-dim)">—</span>';
@@ -899,7 +899,7 @@
         return v != null ? v.toExponential(2) : '<span style="color:var(--text-dim)">—</span>';
       }
       function clTag(ct) {
-        const label = ct === 'free_cl' ? 'Libre' : ct === 'total_cl' ? 'Total' : ct || '—';
+        const label = ct === 'free_cl' ? 'Free' : ct === 'total_cl' ? 'Total' : ct || '—';
         return `<span class="tag ${ct}">${label}</span>`;
       }
       function expoTag(et) {
@@ -927,11 +927,11 @@
           <td>${r.nb_points}</td>
         </tr>`).join('');
 
-      document.getElementById('tbl-body').innerHTML = html || '<tr><td colspan="17" style="text-align:center;padding:20px;color:var(--text-dim)">Aucun résultat.</td></tr>';
+      document.getElementById('tbl-body').innerHTML = html || '<tr><td colspan="17" style="text-align:center;padding:20px;color:var(--text-dim)">No results.</td></tr>';
     }
 
     // =========================================================================
-    // FICK — SÉLECTEUR DE PROFIL INTERNE
+    // FICK — INTERNAL PROFILE SELECTOR
     // =========================================================================
     function getMeasurementIdFromProfile(p) {
       if (!rawData) return null;
@@ -945,7 +945,7 @@
       if (!sel) return;
 
       if (!allProfiles || allProfiles.length === 0) {
-        sel.innerHTML = '<option value="">— Aucun profil Cl\u207B disponible —</option>';
+        sel.innerHTML = '<option value="">— No Cl⁻ profiles available —</option>';
         if (cnt) cnt.textContent = '';
         return;
       }
@@ -956,52 +956,52 @@
         const mat    = p.material.name || '?';
         const nature = p.exposure.exposure_nature || '?';
         const dur    = p.scalars.exposure_duration != null
-                       ? p.scalars.exposure_duration.toFixed(0) + ' ans' : '?';
+                       ? p.scalars.exposure_duration.toFixed(0) + ' yr' : '?';
         const src    = p.source.designation ||
                        (p.source.authors ? p.source.authors.split(',')[0].trim() : '?');
         const nPts   = p.points.length;
-        const label  = `${mat} \u2014 ${nature} \u2014 ${dur} \u2014 ${src} (${nPts} pts)`;
+        const label  = `${mat} — ${nature} — ${dur} — ${src} (${nPts} pts)`;
         return `<option value="${measId}">${label}</option>`;
       }).filter(Boolean);
 
-      sel.innerHTML = '<option value="">— Choisir un profil —</option>' + opts.join('');
-      if (cnt) cnt.textContent = `${opts.length} profil${opts.length > 1 ? 's' : ''} disponible${opts.length > 1 ? 's' : ''}`;
+      sel.innerHTML = '<option value="">— Choose a profile —</option>' + opts.join('');
+      if (cnt) cnt.textContent = `${opts.length} profile${opts.length > 1 ? 's' : ''} available`;
     }
 
     async function onFickMeasurementSelect(measurementIdStr) {
       if (!measurementIdStr) return;
       const measurementId = parseInt(measurementIdStr);
 
-      // Trouver le profil correspondant dans allProfiles
+      // Find the corresponding profile in allProfiles
       const profile = allProfiles.find(p => getMeasurementIdFromProfile(p) === measurementId);
       if (!profile) {
-        GristHelpers.log('Profil introuvable pour cette mesure', 'err');
+        GristHelpers.log('Profile not found for this measurement', 'err');
         return;
       }
 
-      // Reconstruire currentMeasurement depuis rawData
+      // Reconstruct currentMeasurement from rawData
       const measRec = rawData && rawData.measurements.find(m => m.id === measurementId);
       currentMeasurement = { id: measurementId, ...(measRec ? measRec.fields : {}) };
       lastFitResult = null;
       document.getElementById('results-card').style.display = 'none';
 
-      // Charger le contexte depuis les données déjà en mémoire
+      // Load context from data already in memory
       currentMaterial  = profile.material;
       currentMix       = profile.mix;
       currentExposure  = profile.exposure;
       currentProfilePoints = profile.points;
 
-      // Infill age depuis exposure_duration (années → jours)
+      // Prefill age from exposure_duration (years → days)
       if (profile.scalars.exposure_duration != null) {
         document.getElementById('age-jours').value =
           Math.round(profile.scalars.exposure_duration * 365.25);
       }
 
       const matName = profile.material.name || `id=${measurementId}`;
-      GristHelpers.log(`Mesure sélectionnée : id=${measurementId}`);
-      GristHelpers.log(`Matériau : ${matName}`, 'ok');
+      GristHelpers.log(`Measurement selected: id=${measurementId}`);
+      GristHelpers.log(`Material: ${matName}`, 'ok');
       GristHelpers.log(
-        `${profile.points.length} point${profile.points.length > 1 ? 's' : ''} chargé${profile.points.length > 1 ? 's' : ''}`,
+        `${profile.points.length} point${profile.points.length > 1 ? 's' : ''} loaded`,
         profile.points.length > 2 ? 'ok' : 'warn'
       );
 
@@ -1014,19 +1014,19 @@
     // PYODIDE INIT
     // =========================================================================
     async function initPyodide() {
-      GristHelpers.log('Chargement de Pyodide (Python WASM)…');
+      GristHelpers.log('Loading Pyodide (Python WASM)…');
       try {
         pyodide = await loadPyodide();
-        GristHelpers.log('Pyodide chargé ✓', 'ok');
-        GristHelpers.log('Chargement numpy + scipy…');
+        GristHelpers.log('Pyodide loaded ✓', 'ok');
+        GristHelpers.log('Loading numpy + scipy…');
         await pyodide.loadPackage(['numpy', 'scipy']);
-        GristHelpers.log('numpy + scipy chargés ✓', 'ok');
+        GristHelpers.log('numpy + scipy loaded ✓', 'ok');
         pyodideReady = true;
         updateFickUI();
-        GristHelpers.log('Prêt pour le fitting.', 'ok');
+        GristHelpers.log('Ready for fitting.', 'ok');
       } catch (err) {
-        GristHelpers.log('Erreur Pyodide : ' + err.message, 'err');
-        GristHelpers.setStatus('Erreur Pyodide', 'error');
+        GristHelpers.log('Pyodide error: ' + err.message, 'err');
+        GristHelpers.setStatus('Pyodide error', 'error');
       }
     }
 
@@ -1037,11 +1037,11 @@
       grist.ready({ requiredAccess: 'full' });
 
       grist.onRecord(async function(record) {
-        GristHelpers.log(`Mesure sélectionnée : id=${record.id}`);
+        GristHelpers.log(`Measurement selected: id=${record.id}`);
         currentMeasurement = record;
         lastFitResult = null;
         document.getElementById('results-card').style.display = 'none';
-        // Sync le sélecteur interne
+        // Sync the internal selector
         const sel = document.getElementById('fick-measurement-select');
         if (sel) sel.value = String(record.id);
         await fetchFickContext(record);
@@ -1051,7 +1051,7 @@
       });
 
       gristReady = true;
-      GristHelpers.log('Connecté à Grist ✓', 'ok');
+      GristHelpers.log('Connected to Grist ✓', 'ok');
     }
 
     // =========================================================================
@@ -1073,10 +1073,10 @@
           currentMix = mix ? mix.fields : null;
           const expo = exposures.find(e => e.id === currentMaterial.id_exposure);
           currentExposure = expo ? expo.fields : null;
-          GristHelpers.log(`Matériau : ${currentMaterial.name || 'id=' + measurement.id_material}`, 'ok');
+          GristHelpers.log(`Material: ${currentMaterial.name || 'id=' + measurement.id_material}`, 'ok');
         }
       } catch (err) {
-        GristHelpers.log('Erreur fetch contexte : ' + err.message, 'err');
+        GristHelpers.log('Fetch context error: ' + err.message, 'err');
       }
     }
 
@@ -1091,7 +1091,7 @@
           GristHelpers.fetchAllRecords('DATA_CURVE'),
         ]);
 
-        // Infill age depuis le scalaire exposure_duration (années → jours)
+        // Prefill age from the exposure_duration scalar (years → days)
         const scalSrc = rawData ? rawData.scalars
                                 : await GristHelpers.fetchAllRecords('SCALAR');
         const durScalar = scalSrc.find(
@@ -1103,10 +1103,10 @@
             Math.round(durScalar.fields.value * 365.25);
         }
 
-        // Trouver la courbe liée à ce measurement
+        // Find the curve linked to this measurement
         const curve = curves.find(c => c.fields.id_measurement === measurementId);
         if (!curve) {
-          GristHelpers.log('Aucune courbe (CURVE) pour cette mesure', 'warn');
+          GristHelpers.log('No curve (CURVE) for this measurement', 'warn');
           Plotly.purge('chart-fick');
           return;
         }
@@ -1123,9 +1123,9 @@
         );
 
         if (points.length > 0) plotFick(points);
-        else { GristHelpers.log('Courbe vide — aucun point DATA_CURVE', 'warn'); Plotly.purge('chart-fick'); }
+        else { GristHelpers.log('Empty curve — no DATA_CURVE points', 'warn'); Plotly.purge('chart-fick'); }
       } catch (err) {
-        GristHelpers.log('Erreur fetch profil : ' + err.message, 'err');
+        GristHelpers.log('Fetch profile error: ' + err.message, 'err');
       }
     }
 
@@ -1139,11 +1139,11 @@
       const mix  = currentMix       || {};
       const expo = currentExposure  || {};
       const fields = [
-        { label: 'Matériau',          value: mat.name          || '—' },
-        { label: 'Type matériau',     value: mat.material_type || '—' },
-        { label: 'E/C',               value: mix.wc_ratio != null ? mix.wc_ratio.toFixed(2) : '—' },
-        { label: "Type d'exposition", value: expo.exposure_type   || '—' },
-        { label: 'Nature exposition', value: expo.exposure_nature || '—' },
+        { label: 'Material',       value: mat.name          || '—' },
+        { label: 'Material type',  value: mat.material_type || '—' },
+        { label: 'w/c',            value: mix.wc_ratio != null ? mix.wc_ratio.toFixed(2) : '—' },
+        { label: 'Exposure type',  value: expo.exposure_type   || '—' },
+        { label: 'Exposure nature',value: expo.exposure_nature || '—' },
       ];
       document.getElementById('context-info').innerHTML = fields.map(f => `
         <div class="info-item">
@@ -1162,7 +1162,7 @@
       document.getElementById('nb-points').textContent = `${points.length} points`;
 
       const traces = [{
-        x, y, mode: 'markers', type: 'scatter', name: 'Mesures',
+        x, y, mode: 'markers', type: 'scatter', name: 'Measurements',
         marker: { color: '#3b82f6', size: 9, line: { color: '#1e3a5f', width: 1.5 } }
       }];
 
@@ -1176,20 +1176,20 @@
         const seuil = parseFloat(document.getElementById('seuil-cl').value);
         traces.push({
           x: [0, Math.max(...x) * 1.1], y: [seuil, seuil],
-          mode: 'lines', type: 'scatter', name: `Seuil = ${seuil}`,
+          mode: 'lines', type: 'scatter', name: `Threshold = ${seuil}`,
           line: { color: '#ef4444', width: 1.5, dash: 'dash' }
         });
         const enrobage = parseFloat(document.getElementById('enrobage').value);
         traces.push({
           x: [enrobage, enrobage], y: [0, Math.max(...y) * 1.1],
-          mode: 'lines', type: 'scatter', name: `Enrobage = ${enrobage} mm`,
+          mode: 'lines', type: 'scatter', name: `Cover depth = ${enrobage} mm`,
           line: { color: '#22c55e', width: 1.5, dash: 'dot' }
         });
       }
 
       Plotly.newPlot('chart-fick', traces, GristHelpers.plotlyDarkLayout({
-        xaxis: GristHelpers.plotlyDarkAxis('Profondeur (mm)'),
-        yaxis: GristHelpers.plotlyDarkAxis('Cl⁻ (% liant)')
+        xaxis: GristHelpers.plotlyDarkAxis('Depth (mm)'),
+        yaxis: GristHelpers.plotlyDarkAxis('Cl⁻ (% binder)')
       }), { responsive: true, displayModeBar: true,
             modeBarButtonsToRemove: ['lasso2d', 'select2d'], displaylogo: false });
     }
@@ -1206,7 +1206,7 @@
       document.getElementById('direct-input-card').style.display     = mode === 'direct'  ? '' : 'none';
       lastFitResult = null;
       document.getElementById('results-card').style.display = 'none';
-      GristHelpers.log(`Mode : ${mode === 'profile' ? 'Profil de chlorures' : 'Saisie directe Dapp'}`);
+      GristHelpers.log(`Mode: ${mode === 'profile' ? 'Chloride profile' : 'Direct Dapp input'}`);
       updateFickUI();
     }
 
@@ -1215,11 +1215,11 @@
     // =========================================================================
     async function runFitting() {
       if (!pyodideReady || !currentProfilePoints || currentProfilePoints.length < 3) {
-        GristHelpers.log('Il faut Pyodide + au moins 3 points de profil', 'warn'); return;
+        GristHelpers.log('Pyodide and at least 3 profile points required', 'warn'); return;
       }
       const btn = document.getElementById('btn-fit');
-      btn.disabled = true; btn.textContent = '⏳ Calcul en cours…';
-      GristHelpers.log('Lancement du fitting Fick…');
+      btn.disabled = true; btn.textContent = '⏳ Computing…';
+      GristHelpers.log('Running Fick fitting…');
 
       try {
         const x_mm     = currentProfilePoints.map(p => p.x);
@@ -1293,37 +1293,37 @@ json.dumps(result)
 
         const fit = JSON.parse(resultJson);
         if (!fit.success) {
-          GristHelpers.log('Échec du fitting : ' + fit.error, 'err');
-          btn.disabled = false; btn.textContent = '⚙️ Lancer le fitting'; return;
+          GristHelpers.log('Fitting failed: ' + fit.error, 'err');
+          btn.disabled = false; btn.textContent = '⚙️ Run fitting'; return;
         }
         lastFitResult = fit; lastFitResult.source = 'fitting';
-        GristHelpers.log(`Fitting : Cs=${fit.Cs.toFixed(3)}, Dapp=${fit.Dapp.toExponential(2)}, R²=${fit.R2.toFixed(4)}`, 'ok');
-        GristHelpers.log(`Durée de vie : ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' ans' : '∞'}`, 'ok');
+        GristHelpers.log(`Fitting: Cs=${fit.Cs.toFixed(3)}, Dapp=${fit.Dapp.toExponential(2)}, R²=${fit.R2.toFixed(4)}`, 'ok');
+        GristHelpers.log(`Service life: ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' yr' : '∞'}`, 'ok');
         plotFick(currentProfilePoints, fit);
         showFickResults(fit);
         document.getElementById('btn-save').disabled = false;
       } catch (err) {
-        GristHelpers.log('Erreur fitting : ' + err.message, 'err');
+        GristHelpers.log('Fitting error: ' + err.message, 'err');
       }
-      btn.disabled = false; btn.textContent = '⚙️ Lancer le fitting';
+      btn.disabled = false; btn.textContent = '⚙️ Run fitting';
     }
 
     // =========================================================================
     // FICK — DIRECT CALC
     // =========================================================================
     async function calcDirect() {
-      if (!pyodideReady) { GristHelpers.log('Pyodide pas encore prêt…', 'warn'); return; }
+      if (!pyodideReady) { GristHelpers.log('Pyodide not ready yet…', 'warn'); return; }
       const dapp    = parseFloat(document.getElementById('direct-dapp').value);
       const cs      = parseFloat(document.getElementById('direct-cs').value);
       const ageJours = parseFloat(document.getElementById('direct-age').value) || 365;
       const seuil   = parseFloat(document.getElementById('direct-seuil').value);
       const enrobage = parseFloat(document.getElementById('direct-enrobage').value);
-      if (isNaN(dapp) || dapp <= 0) { GristHelpers.log('Dapp invalide', 'err'); return; }
-      if (isNaN(cs)   || cs   <= 0) { GristHelpers.log('Cs invalide', 'err'); return; }
+      if (isNaN(dapp) || dapp <= 0) { GristHelpers.log('Invalid Dapp', 'err'); return; }
+      if (isNaN(cs)   || cs   <= 0) { GristHelpers.log('Invalid Cs', 'err'); return; }
 
       const btn = document.getElementById('btn-calc-direct');
-      btn.disabled = true; btn.textContent = '⏳ Calcul…';
-      GristHelpers.log(`Calcul direct : Dapp=${dapp.toExponential(2)}, Cs=${cs}`);
+      btn.disabled = true; btn.textContent = '⏳ Computing…';
+      GristHelpers.log(`Direct calculation: Dapp=${dapp.toExponential(2)}, Cs=${cs}`);
 
       try {
         pyodide.globals.set('dapp_js',        dapp);
@@ -1358,15 +1358,15 @@ result = {
 json.dumps(result)
         `);
         const fit = JSON.parse(resultJson);
-        if (!fit.success) { GristHelpers.log('Erreur : ' + (fit.error || 'inconnue'), 'err'); }
+        if (!fit.success) { GristHelpers.log('Error: ' + (fit.error || 'unknown'), 'err'); }
         else {
           lastFitResult = fit; lastFitResult.source = 'direct';
-          GristHelpers.log(`Durée de vie : ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' ans' : '∞'}`, 'ok');
+          GristHelpers.log(`Service life: ${fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) + ' yr' : '∞'}`, 'ok');
           showFickResults(fit);
           document.getElementById('btn-save-direct').disabled = false;
         }
-      } catch (err) { GristHelpers.log('Erreur calcul : ' + err.message, 'err'); }
-      btn.disabled = false; btn.textContent = '⚙️ Calculer durée de vie';
+      } catch (err) { GristHelpers.log('Calculation error: ' + err.message, 'err'); }
+      btn.disabled = false; btn.textContent = '⚙️ Calculate service life';
     }
 
     // =========================================================================
@@ -1375,12 +1375,12 @@ json.dumps(result)
     function showFickResults(fit) {
       document.getElementById('results-card').style.display = 'block';
       const items = [
-        { label: 'Cs',             value: fit.Cs   != null ? fit.Cs.toFixed(3)   : '—', unit: '% liant' },
-        { label: 'Dapp',           value: GristHelpers.formatDapp(fit.Dapp),              unit: 'm²/s'   },
-        { label: 'R²',             value: fit.R2   != null ? fit.R2.toFixed(4)   : '—', unit: ''        },
-        { label: 'RMSE',           value: fit.RMSE != null ? fit.RMSE.toFixed(4) : '—', unit: ''        },
-        { label: 'Durée de vie',   value: fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) : '∞',   unit: 'ans' },
-        { label: 'Prof. critique', value: fit.profondeur_crit_mm.toFixed(1),               unit: 'mm'   },
+        { label: 'Cs',             value: fit.Cs   != null ? fit.Cs.toFixed(3)   : '—', unit: '% binder' },
+        { label: 'Dapp',           value: GristHelpers.formatDapp(fit.Dapp),              unit: 'm²/s'     },
+        { label: 'R²',             value: fit.R2   != null ? fit.R2.toFixed(4)   : '—', unit: ''          },
+        { label: 'RMSE',           value: fit.RMSE != null ? fit.RMSE.toFixed(4) : '—', unit: ''          },
+        { label: 'Service life',   value: fit.duree_vie_ans > 0 ? fit.duree_vie_ans.toFixed(1) : '∞',   unit: 'yr' },
+        { label: 'Critical depth', value: fit.profondeur_crit_mm.toFixed(1),               unit: 'mm'   },
       ];
       document.getElementById('results-info').innerHTML = items.map(f => `
         <div class="info-item">
@@ -1394,12 +1394,12 @@ json.dumps(result)
     // FICK — SAVE
     // =========================================================================
     async function saveResults() {
-      if (!lastFitResult || !currentMeasurement) { GristHelpers.log('Rien à sauvegarder', 'warn'); return; }
+      if (!lastFitResult || !currentMeasurement) { GristHelpers.log('Nothing to save', 'warn'); return; }
       const btnP = document.getElementById('btn-save');
       const btnD = document.getElementById('btn-save-direct');
       if (btnP) btnP.disabled = true;
       if (btnD) btnD.disabled = true;
-      GristHelpers.log('Sauvegarde dans SCALAR…');
+      GristHelpers.log('Saving to SCALAR…');
 
       try {
         const tests = await GristHelpers.fetchAllRecords('TEST');
@@ -1409,7 +1409,7 @@ json.dumps(result)
             name: 'diffusivity', test_type: 'natural', standard_name: 'Fick 2nd law'
           });
           diffTest = { id: r.id };
-          GristHelpers.log('Test "diffusivity" créé ✓', 'ok');
+          GristHelpers.log('"diffusivity" test created ✓', 'ok');
         }
 
         const params = [
@@ -1417,7 +1417,7 @@ json.dumps(result)
           { name: 'Cs',              value: lastFitResult.Cs,                                         unit: '%',    is_derived: true  },
           { name: 'R2',              value: lastFitResult.R2,                                         unit: '',     is_derived: true  },
           { name: 'RMSE',            value: lastFitResult.RMSE,                                       unit: '',     is_derived: true  },
-          { name: 'duree_vie_ans',   value: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null, unit: 'ans', is_derived: true },
+          { name: 'duree_vie_ans',   value: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null, unit: 'yr', is_derived: true },
           { name: 'profondeur_crit', value: lastFitResult.profondeur_crit_mm,                         unit: 'mm',   is_derived: true  },
           { name: 'source_dapp',     value: lastFitResult.source === 'fitting' ? 1 : 0,               unit: '',     is_derived: false },
         ].filter(p => p.value != null);
@@ -1428,13 +1428,13 @@ json.dumps(result)
           value:          p.value,
           unit:           p.unit,
           is_derived:     p.is_derived,
-          notes:          `Fick fitting — ${new Date().toLocaleDateString('fr-FR')}`,
+          notes:          `Fick fitting — ${new Date().toLocaleDateString('en-US')}`,
         }));
 
         const results = await GristHelpers.bulkCreateRecords('SCALAR', records);
-        GristHelpers.log(`${results.length} scalaire(s) enregistrés dans SCALAR ✓`, 'ok');
+        GristHelpers.log(`${results.length} scalar(s) saved to SCALAR ✓`, 'ok');
       } catch (err) {
-        GristHelpers.log('Erreur sauvegarde : ' + err.message, 'err');
+        GristHelpers.log('Save error: ' + err.message, 'err');
       }
       if (btnP) btnP.disabled = false;
       if (btnD) btnD.disabled = false;
@@ -1448,15 +1448,15 @@ json.dumps(result)
       const btnDirect = document.getElementById('btn-calc-direct');
       btnFit.disabled    = !(pyodideReady && currentProfilePoints && currentProfilePoints.length >= 3);
       btnDirect.disabled = !pyodideReady;
-      if (pyodideReady && gristReady) GristHelpers.setStatus('Prêt', 'ready');
-      else if (pyodideReady) GristHelpers.setStatus('Pyodide OK — en attente Grist…', '');
+      if (pyodideReady && gristReady) GristHelpers.setStatus('Ready', 'ready');
+      else if (pyodideReady) GristHelpers.setStatus('Pyodide OK — waiting for Grist…', '');
     }
 
     // =========================================================================
     // INIT
     // =========================================================================
     (async function() {
-      GristHelpers.log('Initialisation Chlorures…');
+      GristHelpers.log('Initializing Chlorides…');
       initGrist();
       await GristHelpers.ensureSchema();
       await loadAllData();

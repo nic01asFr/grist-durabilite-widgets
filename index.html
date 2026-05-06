@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grist Widgets — Durabilité des bétons</title>
+  <title>Grist Widgets — Concrete Durability</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -51,38 +51,38 @@
 <body>
   <div class="container">
     <div class="badge">CEREMA Méditerranée</div>
-    <h1>Widgets Grist pour la <strong>durabilité des bétons</strong></h1>
+    <h1>Grist Widgets for <strong>Concrete Durability</strong></h1>
     <p class="subtitle">
-      Collection de widgets custom pour l'analyse de durabilité des bétons exposés aux chlorures et à la carbonatation.
-      Utilisables directement dans <a href="https://grist.numerique.gouv.fr" style="color:#3b82f6;">Grist</a> comme widgets personnalisés.
-      Schéma v2.3 — 14 tables auto-provisionnées.
+      Collection of custom widgets for durability analysis of concrete exposed to chlorides and carbonation.
+      Usable directly in <a href="https://grist.numerique.gouv.fr" style="color:#3b82f6;">Grist</a> as custom widgets.
+      Schema v2.3 — 14 auto-provisioned tables.
     </p>
 
     <a href="data-entry.html" class="widget-card">
       <div class="top">
         <span class="icon">📝</span>
-        <span class="name">Saisie de données</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">Data Entry</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        Interface de saisie guidée suivant le workflow métier : source bibliographique,
-        formulation béton, détails (granulats, liant, ciment, propriétés), site d'exposition,
-        protocole et mesures. Chaînage automatique des références.
+        Guided entry interface following the business workflow: bibliographic source,
+        concrete mix design, details (aggregates, binder, cement, properties), exposure site,
+        protocol and measurements. Automatic reference chaining.
       </div>
       <div class="tech">
-        <span>13 tables</span><span>SCALAR</span><span>CURVE</span><span>Formulaires</span>
+        <span>13 tables</span><span>SCALAR</span><span>CURVE</span><span>Forms</span>
       </div>
     </a>
 
     <a href="fick-analysis.html" class="widget-card">
       <div class="top">
         <span class="icon">📊</span>
-        <span class="name">Chlorures — Profils &amp; Analyse Fick</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">Chlorides — Profiles &amp; Fick Analysis</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        3 onglets fusionnés : fitting Fick sur mesure sélectionnée (D<sub>app</sub>, C<sub>s</sub>, R², durée de vie),
-        visualisation comparative de tous les profils avec filtres, et tableau récapitulatif avec tri et recherche.
+        3 merged tabs: Fick fitting on selected measurement (D<sub>app</sub>, C<sub>s</sub>, R², service life),
+        comparative visualisation of all profiles with filters, and summary table with sort and search.
       </div>
       <div class="tech">
         <span>Pyodide</span><span>scipy</span><span>Plotly.js</span><span>MEASUREMENT</span><span>DATA_CURVE</span>
@@ -92,13 +92,13 @@
     <a href="carbonation-analysis.html" class="widget-card">
       <div class="top">
         <span class="icon">🧱</span>
-        <span class="name">Analyse Carbonatation</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">Carbonation Analysis</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        Ajustement du front de carbonatation : x = K<sub>carb</sub> · √t.
-        Double mode : fitting sur mesures ou saisie directe du K<sub>carb</sub>.
-        Estimation de la durée de vie avant dépassage de l'enrobage.
+        Carbonation front fitting: x = K<sub>carb</sub> · √t.
+        Dual mode: fitting on measurements or direct K<sub>carb</sub> input.
+        Service life estimation before cover depth depassivation.
       </div>
       <div class="tech">
         <span>Pyodide</span><span>scipy</span><span>Plotly.js</span><span>CARBONATION_PROTOCOL</span>
@@ -108,12 +108,12 @@
     <a href="dashboard.html" class="widget-card">
       <div class="top">
         <span class="icon">📈</span>
-        <span class="name">Dashboard Comparatif</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">Comparative Dashboard</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        Comparaison D<sub>app</sub> par mélange (box plots), scatter E/L vs D<sub>app</sub>,
-        analyse des durées de vie. Filtres interactifs par mélange, ciment et régime d'exposition.
+        D<sub>app</sub> comparison by mix (box plots), scatter w/b vs D<sub>app</sub>,
+        service life analysis. Interactive filters by mix, cement and exposure regime.
       </div>
       <div class="tech">
         <span>Plotly.js</span><span>CHLORIDE_ANALYSIS</span><span>CONCRETE_MIX</span>
@@ -123,13 +123,13 @@
     <a href="editor.html" class="widget-card">
       <div class="top">
         <span class="icon">✏️</span>
-        <span class="name">Éditeur de données</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">Data Editor</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        Tableau pivot des mesures du matériau sélectionné (une ligne par mesure, colonnes dynamiques par scalaire).
-        Clic sur une ligne → formulaire d'édition prérempli : mesure, scalaires (ajout/suppression), site, exposition,
-        formulation, liants, cure, source. Sauvegarde en un clic.
+        Pivot table of measurements for the selected material (one row per measurement, dynamic scalar columns).
+        Click a row → pre-filled edit form: measurement, scalars (add/remove), site, exposure,
+        mix design, binders, curing, source. One-click save.
       </div>
       <div class="tech">
         <span>MATERIAL</span><span>MEASUREMENT</span><span>SCALAR</span><span>CURVE</span><span>MIX_DESIGN</span><span>BINDER</span>
@@ -139,28 +139,28 @@
     <a href="export.html" class="widget-card">
       <div class="top">
         <span class="icon">📤</span>
-        <span class="name">Export CSV</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">CSV Export</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        Tableau plat de tous les profils chlorure avec sélection des colonnes par groupe
-        (source, matériau, site, exposition, formulation, liants, cure, résultats).
-        Export CSV avec choix du séparateur et BOM UTF-8 pour Excel.
+        Flat table of all chloride profiles with column selection by group
+        (source, material, site, exposure, mix design, binders, curing, results).
+        CSV export with separator choice and UTF-8 BOM for Excel.
       </div>
       <div class="tech">
-        <span>CSV</span><span>joinChlorideProfiles</span><span>10 groupes</span>
+        <span>CSV</span><span>joinChlorideProfiles</span><span>10 groups</span>
       </div>
     </a>
 
     <a href="site-map.html" class="widget-card">
       <div class="top">
         <span class="icon">🗺️</span>
-        <span class="name">Carte des Sites</span>
-        <span class="tag ready">Prêt</span>
+        <span class="name">Site Map</span>
+        <span class="tag ready">Ready</span>
       </div>
       <div class="desc">
-        Carte interactive des sites d'exposition avec marqueurs colorés par performance D<sub>app</sub>.
-        Popups : nombre de protocoles, D<sub>app</sub> moyen, durée de vie, mélanges testés.
+        Interactive map of exposure sites with markers coloured by D<sub>app</sub> performance.
+        Popups: number of protocols, average D<sub>app</sub>, service life, mixes tested.
       </div>
       <div class="tech">
         <span>Leaflet</span><span>CartoDB Dark</span><span>SITE</span>
@@ -168,8 +168,8 @@
     </a>
 
     <div class="footer">
-      Projet de recherche — Durabilité des bétons à base de substitutions cimentaires<br>
-      <a href="https://github.com/">Voir le code source sur GitHub</a>
+      Research project — Durability of concrete with supplementary cementitious materials<br>
+      <a href="https://github.com/">View source code on GitHub</a>
     </div>
   </div>
 </body>
