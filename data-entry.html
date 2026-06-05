@@ -171,34 +171,11 @@
   <!-- ============================================================ -->
   <div class="tab-panel" id="panel-binder">
     <div class="card">
-      <div class="card-title">Binders — main cement (BINDER)</div>
-      <div class="selector-row">
-        <select id="sel-binder-cement" onchange="onSel('binder_cement')">
-          <option value="">— Select a binder —</option>
-        </select>
-        <button class="btn btn-secondary" onclick="openBinderForm('cement')">+ New</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Mineral additions — SCM (BINDER)</div>
-      <div id="scm-selection-list"></div>
-      <p id="scm-selection-empty" style="font-size:12px;color:var(--text-dim);font-style:italic;padding:4px 0;margin:0;">
-        No SCM added.
+      <div class="card-title">Create a binder component (BINDER)</div>
+      <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px 0;">
+        Define any cementitious component: cement, SCM (fly ash, slag, silica fume…), filler, etc.
+        Binders are then assembled with their quantities in the <strong>Mix design</strong> tab.
       </p>
-      <div class="selector-row" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--surface2);">
-        <select id="sel-scm-add">
-          <option value="">— Choose a binder to add as SCM —</option>
-        </select>
-        <input type="number" id="scm-add-qty" step="5" min="0" placeholder="kg/m³"
-          style="width:100px;padding:7px 8px;background:var(--bg);border:1px solid var(--surface2);border-radius:6px;color:var(--text);font-size:13px;">
-        <button class="btn btn-secondary" onclick="addSCMToSelection()">+ Add</button>
-      </div>
-      <div style="margin-top:8px;">
-        <button class="btn btn-secondary" style="font-size:11px;" onclick="openBinderForm('scm')">+ New SCM binder</button>
-      </div>
-    </div>
-    <div class="card" id="form-binder-card" style="display:none;">
-      <div class="card-title" id="form-binder-title">New binder</div>
       <div class="form-grid">
         <div class="form-field"><label>Name <span class="req">*</span></label><input type="text" id="f-b-name" placeholder="CEM I 52.5R"></div>
         <div class="form-field">
@@ -259,7 +236,7 @@
         <textarea id="f-b-notes" placeholder="Standard, supplier, batch…" style="min-height:48px;"></textarea>
       </div>
       <div class="form-actions">
-        <button class="btn btn-secondary" onclick="cancelBinder()">Cancel</button>
+        <button class="btn btn-secondary" onclick="resetBinderForm()">Reset</button>
         <button class="btn btn-primary" onclick="saveBinder()">Save binder</button>
       </div>
     </div>
@@ -327,12 +304,31 @@
         <button class="btn btn-secondary" onclick="toggleForm('mix')">+ New</button>
       </div>
       <div id="form-mix" style="display:none;">
-        <div class="form-grid">
-          <div class="form-field"><label>Cement (kg/m³)</label><input type="number" id="f-mix-cement-kg" step="1" min="0" placeholder="350" oninput="calcWlRatio()"></div>
-          <div class="form-field" style="grid-column:1/-1;">
-            <label>SCM additions <span style="font-size:10px;color:var(--text-dim);">→ configure in the Binders tab</span></label>
-            <div id="mix-scm-summary" style="padding:5px 0;font-size:12px;color:var(--text-dim);font-style:italic;">No SCM configured.</div>
+
+        <!-- Binders section -->
+        <div style="border:1px solid var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--text-muted);margin-bottom:8px;">
+            🧱 Binders <span class="req">*</span>
           </div>
+          <div id="binders-selection-list"></div>
+          <p id="binders-selection-empty" style="font-size:12px;color:var(--text-dim);font-style:italic;margin:0 0 8px;">
+            No binder added yet.
+          </p>
+          <div class="selector-row">
+            <select id="sel-binder-add">
+              <option value="">— Choose a binder —</option>
+            </select>
+            <input type="number" id="binder-add-qty" step="5" min="0" placeholder="kg/m³"
+              style="width:100px;padding:7px 8px;background:var(--bg);border:1px solid var(--surface2);border-radius:6px;color:var(--text);font-size:13px;">
+            <button class="btn btn-secondary" onclick="addBinderToSelection()">+ Add</button>
+          </div>
+          <button class="btn btn-secondary" style="font-size:11px;margin-top:8px;" onclick="showTab('binder')">
+            + Create new binder component → Binders tab
+          </button>
+        </div>
+
+        <!-- Mix design fields -->
+        <div class="form-grid">
           <div class="form-field"><label>w/c (ratio)</label><input type="number" id="f-mix-wc" step="0.01" min="0" max="1" placeholder="0.45"></div>
           <div class="form-field"><label>Water (kg/m³)</label><input type="number" id="f-mix-water-kg" step="1" min="0" placeholder="175" oninput="calcWlRatio()"></div>
           <div class="form-field">
@@ -694,20 +690,19 @@
     // =========================================================================
     // STATE
     // =========================================================================
-    let activeTab      = 'source';
-    let _binderTarget  = 'cement';
+    let activeTab = 'source';
 
     let allSources = [], allBinders = [], allAggregates = [], allMixes = [];
     let allExposures = [], allCurings = [], allSites = [];
     let allMaterials = [], allMeasurements = [], allTests = [];
 
     const sel = {
-      source: null, binder_cement: null,
+      source: null,
       mix: null, exposure: null, curing: null,
       site: null, material: null, measurement: null, test: null,
     };
     let selectedAggregates = [];  // [{id_aggregate, content_kg_m3, _name, _size}]
-    let selectedSCMs = [];        // [{id_binder, content_kg_m3, _name}]
+    let selectedBinders    = [];  // [{id_binder, content_kg_m3, _name, _type}]
 
     // =========================================================================
     // COLLAPSIBLES
@@ -729,7 +724,7 @@
       document.querySelectorAll('.tab-panel').forEach(p =>
         p.classList.toggle('active', p.id === 'panel-' + tabName)
       );
-      if (tabName === 'mix')         { updateMixContextBar(); updateMixAggSummary(); updateMixSCMSummary(); }
+      if (tabName === 'mix')         { updateMixContextBar(); updateMixAggSummary(); }
       if (tabName === 'material')    updateMaterialContextBar();
       if (tabName === 'measurement') updateMeasurementContextBar();
       if (tabName === 'results')     updateResultsPanel();
@@ -743,7 +738,7 @@
     function updateBreadcrumb() {
       const items = [
         { key: 'source',      label: sel.source      ? (allSources.find(s => s.id === sel.source)?.fields.authors || `#${sel.source}`) : null },
-        { key: 'binder',      label: (sel.binder_cement || selectedSCMs.length > 0) ? labelBinder() : null },
+        { key: 'binder',      label: selectedBinders.length > 0 ? labelBinder() : null },
         { key: 'mix',         label: sel.mix          ? `Mix #${sel.mix}`          : null },
         { key: 'material',    label: sel.material     ? (allMaterials.find(m => m.id === sel.material)?.fields.name || `Mat. #${sel.material}`) : null },
         { key: 'measurement', label: sel.measurement  ? `Measurement #${sel.measurement}` : null },
@@ -759,9 +754,7 @@
     }
 
     function labelBinder() {
-      const c = allBinders.find(b => b.id === sel.binder_cement);
-      const scmNames = selectedSCMs.map(s => s._name).filter(Boolean);
-      return [c?.fields.name, ...scmNames].filter(Boolean).join('+') || null;
+      return selectedBinders.map(b => b._name).filter(Boolean).join('+') || null;
     }
 
     function toggleForm(section) {
@@ -813,8 +806,7 @@
         const suffix = s.fields.title ? ' — ' + s.fields.title.substring(0, 35) : '';
         return label + suffix;
       });
-      fillDrop('sel-binder-cement', allBinders, b => `${b.fields.name || 'Binder #' + b.id} (${b.fields.binder_type || '?'})`);
-      fillDrop('sel-scm-add',       allBinders, b => `${b.fields.name || 'Binder #' + b.id} (${b.fields.binder_type || '?'})`);
+      fillDrop('sel-binder-add',    allBinders, b => `${b.fields.name || 'Binder #' + b.id} (${b.fields.binder_type || '?'})`);
       fillDrop('sel-aggregate-add', allAggregates, a => {
         const name = a.fields.name || `Aggregate #${a.id}`;
         const type = a.fields.aggregate_type || '';
@@ -860,7 +852,7 @@
 
       // Restore selections
       const map = {
-        'sel-source': 'source', 'sel-binder-cement': 'binder_cement',
+        'sel-source': 'source',
         'sel-mix': 'mix', 'sel-exposure': 'exposure',
         'sel-curing': 'curing', 'sel-site': 'site', 'sel-material': 'material',
         'sel-measurement': 'measurement',
@@ -893,8 +885,7 @@
     // SELECTION HANDLERS
     // =========================================================================
     function onSel(key) {
-      const elId = key === 'binder_cement' ? 'sel-binder-cement'
-                 : `sel-${key.replace('_', '-')}`;
+      const elId = `sel-${key.replace('_', '-')}`;
       const v = parseInt(document.getElementById(elId)?.value) || null;
       sel[key] = v;
       if (key === 'material') { sel.measurement = null; populateDropdowns(); }
@@ -904,23 +895,23 @@
     // =========================================================================
     // BINDER FORM
     // =========================================================================
-    function openBinderForm(target) {
-      _binderTarget = target;
-      document.getElementById('form-binder-title').textContent =
-        target === 'cement' ? 'New cement / main binder' : 'New mineral addition (SCM)';
-      document.getElementById('form-binder-card').style.display = '';
-    }
-    function cancelBinder() {
-      document.getElementById('form-binder-card').style.display = 'none';
+    function resetBinderForm() {
+      ['f-b-name','f-b-density','f-b-surface','f-b-loi',
+       'f-b-C3S','f-b-C2S','f-b-C3A','f-b-C4AF','f-b-Gp',
+       'f-b-SiO2','f-b-Al2O3','f-b-Fe2O3','f-b-CaO','f-b-MgO',
+       'f-b-SO3','f-b-K2O','f-b-Na2O','f-b-notes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      document.getElementById('f-b-type').value = '';
     }
 
     function calcWlRatio() {
-      const water  = parseFloat(document.getElementById('f-mix-water-kg').value);
-      const cement = parseFloat(document.getElementById('f-mix-cement-kg').value) || 0;
-      const scm    = selectedSCMs.reduce((sum, s) => sum + (s.content_kg_m3 ?? 0), 0);
-      const wlEl   = document.getElementById('f-mix-wl');
-      if (!isNaN(water) && (cement + scm) > 0) {
-        wlEl.placeholder = (water / (cement + scm)).toFixed(3);
+      const water       = parseFloat(document.getElementById('f-mix-water-kg').value);
+      const totalBinder = selectedBinders.reduce((sum, b) => sum + (b.content_kg_m3 ?? 0), 0);
+      const wlEl        = document.getElementById('f-mix-wl');
+      if (!isNaN(water) && totalBinder > 0) {
+        wlEl.placeholder = (water / totalBinder).toFixed(3);
       } else {
         wlEl.placeholder = 'computed';
       }
@@ -953,13 +944,7 @@
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('BINDER', fields);
         GristHelpers.log(`Binder "${name}" created (id=${result.id}) ✓`, 'ok');
-        if (_binderTarget === 'cement') {
-          sel.binder_cement = result.id;
-        } else {
-          selectedSCMs.push({ id_binder: result.id, content_kg_m3: null, _name: name });
-          renderSelectedSCMs();
-        }
-        cancelBinder();
+        resetBinderForm();
         await refreshAll();
       } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
     }
@@ -1010,12 +995,10 @@
     }
 
     function updateMixContextBar() {
-      const bc   = allBinders.find(b => b.id === sel.binder_cement);
-      const nScm = selectedSCMs.length;
-      const nAgg = selectedAggregates.length;
+      const nBinders = selectedBinders.length;
+      const nAgg     = selectedAggregates.length;
       document.getElementById('mix-context-bar').innerHTML =
-        tagHTML('Cement', bc?.fields.name) +
-        tagHTML('SCM', nScm > 0 ? `${nScm} addition${nScm > 1 ? 's' : ''}` : null) +
+        tagHTML('Binders', nBinders > 0 ? `${nBinders} component${nBinders > 1 ? 's' : ''}` : null) +
         tagHTML('Aggregates', nAgg > 0 ? `${nAgg} fraction${nAgg > 1 ? 's' : ''}` : null);
     }
 
@@ -1067,15 +1050,14 @@
     // SAVE: MIX_DESIGN
     // =========================================================================
     async function saveMix() {
-      if (!sel.binder_cement) { GristHelpers.log('Select a cement in the Binders tab', 'warn'); return; }
+      if (selectedBinders.length === 0) { GristHelpers.log('Add at least one binder component', 'warn'); return; }
       try {
-        // w/b: entered value or computed from water / (cement + SCM)
+        // w/b: entered value or computed from water / sum(binders)
         const wlEntered = floatOrNull('f-mix-wl');
         const wlCalc   = (() => {
-          const w = floatOrNull('f-mix-water-kg');
-          const c = floatOrNull('f-mix-cement-kg') ?? 0;
-          const s = floatOrNull('f-mix-scm-kg')    ?? 0;
-          return (w != null && (c + s) > 0) ? Math.round(w / (c + s) * 1000) / 1000 : null;
+          const w     = floatOrNull('f-mix-water-kg');
+          const total = selectedBinders.reduce((sum, b) => sum + (b.content_kg_m3 ?? 0), 0);
+          return (w != null && total > 0) ? Math.round(w / total * 1000) / 1000 : null;
         })();
 
         const mixFields = {
@@ -1091,25 +1073,16 @@
         const result = await GristHelpers.createRecord('MIX_DESIGN', mixFields);
         GristHelpers.log(`Mix design created (id=${result.id}) ✓`, 'ok');
 
-        // Main cement → MIX_DESIGN_BINDER
-        await GristHelpers.createRecord('MIX_DESIGN_BINDER', {
-          id_mix_design: result.id,
-          id_binder:     sel.binder_cement,
-          content_kg_m3: floatOrNull('f-mix-cement-kg') ?? 0,
-        });
-
-        // SCMs (multiple) → MIX_DESIGN_BINDER
-        for (const scm of selectedSCMs) {
-          if (scm.id_binder) {
-            await GristHelpers.createRecord('MIX_DESIGN_BINDER', {
-              id_mix_design: result.id,
-              id_binder:     scm.id_binder,
-              content_kg_m3: scm.content_kg_m3 ?? 0,
-            });
-          }
+        // All binders → MIX_DESIGN_BINDER
+        for (const b of selectedBinders) {
+          await GristHelpers.createRecord('MIX_DESIGN_BINDER', {
+            id_mix_design: result.id,
+            id_binder:     b.id_binder,
+            content_kg_m3: b.content_kg_m3 ?? 0,
+          });
         }
-        selectedSCMs = [];
-        renderSelectedSCMs();
+        selectedBinders = [];
+        renderSelectedBinders();
 
         // Aggregates → MIX_DESIGN_AGGREGATE
         for (const agg of selectedAggregates) {
@@ -1416,70 +1389,56 @@
     }
 
     // =========================================================================
-    // SCMs — multi-addition selection
+    // BINDERS — multi-component selection (in Mix design tab)
     // =========================================================================
-    function renderSelectedSCMs() {
-      const listEl  = document.getElementById('scm-selection-list');
-      const emptyEl = document.getElementById('scm-selection-empty');
+    function renderSelectedBinders() {
+      const listEl  = document.getElementById('binders-selection-list');
+      const emptyEl = document.getElementById('binders-selection-empty');
       if (!listEl) return;
-      if (selectedSCMs.length === 0) {
+      if (selectedBinders.length === 0) {
         listEl.innerHTML = '';
         if (emptyEl) emptyEl.style.display = '';
       } else {
         if (emptyEl) emptyEl.style.display = 'none';
-        listEl.innerHTML = selectedSCMs.map((item, idx) => `
+        listEl.innerHTML = selectedBinders.map((item, idx) => `
           <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--surface2);font-size:12px;">
             <span style="flex:1;color:var(--text-muted);font-weight:500;">${item._name}</span>
+            <span style="color:var(--text-dim);font-size:11px;min-width:80px;">${item._type || ''}</span>
             <input type="number" step="5" min="0" value="${item.content_kg_m3 ?? ''}" placeholder="kg/m³"
               style="width:90px;padding:4px 7px;background:var(--bg);border:1px solid var(--surface2);border-radius:5px;color:var(--text);font-size:12px;"
-              oninput="selectedSCMs[${idx}].content_kg_m3 = this.value === '' ? null : parseFloat(this.value); calcWlRatio(); updateMixSCMSummary();">
-            <button class="btn-icon" title="Remove" onclick="removeSCMFromSelection(${idx})" style="color:var(--error);">✕</button>
+              oninput="selectedBinders[${idx}].content_kg_m3 = this.value === '' ? null : parseFloat(this.value); calcWlRatio(); updateMixContextBar();">
+            <button class="btn-icon" title="Remove" onclick="removeBinderFromSelection(${idx})" style="color:var(--error);">✕</button>
           </div>
         `).join('');
       }
-      updateMixSCMSummary();
       calcWlRatio();
+      updateMixContextBar();
       updateBreadcrumb();
     }
 
-    function addSCMToSelection() {
-      const selEl = document.getElementById('sel-scm-add');
-      const qtyEl = document.getElementById('scm-add-qty');
+    function addBinderToSelection() {
+      const selEl = document.getElementById('sel-binder-add');
+      const qtyEl = document.getElementById('binder-add-qty');
       const id    = parseInt(selEl.value);
       if (!id) { GristHelpers.log('Choose a binder from the list', 'warn'); return; }
-      if (selectedSCMs.some(s => s.id_binder === id)) {
-        GristHelpers.log('This binder is already in the SCM selection', 'warn'); return;
+      if (selectedBinders.some(b => b.id_binder === id)) {
+        GristHelpers.log('This binder is already in the selection', 'warn'); return;
       }
       const binder = allBinders.find(b => b.id === id);
-      selectedSCMs.push({
-        id_binder:    id,
+      selectedBinders.push({
+        id_binder:     id,
         content_kg_m3: qtyEl.value === '' ? null : parseFloat(qtyEl.value),
         _name:         binder?.fields.name || `Binder #${id}`,
+        _type:         binder?.fields.binder_type || '',
       });
       selEl.value = '';
       qtyEl.value = '';
-      renderSelectedSCMs();
+      renderSelectedBinders();
     }
 
-    function removeSCMFromSelection(idx) {
-      selectedSCMs.splice(idx, 1);
-      renderSelectedSCMs();
-    }
-
-    function updateMixSCMSummary() {
-      const el = document.getElementById('mix-scm-summary');
-      if (!el) return;
-      if (selectedSCMs.length === 0) {
-        el.textContent = 'No SCM configured — see Binders tab.';
-        el.style.fontStyle = 'italic';
-        el.style.color = 'var(--text-dim)';
-        return;
-      }
-      el.innerHTML = selectedSCMs
-        .map(s => `<strong>${s._name}</strong>${s.content_kg_m3 != null ? ' — ' + s.content_kg_m3 + ' kg/m³' : ''}`)
-        .join(' · ');
-      el.style.fontStyle = 'normal';
-      el.style.color = 'var(--text-muted)';
+    function removeBinderFromSelection(idx) {
+      selectedBinders.splice(idx, 1);
+      renderSelectedBinders();
     }
 
     function updateMixAggSummary() {
