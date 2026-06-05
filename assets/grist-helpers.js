@@ -191,6 +191,7 @@ const GristHelpers = {
         { id: 'y_name',         fields: { type: 'Text',            label: 'Y axis' } },
         { id: 'x_unit',         fields: { type: 'Text',            label: 'Unit X' } },
         { id: 'y_unit',         fields: { type: 'Text',            label: 'Unit Y' } },
+        { id: 'notes',          fields: { type: 'Text',            label: 'Notes' } },
       ]
     },
 

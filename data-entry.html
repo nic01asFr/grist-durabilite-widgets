@@ -663,8 +663,12 @@
           <div class="form-grid" style="margin-bottom:8px;">
             <div class="form-field"><label>X axis (name)</label><input type="text" id="f-cv-xname" placeholder="depth"></div>
             <div class="form-field"><label>X axis (unit)</label><input type="text" id="f-cv-xunit" placeholder="mm"></div>
-            <div class="form-field"><label>Y axis (name)</label><input type="text" id="f-cv-yname" placeholder="chloride_content"></div>
+            <div class="form-field"><label>Y axis (name)</label><input type="text" id="f-cv-yname" placeholder="measured_quantity"></div>
             <div class="form-field"><label>Y axis (unit)</label><input type="text" id="f-cv-yunit" placeholder="% binder"></div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Notes</label>
+              <input type="text" id="f-cv-notes" placeholder="Conditions, carbonation state, specimen preparation…">
+            </div>
           </div>
           <table class="mini-table">
             <thead><tr><th>X</th><th>Y</th><th class="row-actions"></th></tr></thead>
@@ -1302,6 +1306,7 @@
           x_unit: document.getElementById('f-cv-xunit').value.trim() || '',
           y_name: document.getElementById('f-cv-yname').value.trim() || 'y',
           y_unit: document.getElementById('f-cv-yunit').value.trim() || '',
+          notes:  document.getElementById('f-cv-notes').value.trim() || '',
         });
         const points = [];
         rows.forEach(row => {
@@ -1312,6 +1317,7 @@
         if (points.length > 0) await GristHelpers.bulkCreateRecords('DATA_CURVE', points);
         GristHelpers.log(`Curve created: CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
         document.getElementById('curve-rows').innerHTML = '';
+        document.getElementById('f-cv-notes').value = '';
       } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
     }
 
