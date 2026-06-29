@@ -177,6 +177,17 @@
       border-bottom: 1px solid var(--surface2); display: flex; gap: 12px; align-items: center;
     }
     .curve-row:last-child { border-bottom: none; }
+
+    .meas-group-row td {
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-top: 2px solid var(--surface2);
+      user-select: none;
+      cursor: default;
+    }
   </style>
 </head>
 <body>
@@ -1090,8 +1101,7 @@ async function loadMeasurementsTable() {
 // Build the table header (fixed + dynamic columns)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Cl⁻ type', 'Material', 'Source',
-                     'Mat. type', 'Expo. type', 'Nature', 'w/c', 'w/b', 'Water (kg/m³)'];
+  const fixedCols = ['Test', 'Cl⁻ type', 'Prep. date', 'Result date'];
   const allCols   = [...fixedCols, ...measScalarNames, 'Curves'];
   const tr = document.querySelector('#meas-thead tr');
   tr.innerHTML = allCols.map((name, i) =>
@@ -1107,8 +1117,8 @@ function renderMeasTable() {
 
   // Build row data
   let rows = measLinked.map(m => {
-    const f       = m.fields;
-    const test    = allTests.get(f.id_test) || {};
+    const f        = m.fields;
+    const test     = allTests.get(f.id_test) || {};
     const mScalars = measScalarsByMeas.get(m.id) || [];
     const mCurves  = measCurvesByMeas.get(m.id)  || [];
     const scMap    = new Map(mScalars.map(s => [s.fields.name, s.fields]));
@@ -1125,6 +1135,7 @@ function renderMeasTable() {
     const mixF  = allMixesMap.get(matF.id_mix_design) || {};
     return {
       id:          m.id,
+      mat_id:      f.id_material || 0,
       test:        test.name || '',
       testType:    test.test_type || '',
       mat_name:    matF.name            || '',
@@ -1159,20 +1170,35 @@ function renderMeasTable() {
     });
   }
 
-  // Sort
-  if (measSortCol >= 0) {
-    const sign = measSortAsc ? 1 : -1;
-    rows.sort((a, b) => {
-      const av = measRowVal(a, measSortCol);
-      const bv = measRowVal(b, measSortCol);
-      if (typeof av === 'number' && typeof bv === 'number') return sign * (av - bv);
-      return sign * String(av ?? '').localeCompare(String(bv ?? ''), 'en');
-    });
-  }
-
   // Stats
   document.getElementById('meas-tbl-stats').textContent =
     `${rows.length} measurement${rows.length > 1 ? 's' : ''} displayed out of ${measLinked.length}`;
+
+  // Group by material id, order groups by material name
+  const groups = new Map();
+  rows.forEach(r => {
+    if (!groups.has(r.mat_id)) groups.set(r.mat_id, []);
+    groups.get(r.mat_id).push(r);
+  });
+
+  // Sort within each group by the selected column, or by prep date by default
+  for (const [, grp] of groups) {
+    if (measSortCol >= 0) {
+      const sign = measSortAsc ? 1 : -1;
+      grp.sort((a, b) => {
+        const av = measRowVal(a, measSortCol);
+        const bv = measRowVal(b, measSortCol);
+        if (typeof av === 'number' && typeof bv === 'number') return sign * (av - bv);
+        return sign * String(av ?? '').localeCompare(String(bv ?? ''), 'en');
+      });
+    } else {
+      grp.sort((a, b) => String(a.prep ?? '').localeCompare(String(b.prep ?? ''), 'en'));
+    }
+  }
+
+  const sortedGroups = [...groups.entries()].sort((a, b) =>
+    String(a[1][0]?.mat_name ?? '').localeCompare(String(b[1][0]?.mat_name ?? ''), 'en')
+  );
 
   // Render
   function fmtScal(val, unit) {
@@ -1190,32 +1216,37 @@ function renderMeasTable() {
     return ct ? `<span class="tag ${ct}">${label}</span>` : '<span style="color:var(--text-dim)">—</span>';
   }
 
-  function expoTag(et) {
-    return et ? `<span class="tag ${et}">${et}</span>` : '<span style="color:var(--text-dim)">—</span>';
-  }
+  const nCols = 4 + measScalarNames.length + 1;
+  let html = '';
+  for (const [, grp] of sortedGroups) {
+    const rep = grp[0];
+    const matInfo = [
+      rep.mat_type || '',
+      rep.expo_type || '',
+      rep.expo_nature || '',
+      rep.wc_ratio != null ? `w/c ${Number(rep.wc_ratio).toFixed(2)}` : '',
+      rep.wl_ratio != null ? `w/b ${Number(rep.wl_ratio).toFixed(2)}` : '',
+      rep.water_kg != null ? `${Math.round(rep.water_kg)} kg/m³` : '',
+      rep.source || '',
+    ].filter(Boolean).join(' · ');
 
-  function fmtNum(v, digits = 2) {
-    return v != null ? Number(v).toFixed(digits) : '<span style="color:var(--text-dim)">—</span>';
-  }
-
-  const html = rows.map(r => {
-    const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
-    const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
-    return `<tr${sel} data-meas-id="${r.id}">
-      <td><span class="meas-badge">${r.test || '?'}</span></td>
-      <td>${clTag(r.testType)}</td>
-      <td>${r.mat_name    || '—'}</td>
-      <td>${r.source      || '—'}</td>
-      <td>${r.mat_type    || '—'}</td>
-      <td>${expoTag(r.expo_type)}</td>
-      <td>${r.expo_nature || '—'}</td>
-      <td>${fmtNum(r.wc_ratio)}</td>
-      <td>${fmtNum(r.wl_ratio)}</td>
-      <td>${fmtNum(r.water_kg, 0)}</td>
-      ${scCells}
-      <td>${r.nCurves || '—'}</td>
+    html += `<tr class="meas-group-row">
+      <td colspan="${nCols}">▸ ${rep.mat_name || '—'}${matInfo ? ' · ' + matInfo : ''}</td>
     </tr>`;
-  }).join('');
+
+    grp.forEach(r => {
+      const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
+      const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
+      html += `<tr${sel} data-meas-id="${r.id}">
+        <td><span class="meas-badge">${r.test || '?'}</span></td>
+        <td>${clTag(r.testType)}</td>
+        <td>${r.prep || '—'}</td>
+        <td>${r.result || '—'}</td>
+        ${scCells}
+        <td>${r.nCurves || '—'}</td>
+      </tr>`;
+    });
+  }
 
   const tbody = document.getElementById('meas-tbl-body');
   tbody.innerHTML = html || '<tr><td colspan="20" style="text-align:center;padding:16px;color:var(--text-dim)">No measurement.</td></tr>';
@@ -1227,8 +1258,7 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.test, r.testType, r.mat_name, r.source,
-                 r.mat_type, r.expo_type, r.expo_nature, r.wc_ratio, r.wl_ratio, r.water_kg];
+  const fixed = [r.test, r.testType, r.prep, r.result];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
   if (scIdx < r.scalars.length) return r.scalars[scIdx] ?? -Infinity;
@@ -1289,7 +1319,7 @@ function selectMeasRow(measId) {
   attachDetailListeners(detailBody, m, mScalars);
 
   // Scroll to form
-  document.getElementById('meas-detail-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('meas-detail-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // -------------------------------------------------------------------------
