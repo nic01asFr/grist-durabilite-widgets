@@ -1101,7 +1101,7 @@ async function loadMeasurementsTable() {
 // Build the table header (fixed + dynamic columns)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Cl⁻ type', 'Prep. date', 'Result date'];
+  const fixedCols = ['Test', 'Cl⁻ type', 'Time (days)', 'Prep. date', 'Result date'];
   const allCols   = [...fixedCols, ...measScalarNames, 'Curves'];
   const tr = document.querySelector('#meas-thead tr');
   tr.innerHTML = allCols.map((name, i) =>
@@ -1145,6 +1145,7 @@ function renderMeasTable() {
       operator:    f.operator || '',
       prep:        tsToDateInput(f.preparation_date) || '',
       result:      tsToDateInput(f.result_date) || '',
+      time_days:   (f.result_date && f.preparation_date) ? Math.round((f.result_date - f.preparation_date) / 86400) : null,
       mat_type:    matF.material_type    || '',
       expo_type:   expoF.exposure_type   || '',
       expo_nature: expoF.exposure_nature || '',
@@ -1240,6 +1241,7 @@ function renderMeasTable() {
       html += `<tr${sel} data-meas-id="${r.id}">
         <td><span class="meas-badge">${r.test || '?'}</span></td>
         <td>${clTag(r.testType)}</td>
+        <td>${r.time_days != null ? r.time_days : '—'}</td>
         <td>${r.prep || '—'}</td>
         <td>${r.result || '—'}</td>
         ${scCells}
@@ -1258,7 +1260,7 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.test, r.testType, r.prep, r.result];
+  const fixed = [r.test, r.testType, r.time_days, r.prep, r.result];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
   if (scIdx < r.scalars.length) return r.scalars[scIdx] ?? -Infinity;
