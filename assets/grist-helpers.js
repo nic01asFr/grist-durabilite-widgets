@@ -134,7 +134,7 @@ const GristHelpers = {
     // id_test: the test type is set at campaign creation
     TEST: {
       columns: [
-        { id: 'name',                fields: { type: 'Choice',  label: 'Measured property', widgetOptions: '{"choices":["calorimetry","carbonation","cl_profil","diffusivity","Rc","gas_permeability","sorptivity","porosity","total_porosity","resistivity","org_density"]}' } },
+        { id: 'name',                fields: { type: 'Choice',  label: 'Measured property', widgetOptions: '{"choices":["calorimetry","carbonation","cl_profil","diffusivity","Rc","gas_permeability","sorptivity","porosity","total_porosity","resistivity","org_density","MEB","DRX"]}' } },
         { id: 'standard_name',       fields: { type: 'Text',    label: 'Standard' } },
         { id: 'experiment_duration', fields: { type: 'Numeric', label: 'Test duration (days)' } },
         { id: 'test_type',           fields: { type: 'Choice',  label: 'Test type', widgetOptions: '{"choices":["natural","accelerated","total_cl","free_cl"]}' } },
@@ -216,7 +216,7 @@ const GristHelpers = {
     curing_method:      ['water_spraying', 'wet_covering', 'curing_compounds', 'forms_left_in_place', 'wet_curing', 'water_immersion'],
     sample_type:        ['laboratory_sample', 'bridge_pier'],
     sample_dimensions:  ['cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320','cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'],
-    test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density'],
+    test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density', 'MEB', 'DRX'],
     test_type:          ['natural', 'accelerated', 'total_cl', 'free_cl'],
     binder_type:        ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'metakaolin', 'zeolite', 'other'],
     aggregate_type:     ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],

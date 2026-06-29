@@ -581,6 +581,8 @@
                   <option value="total_porosity">total_porosity</option>
                   <option value="resistivity">resistivity</option>
                   <option value="org_density">org_density</option>
+                  <option value="MEB">MEB (SEM)</option>
+                  <option value="DRX">DRX (XRD)</option>
                 </select>
               </div>
               <div class="form-field">
@@ -623,63 +625,7 @@
       </div>
       <div id="results-content" style="display:none;">
         <div class="context-bar" id="results-context-bar" style="margin-bottom:12px;"></div>
-
-        <!-- Scalars -->
-        <div class="result-section">
-          <div class="result-section-title">🔢 Scalars (SCALAR)</div>
-          <div class="form-grid">
-            <div class="form-field">
-              <label>Parameter name <span class="req">*</span></label>
-              <input type="text" id="f-sc-name" placeholder="D, Cs, mean_depth, depth_1, Rc…">
-            </div>
-            <div class="form-field">
-              <label>Value <span class="req">*</span></label>
-              <input type="number" id="f-sc-value" step="any" placeholder="1.2e-12">
-            </div>
-            <div class="form-field">
-              <label>Unit</label>
-              <input type="text" id="f-sc-unit" placeholder="m²/s, %, mm, MPa…">
-            </div>
-            <div class="form-field">
-              <label>Derived (computed)</label>
-              <select id="f-sc-derived">
-                <option value="0">No (directly measured)</option>
-                <option value="1">Yes (computed from a curve)</option>
-              </select>
-            </div>
-            <div class="form-field" style="grid-column:1/-1;">
-              <label>Notes</label>
-              <input type="text" id="f-sc-notes" placeholder="Calculation method, conditions…">
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" onclick="saveScalar()">💾 Save scalar</button>
-          </div>
-        </div>
-
-        <!-- Curves -->
-        <div class="result-section">
-          <div class="result-section-title">📈 Curve (CURVE + DATA_CURVE)</div>
-          <div class="form-grid" style="margin-bottom:8px;">
-            <div class="form-field"><label>X axis (name)</label><input type="text" id="f-cv-xname" placeholder="depth"></div>
-            <div class="form-field"><label>X axis (unit)</label><input type="text" id="f-cv-xunit" placeholder="mm"></div>
-            <div class="form-field"><label>Y axis (name)</label><input type="text" id="f-cv-yname" placeholder="measured_quantity"></div>
-            <div class="form-field"><label>Y axis (unit)</label><input type="text" id="f-cv-yunit" placeholder="% binder"></div>
-            <div class="form-field" style="grid-column:1/-1;">
-              <label>Notes</label>
-              <input type="text" id="f-cv-notes" placeholder="Conditions, carbonation state, specimen preparation…">
-            </div>
-          </div>
-          <table class="mini-table">
-            <thead><tr><th>X</th><th>Y</th><th class="row-actions"></th></tr></thead>
-            <tbody id="curve-rows"></tbody>
-          </table>
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button class="btn btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="addCurveRow()">+ Point</button>
-            <button class="btn btn-primary"   style="font-size:11px; padding:4px 10px;" onclick="saveCurve()">💾 Save curve</button>
-          </div>
-        </div>
-
+        <div id="results-form-container"></div>
       </div>
     </div>
   </div>
@@ -1322,8 +1268,12 @@
     }
 
     // =========================================================================
-    // RESULTS PANEL
+    // RESULTS PANEL — dynamic rendering based on test type
     // =========================================================================
+    const CHLORIDE_TESTS    = new Set(['cl_profil', 'diffusivity']);
+    const CARBONATION_TESTS = new Set(['carbonation']);
+    const FILE_TESTS        = new Set(['MEB', 'DRX']);
+
     function updateResultsPanel() {
       const hasM = !!sel.measurement;
       document.getElementById('results-empty').style.display   = hasM ? 'none' : '';
@@ -1337,7 +1287,382 @@
           tagHTML('Measurement', `#${sel.measurement}`) +
           tagHTML('Material',    mat?.fields.name) +
           tagHTML('Test',        test ? `${test.fields.name} (${test.fields.test_type})` : null);
+        renderResultsForm(test?.fields.name);
       }
+    }
+
+    function renderResultsForm(testName) {
+      const container = document.getElementById('results-form-container');
+      if (!container) return;
+      if (CHLORIDE_TESTS.has(testName))    container.innerHTML = buildChlorideForm();
+      else if (CARBONATION_TESTS.has(testName)) container.innerHTML = buildCarbonationForm();
+      else if (FILE_TESTS.has(testName))   container.innerHTML = buildFileRefForm(testName);
+      else                                 container.innerHTML = buildGenericForm();
+    }
+
+    // ---- Chloride form ----
+    function buildChlorideForm() {
+      return `
+        <div class="result-section">
+          <div class="result-section-title">🔢 Fick parameters (scalars)</div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>D<sub>app</sub> (m²/s)</label>
+              <input type="number" id="f-cl-D" step="any" placeholder="1.5e-12">
+            </div>
+            <div class="form-field">
+              <label>C<sub>s</sub> (% binder)</label>
+              <input type="number" id="f-cl-Cs" step="any" placeholder="0.8">
+            </div>
+            <div class="form-field">
+              <label>Derived from profile</label>
+              <select id="f-cl-derived">
+                <option value="0">No (directly measured)</option>
+                <option value="1">Yes (fitted from profile)</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Notes</label>
+              <input type="text" id="f-cl-notes" placeholder="Method, conditions…">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveClScalars()">💾 Save D / Cs</button>
+          </div>
+        </div>
+        <div class="result-section">
+          <div class="result-section-title">📈 Chloride profile (CURVE)</div>
+          <div class="form-grid" style="margin-bottom:8px;">
+            <div class="form-field">
+              <label>Exposure time (days)</label>
+              <input type="number" id="f-cl-cv-time" step="1" min="0" placeholder="90">
+            </div>
+            <div class="form-field">
+              <label>Cl unit</label>
+              <input type="text" id="f-cl-cv-yunit" value="% binder" placeholder="% binder">
+            </div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Notes</label>
+              <input type="text" id="f-cl-cv-notes" placeholder="Solution concentration, specimen ID…">
+            </div>
+          </div>
+          <table class="mini-table">
+            <thead><tr><th>Depth (mm)</th><th>Cl content</th><th class="row-actions"></th></tr></thead>
+            <tbody id="cl-profile-rows"></tbody>
+          </table>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="addClProfileRow()">+ Point</button>
+            <button class="btn btn-primary"   style="font-size:11px;padding:4px 10px;" onclick="saveClProfile()">💾 Save profile</button>
+          </div>
+        </div>`;
+    }
+
+    // ---- Carbonation form ----
+    function buildCarbonationForm() {
+      return `
+        <div class="result-section">
+          <div class="result-section-title">🔢 Mean carbonation depth (scalar)</div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Mean depth (mm)</label>
+              <input type="number" id="f-carb-mean" step="0.1" min="0" placeholder="12.5">
+            </div>
+            <div class="form-field">
+              <label>Notes</label>
+              <input type="text" id="f-carb-mean-notes" placeholder="Mean of all sections…">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveCarbScalar()">💾 Save mean depth</button>
+          </div>
+        </div>
+        <div class="result-section">
+          <div class="result-section-title">📈 Carbonation profile — paired measurements</div>
+          <p style="font-size:11px;color:var(--text-dim);margin:0 0 8px;">
+            For each specimen section, enter the depths measured on both faces after the phenolphthalein test.
+            Saved as two separate CURVEs (face A and face B).
+          </p>
+          <div class="form-grid" style="margin-bottom:8px;">
+            <div class="form-field">
+              <label>Exposure time (days)</label>
+              <input type="number" id="f-carb-cv-time" step="1" min="0" placeholder="90">
+            </div>
+            <div class="form-field">
+              <label>Notes</label>
+              <input type="text" id="f-carb-cv-notes" placeholder="CO₂ %, RH %, specimen ID…">
+            </div>
+          </div>
+          <table class="mini-table">
+            <thead><tr><th>#</th><th>Depth face A (mm)</th><th>Depth face B (mm)</th><th class="row-actions"></th></tr></thead>
+            <tbody id="carb-profile-rows"></tbody>
+          </table>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="addCarbProfileRow()">+ Pair</button>
+            <button class="btn btn-primary"   style="font-size:11px;padding:4px 10px;" onclick="saveCarbProfile()">💾 Save profile</button>
+          </div>
+        </div>`;
+    }
+
+    // ---- File reference form (MEB, DRX) ----
+    function buildFileRefForm(testName) {
+      return `
+        <div class="result-section">
+          <div class="result-section-title">📎 File reference (${testName})</div>
+          <p style="font-size:11px;color:var(--text-dim);margin:0 0 8px;">
+            Grist does not support native file upload from a custom widget.
+            Store the file on a shared drive or repository, then record its path or URL here.
+            The reference is saved as a SCALAR (name = "${testName.toLowerCase()}_file", notes = path/URL).
+          </p>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>File name</label>
+              <input type="text" id="f-file-name" placeholder="${testName}_OPC45_28d.tiff">
+            </div>
+            <div class="form-field">
+              <label>File type</label>
+              <select id="f-file-type">
+                <option value="">—</option>
+                <option value="image/tiff">TIFF image</option>
+                <option value="image/jpeg">JPEG image</option>
+                <option value="application/pdf">PDF</option>
+                <option value="application/zip">ZIP archive</option>
+                <option value="text/csv">CSV data</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Path / URL <span class="req">*</span></label>
+              <input type="text" id="f-file-url" placeholder="https://… or \\\\server\\share\\file.tiff">
+            </div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Description / conditions</label>
+              <textarea id="f-file-notes" placeholder="Magnification, accelerating voltage, acquisition conditions…" style="min-height:48px;"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveFileRef('${testName}')">💾 Save reference</button>
+          </div>
+        </div>`;
+    }
+
+    // ---- Generic form (all other tests) ----
+    function buildGenericForm() {
+      return `
+        <div class="result-section">
+          <div class="result-section-title">🔢 Scalars (SCALAR)</div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Parameter name <span class="req">*</span></label>
+              <input type="text" id="f-sc-name" placeholder="D, Cs, mean_depth, depth_1, Rc…">
+            </div>
+            <div class="form-field">
+              <label>Value <span class="req">*</span></label>
+              <input type="number" id="f-sc-value" step="any" placeholder="1.2e-12">
+            </div>
+            <div class="form-field">
+              <label>Unit</label>
+              <input type="text" id="f-sc-unit" placeholder="m²/s, %, mm, MPa…">
+            </div>
+            <div class="form-field">
+              <label>Derived (computed)</label>
+              <select id="f-sc-derived">
+                <option value="0">No (directly measured)</option>
+                <option value="1">Yes (computed from a curve)</option>
+              </select>
+            </div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Notes</label>
+              <input type="text" id="f-sc-notes" placeholder="Calculation method, conditions…">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveScalar()">💾 Save scalar</button>
+          </div>
+        </div>
+        <div class="result-section">
+          <div class="result-section-title">📈 Curve (CURVE + DATA_CURVE)</div>
+          <div class="form-grid" style="margin-bottom:8px;">
+            <div class="form-field"><label>X axis (name)</label><input type="text" id="f-cv-xname" placeholder="depth"></div>
+            <div class="form-field"><label>X axis (unit)</label><input type="text" id="f-cv-xunit" placeholder="mm"></div>
+            <div class="form-field"><label>Y axis (name)</label><input type="text" id="f-cv-yname" placeholder="measured_quantity"></div>
+            <div class="form-field"><label>Y axis (unit)</label><input type="text" id="f-cv-yunit" placeholder="% binder"></div>
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Notes</label>
+              <input type="text" id="f-cv-notes" placeholder="Conditions, carbonation state, specimen preparation…">
+            </div>
+          </div>
+          <table class="mini-table">
+            <thead><tr><th>X</th><th>Y</th><th class="row-actions"></th></tr></thead>
+            <tbody id="curve-rows"></tbody>
+          </table>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="addCurveRow()">+ Point</button>
+            <button class="btn btn-primary"   style="font-size:11px;padding:4px 10px;" onclick="saveCurve()">💾 Save curve</button>
+          </div>
+        </div>`;
+    }
+
+    // =========================================================================
+    // SAVE: chloride scalars (D and/or Cs)
+    // =========================================================================
+    async function saveClScalars() {
+      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      const D         = parseFloat(document.getElementById('f-cl-D')?.value);
+      const Cs        = parseFloat(document.getElementById('f-cl-Cs')?.value);
+      const isDerived = document.getElementById('f-cl-derived')?.value === '1';
+      const notes     = document.getElementById('f-cl-notes')?.value.trim() || '';
+      if (isNaN(D) && isNaN(Cs)) { GristHelpers.log('Enter at least D or Cs', 'warn'); return; }
+      try {
+        if (!isNaN(D)) {
+          await GristHelpers.createRecord('SCALAR', {
+            id_measurement: sel.measurement, name: 'D', value: D,
+            unit: 'm²/s', is_derived: isDerived, notes,
+          });
+          GristHelpers.log(`Scalar D = ${D} m²/s saved ✓`, 'ok');
+          document.getElementById('f-cl-D').value = '';
+        }
+        if (!isNaN(Cs)) {
+          await GristHelpers.createRecord('SCALAR', {
+            id_measurement: sel.measurement, name: 'Cs', value: Cs,
+            unit: '% binder', is_derived: isDerived, notes,
+          });
+          GristHelpers.log(`Scalar Cs = ${Cs} % binder saved ✓`, 'ok');
+          document.getElementById('f-cl-Cs').value = '';
+        }
+      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+    }
+
+    function addClProfileRow() {
+      const tbody = document.getElementById('cl-profile-rows');
+      if (!tbody) return;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="number" placeholder="5" step="0.5" min="0" data-field="x"></td>
+        <td><input type="number" placeholder="0.35" step="any" data-field="y"></td>
+        <td class="row-actions"><button class="btn-icon" onclick="this.closest('tr').remove()">✕</button></td>`;
+      tbody.appendChild(row);
+    }
+
+    async function saveClProfile() {
+      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      const rows = document.getElementById('cl-profile-rows')?.querySelectorAll('tr') || [];
+      if (rows.length === 0) { GristHelpers.log('Add at least one point', 'warn'); return; }
+      const time  = parseFloat(document.getElementById('f-cl-cv-time')?.value);
+      const yunit = document.getElementById('f-cl-cv-yunit')?.value.trim() || '% binder';
+      const notes = document.getElementById('f-cl-cv-notes')?.value.trim() || '';
+      const noteStr = [!isNaN(time) ? `t=${time} days` : '', notes].filter(Boolean).join(' — ');
+      try {
+        const curveRec = await GristHelpers.createRecord('CURVE', {
+          id_measurement: sel.measurement,
+          x_name: 'depth', x_unit: 'mm', y_name: 'Cl', y_unit: yunit, notes: noteStr,
+        });
+        const points = [];
+        rows.forEach(row => {
+          const x = parseFloat(row.querySelector('[data-field="x"]')?.value);
+          const y = parseFloat(row.querySelector('[data-field="y"]')?.value);
+          if (!isNaN(x) && !isNaN(y)) points.push({ id_curve: curveRec.id, x, y });
+        });
+        if (points.length > 0) await GristHelpers.bulkCreateRecords('DATA_CURVE', points);
+        GristHelpers.log(`Cl profile: CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
+        document.getElementById('cl-profile-rows').innerHTML = '';
+      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+    }
+
+    // =========================================================================
+    // SAVE: carbonation scalar (mean depth)
+    // =========================================================================
+    async function saveCarbScalar() {
+      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      const depth = parseFloat(document.getElementById('f-carb-mean')?.value);
+      if (isNaN(depth)) { GristHelpers.log('Enter a mean depth value', 'warn'); return; }
+      const notes = document.getElementById('f-carb-mean-notes')?.value.trim() || '';
+      try {
+        await GristHelpers.createRecord('SCALAR', {
+          id_measurement: sel.measurement, name: 'mean_depth', value: depth,
+          unit: 'mm', is_derived: false, notes,
+        });
+        GristHelpers.log(`Scalar mean_depth = ${depth} mm saved ✓`, 'ok');
+        document.getElementById('f-carb-mean').value = '';
+      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+    }
+
+    function addCarbProfileRow() {
+      const tbody = document.getElementById('carb-profile-rows');
+      if (!tbody) return;
+      const idx = tbody.querySelectorAll('tr').length + 1;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td style="color:var(--text-dim);font-size:11px;">${idx}</td>
+        <td><input type="number" placeholder="8.0" step="0.5" min="0" data-field="faceA"></td>
+        <td><input type="number" placeholder="9.5" step="0.5" min="0" data-field="faceB"></td>
+        <td class="row-actions"><button class="btn-icon" onclick="this.closest('tr').remove()">✕</button></td>`;
+      tbody.appendChild(row);
+    }
+
+    async function saveCarbProfile() {
+      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      const rows = document.getElementById('carb-profile-rows')?.querySelectorAll('tr') || [];
+      if (rows.length === 0) { GristHelpers.log('Add at least one pair', 'warn'); return; }
+      const time  = parseFloat(document.getElementById('f-carb-cv-time')?.value);
+      const notes = document.getElementById('f-carb-cv-notes')?.value.trim() || '';
+      const baseNotes = [!isNaN(time) ? `t=${time} days` : '', notes].filter(Boolean).join(' — ');
+      const ptsA = [], ptsB = [];
+      rows.forEach((row, i) => {
+        const a = parseFloat(row.querySelector('[data-field="faceA"]')?.value);
+        const b = parseFloat(row.querySelector('[data-field="faceB"]')?.value);
+        if (!isNaN(a)) ptsA.push({ x: i + 1, y: a });
+        if (!isNaN(b)) ptsB.push({ x: i + 1, y: b });
+      });
+      try {
+        if (ptsA.length > 0) {
+          const cA = await GristHelpers.createRecord('CURVE', {
+            id_measurement: sel.measurement,
+            x_name: 'section', x_unit: '#', y_name: 'depth_face_A', y_unit: 'mm',
+            notes: [baseNotes, 'face A'].filter(Boolean).join(' — '),
+          });
+          await GristHelpers.bulkCreateRecords('DATA_CURVE', ptsA.map(p => ({ id_curve: cA.id, x: p.x, y: p.y })));
+          GristHelpers.log(`Face A: CURVE #${cA.id}, ${ptsA.length} points ✓`, 'ok');
+        }
+        if (ptsB.length > 0) {
+          const cB = await GristHelpers.createRecord('CURVE', {
+            id_measurement: sel.measurement,
+            x_name: 'section', x_unit: '#', y_name: 'depth_face_B', y_unit: 'mm',
+            notes: [baseNotes, 'face B'].filter(Boolean).join(' — '),
+          });
+          await GristHelpers.bulkCreateRecords('DATA_CURVE', ptsB.map(p => ({ id_curve: cB.id, x: p.x, y: p.y })));
+          GristHelpers.log(`Face B: CURVE #${cB.id}, ${ptsB.length} points ✓`, 'ok');
+        }
+        document.getElementById('carb-profile-rows').innerHTML = '';
+      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+    }
+
+    // =========================================================================
+    // SAVE: file reference (MEB, DRX) stored as SCALAR
+    // =========================================================================
+    async function saveFileRef(testName) {
+      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      const url   = document.getElementById('f-file-url')?.value.trim();
+      const fname = document.getElementById('f-file-name')?.value.trim() || '';
+      const ftype = document.getElementById('f-file-type')?.value || '';
+      const notes = document.getElementById('f-file-notes')?.value.trim() || '';
+      if (!url) { GristHelpers.log('Path / URL required', 'warn'); return; }
+      const combinedNotes = [fname, ftype, url, notes].filter(Boolean).join(' | ');
+      try {
+        await GristHelpers.createRecord('SCALAR', {
+          id_measurement: sel.measurement,
+          name: testName.toLowerCase() + '_file',
+          value: 0,
+          unit: 'file_ref',
+          is_derived: false,
+          notes: combinedNotes,
+        });
+        GristHelpers.log(`File reference saved: ${fname || url} ✓`, 'ok');
+        ['f-file-url', 'f-file-name', 'f-file-notes'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        document.getElementById('f-file-type').value = '';
+      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
