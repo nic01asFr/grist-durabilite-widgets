@@ -90,6 +90,7 @@ const GristHelpers = {
     // --- Concrete mix design ---
     MIX_DESIGN: {
       columns: [
+        { id: 'name',                                fields: { type: 'Text',    label: 'Name' } },
         { id: 'water_type',                          enum: 'water_type', fields: { type: 'Choice',  label: 'Water type' } },
         { id: 'water_content_kg',                    fields: { type: 'Numeric', label: 'Water (kg/m³)' } },
         { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric', label: 'GWP (kg CO₂-eq/m³)' } },
@@ -375,6 +376,113 @@ const GristHelpers = {
     const scms = binders.filter(b => !GristHelpers.isCement(b.binder_type));
     if (scms.length === 0) return base + ' only';
     return base + ' + ' + scms.map(b => GristHelpers.SCM_LABELS[b.binder_type] || b.binder_type).join(' + ');
+  },
+
+  // =========================================================================
+  // BINDER FAMILIES — two-level choice of a mix design (family → mix)
+  // Classified by the nature of the additions, not by EN 197 class: the clinker
+  // share needed for an EN 197 class is rarely known precisely.
+  // =========================================================================
+  // SCM binder_type → addition category used for the family
+  SCM_CATEGORY: {
+    limestone_filler: 'LS', fly_ash: 'FA', slag: 'S', silica_fume: 'SF',
+    metakaolin: 'CC', calcined_clay: 'CC',
+    natural_pozzolan: 'PZ', zeolite: 'PZ', rice_husk_ash: 'PZ', glass_powder: 'PZ',
+    other: 'OT',
+  },
+  SCM_MIN_SHARE: 0.05,  // additions below 5 % of the binder are minor components
+
+  // Families in display order. Blended cements get one family per CEM class (see binderFamily).
+  BINDER_FAMILIES: [
+    { key: 'cem1',         label: 'CEM I (Portland only)' },
+    { key: 'limestone',    label: 'Portland + limestone' },
+    { key: 'fly_ash',      label: 'Portland + fly ash' },
+    { key: 'slag',         label: 'Portland + slag' },
+    { key: 'silica_fume',  label: 'Portland + silica fume' },
+    { key: 'pozzolan',     label: 'Portland + pozzolan / metakaolin / calcined clay' },
+    { key: 'lc3',          label: 'LC3 (calcined clay + limestone)' },
+    { key: 'ternary',      label: 'Ternary and other blends' },
+    { key: 'blended',      label: 'Blended cement' },
+    { key: 'non_portland', label: 'Non-Portland (CAC, CSA, alkali-activated)' },
+    { key: 'unknown',      label: 'No binder' },
+  ],
+
+  // binders: [{ binder_type, name, content_kg_m3 }]
+  // Returns { total, scms: [{ category, label, share }], scmShare } — shares are null when contents are missing.
+  mixComposition(binders) {
+    const total = binders.reduce((t, b) => t + (b.content_kg_m3 || 0), 0);
+    const known = total > 0 && binders.every(b => b.content_kg_m3 != null);
+    const byLabel = new Map();
+    binders.filter(b => !GristHelpers.isCement(b.binder_type)).forEach(b => {
+      const label = GristHelpers.SCM_LABELS[b.binder_type] || GristHelpers.enumLabel(b.binder_type) || '?';
+      const cur = byLabel.get(label) || { category: GristHelpers.SCM_CATEGORY[b.binder_type] || 'OT', label, content: 0 };
+      cur.content += b.content_kg_m3 || 0;
+      byLabel.set(label, cur);
+    });
+    const scms = [...byLabel.values()].map(x => ({ category: x.category, label: x.label, share: known ? x.content / total : null }));
+    const scmShare = known ? scms.reduce((t, x) => t + x.share, 0) : null;
+    return { total, scms, scmShare };
+  },
+
+  // Returns { key, label, order } — key is unique per family (blended cements: 'blended:CEM III').
+  binderFamily(binders) {
+    const F = GristHelpers.BINDER_FAMILIES;
+    const fam = (key, label) => {
+      const base = key.split(':')[0];
+      return { key, label: label || F.find(f => f.key === base).label, order: F.findIndex(f => f.key === base) };
+    };
+    if (!binders || binders.length === 0) return fam('unknown');
+
+    const types = binders.map(b => b.binder_type);
+    const blended = binders.find(b => b.binder_type === 'blended_cement');
+    if (blended) {
+      const m = String(blended.name || '').match(/CEM\s*(VI|V|IV|III|II|I)(?![A-Z])/i);
+      const cls = m ? `CEM ${m[1].toUpperCase()}` : null;
+      return fam(`blended:${cls || '?'}`, `Blended cement — ${cls || 'class not specified'}`);
+    }
+    const hasPortland = types.includes('portland_cement');
+    const otherCement = types.some(t => GristHelpers.isCement(t) && t !== 'portland_cement');
+    if (otherCement) return fam(hasPortland ? 'ternary' : 'non_portland');
+
+    const { scms } = GristHelpers.mixComposition(binders);
+    // Unknown shares: every addition counts; known shares: minor components are ignored.
+    const cats = new Set(scms.filter(x => x.share == null || x.share >= GristHelpers.SCM_MIN_SHARE).map(x => x.category));
+    if (cats.size === 0) return fam('cem1');
+    const only = (...c) => cats.size === c.length && c.every(x => cats.has(x));
+    if (only('LS'))       return fam('limestone');
+    if (only('FA'))       return fam('fly_ash');
+    if (only('S'))        return fam('slag');
+    if (only('SF'))       return fam('silica_fume');
+    if (only('CC') || only('PZ') || only('CC', 'PZ')) return fam('pozzolan');
+    if (only('CC', 'LS')) return fam('lc3');
+    return fam('ternary');
+  },
+
+  // Short composition text, e.g. "FA 25 %", "S 50 % + LS 5 %", "CEM III/A 42.5 N"
+  mixCompositionLabel(binders) {
+    if (!binders || binders.length === 0) return 'No binder';
+    const blended = binders.find(b => b.binder_type === 'blended_cement');
+    const { scms } = GristHelpers.mixComposition(binders);
+    const parts = scms.map(x => (x.share != null ? `${x.label} ${Math.round(x.share * 100)} %` : x.label));
+    if (blended) return [blended.name || 'Blended cement', ...parts].join(' + ');
+    const nonPortland = binders.filter(b => GristHelpers.isCement(b.binder_type) && b.binder_type !== 'portland_cement');
+    const cements = nonPortland.map(b => GristHelpers.CEMENT_LABELS[b.binder_type]);
+    return [...cements, ...parts].join(' + ') || 'Portland only';
+  },
+
+  // Suggested mix name, e.g. "FA25-0.45", "S50-LS5-0.40", "CEMI-0.50"
+  suggestMixName(binders, wb) {
+    if (!binders || binders.length === 0) return '';
+    const CODES = { Limestone: 'LS', Slag: 'S', Pozzolan: 'PZ', Zeolite: 'Z', Other: 'X' };
+    const blended = binders.find(b => b.binder_type === 'blended_cement');
+    const { scms } = GristHelpers.mixComposition(binders);
+    const parts = scms.map(x => `${CODES[x.label] || x.label.replace(/\s+/g, '')}${x.share != null ? Math.round(x.share * 100) : ''}`);
+    const nonPortland = binders
+      .filter(b => GristHelpers.isCement(b.binder_type) && !['portland_cement', 'blended_cement'].includes(b.binder_type))
+      .map(b => GristHelpers.CEMENT_LABELS[b.binder_type]);
+    const head = blended ? String(blended.name || 'Blended').replace(/\s+/g, '')
+      : (parts.length || nonPortland.length ? '' : 'CEMI');
+    return [head, ...nonPortland, ...parts, wb != null && wb > 0 ? wb.toFixed(2) : null].filter(Boolean).join('-');
   },
 
   // =========================================================================

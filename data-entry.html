@@ -151,6 +151,8 @@
       background: var(--bg); border: 1px solid var(--accent); border-left-width: 4px; border-radius: 6px;
     }
 
+    .family-select { flex: 0 1 240px; min-width: 0; }
+    .form-field .family-select { margin-bottom: 4px; }
     .label-link {
       float: right; text-transform: none; letter-spacing: 0; font-size: 11px;
       color: var(--accent-light); cursor: pointer;
@@ -302,6 +304,7 @@
         <div class="form-grid">
           <div class="form-field">
             <label>Mix design <span class="req">*</span><a class="label-link" onclick="openBlock('mix')">new…</a></label>
+            <select id="f-mat-mix-family" class="family-select" onchange="onMixFamily('f-mat-mix')"></select>
             <select id="f-mat-mix" onchange="onRefSelect('mix', this)"><option value="">— Select —</option></select>
           </div>
           <div class="form-field">
@@ -343,6 +346,7 @@
       <div class="block-body">
         <div class="context-bar" id="mix-context-bar"></div>
         <div class="selector-row">
+          <select id="sel-mix-family" class="family-select" onchange="onMixFamily('sel-mix')"></select>
           <select id="sel-mix" onchange="onSel('mix')">
             <option value="">— Select a mix design —</option>
           </select>
@@ -399,11 +403,15 @@
 
         <!-- Mix design fields -->
           <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1;">
+              <label>Name <span style="font-size:10px;color:var(--text-dim);text-transform:none;">suggested from the composition — edit freely</span></label>
+              <input type="text" id="f-mix-name" placeholder="FA25-0.45" oninput="this.dataset.touched = this.value ? '1' : ''">
+            </div>
             <div class="form-field"><label>w/c (ratio)</label><input type="number" id="f-mix-wc" step="0.01" min="0" max="1" placeholder="0.45"></div>
             <div class="form-field"><label>Water (kg/m³)</label><input type="number" id="f-mix-water-kg" step="1" min="0" placeholder="175" oninput="calcWlRatio()"></div>
             <div class="form-field">
               <label>w/b (ratio) <span style="font-size:10px; color:var(--text-dim);">auto if empty</span></label>
-              <input type="number" id="f-mix-wl" step="0.01" min="0" max="1" placeholder="computed">
+              <input type="number" id="f-mix-wl" step="0.01" min="0" max="1" placeholder="computed" oninput="refreshMixNameSuggestion()">
             </div>
             <div class="form-field">
               <label>Water type</label>
@@ -1018,10 +1026,11 @@
         const wbManual = f.wl_ratio != null && (wbComputed == null || Math.abs(f.wl_ratio - wbComputed) > 0.001);
         setVal('f-mix-wl', wbManual ? f.wl_ratio : '');
 
+        document.getElementById('f-mix-name').dataset.touched = '';
         renderSelectedBinders();
         renderSelectedAggregates();
         openDuplicateForm('mix',
-          `⧉ Copy of mix design <strong>#${mix.id}</strong> (${selectedBinders.length} binder(s), ` +
+          `⧉ Copy of mix design <strong>#${mix.id}${mix.fields.name ? ' ' + escapeHtml(mix.fields.name) : ''}</strong> (${selectedBinders.length} binder(s), ` +
           `${selectedAggregates.length} aggregate(s)). ` +
           `Change what differs, then save: a <strong>new</strong> mix design will be created.`);
       } catch (err) { notify('Error: ' + err.message, 'err'); }
@@ -1105,6 +1114,7 @@
           `${allSources.length} sources, ${allBinders.length} binders, ` +
           `${allMaterials.length} materials, ${allMeasurements.length} measurements`, 'ok'
         );
+        computeMixInfo();
         populateDropdowns();
         updateStepper();
         GristHelpers.setStatus('Ready', 'ready');
@@ -1118,20 +1128,112 @@
     // DROPDOWNS
     // =========================================================================
     // ---- Record labels shared by selectors ----
+    // ---- Mix designs: family (level 1) and label (level 2) ----
+    let mixInfo = new Map();                                  // mixId → { family, composition, scmShare, total, users }
+    const mixFamilyFilter = { 'sel-mix': '', 'f-mat-mix': '' };  // family chosen in each selector pair
+
+    function mixBinders(mixId) {
+      return allMixBinders.filter(r => r.fields.id_mix_design === mixId).map(r => {
+        const b = allBinders.find(x => x.id === r.fields.id_binder)?.fields || {};
+        // Quantities left empty are stored as 0: treat them as unknown
+        return { binder_type: b.binder_type, name: b.name, content_kg_m3: r.fields.content_kg_m3 || null };
+      });
+    }
+
+    function computeMixInfo() {
+      mixInfo = new Map(allMixes.map(m => {
+        const binders = mixBinders(m.id);
+        const comp = GristHelpers.mixComposition(binders);
+        return [m.id, {
+          family:      GristHelpers.binderFamily(binders),
+          composition: GristHelpers.mixCompositionLabel(binders),
+          scmShare:    comp.scmShare ?? 0,
+          total:       comp.total,
+          users:       allMaterials.filter(x => x.fields.id_mix_design === m.id).map(x => x.fields.name || `#${x.id}`),
+        }];
+      }));
+    }
+
     function mixLabel(m) {
-      const binders = allMixBinders
-        .filter(r => r.fields.id_mix_design === m.id)
-        .map(r => allBinders.find(b => b.id === r.fields.id_binder)?.fields)
-        .filter(Boolean);
-      const sig   = binders.length ? GristHelpers.binderSignature(binders) : null;
-      const total = allMixBinders.filter(r => r.fields.id_mix_design === m.id)
-        .reduce((sum, r) => sum + (r.fields.content_kg_m3 || 0), 0);
+      const info = mixInfo.get(m.id);
+      const f = m.fields;
       const parts = [
-        m.fields.wc_ratio ? `w/c ${m.fields.wc_ratio}` : '',
-        m.fields.wl_ratio ? `w/b ${m.fields.wl_ratio}` : '',
-        total ? `${total} kg binder` : '',
+        info?.composition,
+        f.wl_ratio ? `w/b ${f.wl_ratio}` : (f.wc_ratio ? `w/c ${f.wc_ratio}` : ''),
+        info?.total ? `${info.total} kg/m³` : '',
       ].filter(Boolean).join(' · ');
-      return `#${m.id} — ${sig || 'no binder'}${parts ? ' — ' + parts : ''}`;
+      const users = info?.users || [];
+      const used = users.length
+        ? ` — used by: ${users.slice(0, 2).join(', ')}${users.length > 2 ? ` +${users.length - 2}` : ''}` : '';
+      return `#${m.id}${f.name ? ' ' + f.name : ''} — ${parts || 'no binder'}${used}`;
+    }
+
+    // Fills a family <select> (id + '-family') and its mix <select>:
+    // a family → the mixes of that family; "All families" → every mix, grouped by family.
+    function fillMixSelect(elId) {
+      const el    = document.getElementById(elId);
+      const famEl = document.getElementById(elId + '-family');
+      if (!el || !famEl) return;
+      el.dataset.placeholder ??= el.options[0]?.text || '— Select —';
+
+      const fams = new Map();
+      allMixes.forEach(m => {
+        const f = mixInfo.get(m.id).family;
+        fams.set(f.key, { ...f, n: (fams.get(f.key)?.n || 0) + 1 });
+      });
+      const famList = [...fams.values()].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+
+      // A mix selected elsewhere (duplicate, creation, material form) brings its family along.
+      const selFam = sel.mix && mixInfo.get(sel.mix)?.family.key;
+      if (selFam && mixFamilyFilter[elId] && mixFamilyFilter[elId] !== selFam) mixFamilyFilter[elId] = selFam;
+      if (!fams.has(mixFamilyFilter[elId])) mixFamilyFilter[elId] = '';
+      const cur = mixFamilyFilter[elId];
+
+      famEl.innerHTML = `<option value="">All families (${allMixes.length})</option>` +
+        famList.map(f => `<option value="${escapeHtml(f.key)}">${escapeHtml(f.label)} (${f.n})</option>`).join('');
+      famEl.value = cur;
+
+      const sorted = [...allMixes].sort((a, b) => {
+        const A = mixInfo.get(a.id), B = mixInfo.get(b.id);
+        return A.family.order - B.family.order || A.family.label.localeCompare(B.family.label)
+          || A.scmShare - B.scmShare || (a.fields.wl_ratio || 0) - (b.fields.wl_ratio || 0);
+      });
+      const opt = m => `<option value="${m.id}">${escapeHtml(mixLabel(m))}</option>`;
+      let html = `<option value="">${escapeHtml(el.dataset.placeholder)}</option>`;
+      if (cur) {
+        html += sorted.filter(m => mixInfo.get(m.id).family.key === cur).map(opt).join('');
+      } else {
+        famList.forEach(f => {
+          html += `<optgroup label="${escapeHtml(f.label)}">` +
+            sorted.filter(m => mixInfo.get(m.id).family.key === f.key).map(opt).join('') + '</optgroup>';
+        });
+      }
+      el.innerHTML = html;
+      el.value = sel.mix || '';
+    }
+
+    function onMixFamily(elId) {
+      const key = document.getElementById(elId + '-family').value;
+      mixFamilyFilter[elId] = key;
+      // The selected mix no longer belongs to the chosen family: deselect it.
+      if (sel.mix && key && mixInfo.get(sel.mix)?.family.key !== key) sel.mix = null;
+      populateDropdowns();
+      updateStepper();
+    }
+
+    // Keeps the mix name in line with the composition until the user types their own.
+    function refreshMixNameSuggestion() {
+      const el = document.getElementById('f-mix-name');
+      if (!el || el.dataset.touched) return;
+      const binders = selectedBinders.map(b => ({
+        binder_type:   allBinders.find(x => x.id === b.id_binder)?.fields.binder_type,
+        name:          b._name,
+        content_kg_m3: b.content_kg_m3,
+      }));
+      const water = floatOrNull('f-mix-water-kg');
+      const total = selectedBinders.reduce((t, b) => t + (b.content_kg_m3 ?? 0), 0);
+      const wb = floatOrNull('f-mix-wl') ?? (water != null && total > 0 ? water / total : null);
+      el.value = GristHelpers.suggestMixName(binders, wb);
     }
     function exposureLabel(e) {
       const L = GristHelpers.enumLabel;
@@ -1184,11 +1286,11 @@
           ? ` ${a.fields.size_min_mm ?? '?'}–${a.fields.size_max_mm ?? '?'} mm` : '';
         return `${name}${type ? ' (' + type + ')' : ''}${size}`;
       });
-      fillDrop('sel-mix',      allMixes,     mixLabel);
+      fillMixSelect('sel-mix');
       fillDrop('sel-exposure', allExposures, exposureLabel);
       fillDrop('sel-curing',   allCurings,   curingLabel);
       fillDrop('sel-site',     allSites,     siteLabel);
-      fillDrop('f-mat-mix',      allMixes,     mixLabel);
+      fillMixSelect('f-mat-mix');
       fillDrop('f-mat-exposure', allExposures, exposureLabel);
       fillDrop('f-mat-curing',   allCurings,   curingLabel);
       fillDrop('f-mat-site',     allSites,     siteLabel);
@@ -1300,6 +1402,7 @@
       } else {
         wlEl.placeholder = 'computed';
       }
+      refreshMixNameSuggestion();
     }
 
     function floatOrNull(id) {
@@ -1568,6 +1671,8 @@
           fails: () => selectedBinders.some(b => b.content_kg_m3 == null) },
         range('f-mix-wc', 0, 3), range('f-mix-wl', 0, 3),
         range('f-mix-air', 0, 30), range('f-mix-water-kg', 0, 1000),
+        { id: 'f-mix-name', level: 'warn', msg: 'A mix design with this name already exists',
+          fails: () => val('f-mix-name') && allMixes.some(m => (m.fields.name || '').trim().toLowerCase() === val('f-mix-name').toLowerCase()) },
         { id: 'f-mix-wc', level: 'warn', msg: `Differs from water / cement = ${cement ? (water / cement).toFixed(3) : '?'}`,
           fails: () => mismatch('f-mix-wc', cement) },
         { id: 'f-mix-wl', level: 'warn', msg: `Differs from water / binder = ${binder ? (water / binder).toFixed(3) : '?'}`,
@@ -1583,6 +1688,7 @@
         })();
 
         const mixFields = {
+          name:                                val('f-mix-name'),
           water_content_kg:                    floatOrNull('f-mix-water-kg')      ?? 0,
           water_type:                          document.getElementById('f-mix-water-type').value || '',
           wc_ratio:                            floatOrNull('f-mix-wc')            ?? 0,
@@ -1620,6 +1726,7 @@
         renderSelectedAggregates();
 
         sel.mix = result.id;
+        document.getElementById('f-mix-name').dataset.touched = '';
         toggleForm('mix');
         await refreshAll();
         backToMaterialForm('mix');
@@ -2720,6 +2827,7 @@
       calcWlRatio();
       updateMixContextBar();
       updateStepper();
+      refreshMixNameSuggestion();
     }
 
     function addBinderToSelection() {

@@ -32,6 +32,7 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 - `grist-helpers.js` — `GristHelpers` namespace:
   - Schema: `SCHEMA` (15 table definitions), `ENUMS` (allowed values of Choice columns), `ENUM_LABELS` + `enumLabel(value)` (display labels for enum values; stored values unchanged), `SCALAR_PARAMETERS` (dictionary of `SCALAR.name` values with default unit + RILEM label), `VALUE_RENAMES` (stored values renamed across versions), `ensureSchema()`
   - Binders: `CEMENT_LABELS`, `SCM_LABELS`, `isCement(type)`, `binderSignature(binders)` (e.g. "Portland + FA + SF")
+  - Binder families (two-level mix choice): `BINDER_FAMILIES`, `binderFamily(binders)` (classified by the nature of additions ≥ 5 % of the binder, not by EN 197 class; blended cements by the CEM class read in their name), `mixComposition()`, `mixCompositionLabel()` (e.g. "FA 25 %"), `suggestMixName(binders, wb)`
   - Data access: `fetchAllRecords(table)`, `createRecord(table, fields)`, `updateRecord()`, `bulkCreateRecords()`, `bulkRemoveRecords()`, `joinScalarData()`, `joinCurvePoints()`, `joinChlorideProfiles()`
   - UI: `log()`, `setStatus()`, `plotlyDarkLayout()`, `plotlyDarkAxis()`, `formatDapp()`, `formatKcarb()`, `formatDureeVie()`
 
@@ -64,7 +65,7 @@ Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement sto
 **Constituents and mix design:**
 - **BINDER**: `name`, `binder_type` [binder_type], `density_kg_m3`, `specific_surface`, `loss_on_ignition`, Bogue phases `C3S`, `C2S`, `C3A`, `C4AF`, `Gp`, oxides `SiO2`, `Al2O3`, `Fe2O3`, `CaO`, `MgO`, `SO3`, `K2O`, `Na2O`, `notes`
 - **AGGREGATE**: `name`, `aggregate_type` [aggregate_type], `size_min_mm`, `size_max_mm`, `density_kg_m3`, `water_absorption_pct`, `notes`
-- **MIX_DESIGN**: `water_type` [water_type], `water_content_kg`, `global_warming_performance_kg_eq_m3`, `wc_ratio`, `wl_ratio`, `admix_type` [admix_type], `adjuvant_content`, `entrained_air`
+- **MIX_DESIGN**: `name` (optional, suggested from the composition e.g. `FA25-0.45`), `water_type` [water_type], `water_content_kg`, `global_warming_performance_kg_eq_m3`, `wc_ratio`, `wl_ratio`, `admix_type` [admix_type], `adjuvant_content`, `entrained_air`
 - **MIX_DESIGN_BINDER**: `id_mix_design` (Ref→MIX_DESIGN), `id_binder` (Ref→BINDER), `content_kg_m3`
 - **MIX_DESIGN_AGGREGATE**: `id_mix_design` (Ref→MIX_DESIGN), `id_aggregate` (Ref→AGGREGATE), `content_kg_m3`
 - **CURING_CONDITION**: `temperature_c`, `humidity_pct`, `wind_protection`, `solar_protection`, `curing_method` [curing_method], `curing_duration_days`, `standard_name`
