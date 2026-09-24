@@ -352,7 +352,7 @@
         (p.source.authors ? p.source.authors.split(',')[0].trim() +
           (p.source.year ? ' ' + p.source.year : '') : '?');
       const expo = [p.exposure.exposure_nature, p.exposure.exposure_type]
-        .filter(Boolean).join(' / ');
+        .map(GristHelpers.enumLabel).filter(Boolean).join(' / ');
       const dur = p.scalars.exposure_duration != null
         ? p.scalars.exposure_duration.toFixed(1) + ' yr' : '?';
       const ec  = p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?';
@@ -411,7 +411,7 @@
 
     function getLegendKey(p, colorBy) {
       switch (colorBy) {
-        case 'exposure_nature': return p.exposure.exposure_nature || 'Unknown';
+        case 'exposure_nature': return GristHelpers.enumLabel(p.exposure.exposure_nature) || 'Unknown';
         case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
         case 'binder_sig':      return getBinderSignature(p);
         case 'cement':          return primaryCementName(p) || 'Unknown';

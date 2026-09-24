@@ -199,8 +199,8 @@
       const srcLabels   = [...new Set(data.map(d => sourceLabel(d.source)).filter(Boolean))].sort();
 
       fillSelect('filter-mix',            matNames,    'All materials');
-      fillSelect('filter-exposure-type',  expoTypes,   'All exposure types');
-      fillSelect('filter-exposure-nature',expoNatures, 'All natures');
+      fillSelect('filter-exposure-type',  expoTypes,   'All exposure types', GristHelpers.enumLabel);
+      fillSelect('filter-exposure-nature',expoNatures, 'All natures',        GristHelpers.enumLabel);
       fillSelect('filter-source',         srcLabels,   'All sources');
     }
 
@@ -209,12 +209,12 @@
       return source.designation || source.authors || null;
     }
 
-    function fillSelect(id, values, defaultText) {
+    function fillSelect(id, values, defaultText, labelFn = v => v) {
       const sel = document.getElementById(id);
       sel.innerHTML = `<option value="">${defaultText}</option>`;
       values.forEach(v => {
         const opt = document.createElement('option');
-        opt.value = v; opt.textContent = v;
+        opt.value = v; opt.textContent = labelFn(v);
         sel.appendChild(opt);
       });
       sel.onchange = applyFilters;
@@ -389,8 +389,8 @@
           <td>${d.material.name           || '—'}</td>
           <td>${d.material.id_mix_design  ? `mix#${d.material.id_mix_design}` : '—'}</td>
           <td>${d.mix.wc_ratio != null    ? d.mix.wc_ratio.toFixed(2) : '—'}</td>
-          <td>${d.exposure.exposure_type  || '—'}</td>
-          <td>${d.exposure.exposure_nature|| '—'}</td>
+          <td>${GristHelpers.enumLabel(d.exposure.exposure_type)   || '—'}</td>
+          <td>${GristHelpers.enumLabel(d.exposure.exposure_nature) || '—'}</td>
           <td>${GristHelpers.formatDapp(d.D)}</td>
           <td>${d.duree_vie_ans != null && d.duree_vie_ans > 0 ? d.duree_vie_ans.toFixed(1) : '—'}</td>
           <td>${sourceLabel(d.source)     || '—'}</td>

@@ -617,7 +617,7 @@
 
     function getLegendKey(p, colorBy) {
       switch (colorBy) {
-        case 'exposure_nature': return p.exposure.exposure_nature || 'Unknown';
+        case 'exposure_nature': return GristHelpers.enumLabel(p.exposure.exposure_nature) || 'Unknown';
         case 'cl_type':         return getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
         case 'binder_sig':      return getBinderSignature(p);
         case 'cement':          return primaryCementName(p) || 'Unknown';
@@ -636,7 +636,7 @@
       const src = p.source.designation ||
         (p.source.authors ? p.source.authors.split(',')[0].trim() +
           (p.source.year ? ' ' + p.source.year : '') : '?');
-      const expo = [p.exposure.exposure_nature, p.exposure.exposure_type].filter(Boolean).join(' / ');
+      const expo = [p.exposure.exposure_nature, p.exposure.exposure_type].map(GristHelpers.enumLabel).filter(Boolean).join(' / ');
       const dur  = p.scalars.exposure_duration != null ? p.scalars.exposure_duration.toFixed(1) + ' yr' : '?';
       const ec   = p.mix.wc_ratio != null ? p.mix.wc_ratio.toFixed(2) : '?';
       const el   = (p.mix.wl_ratio ?? p.mix.wc_ratio) != null ? (p.mix.wl_ratio ?? p.mix.wc_ratio).toFixed(2) : '?';
@@ -795,11 +795,11 @@
       return {
         source:       src,
         mat_name:     p.material.name        || '—',
-        mat_type:     p.material.material_type || '—',
+        mat_type:     GristHelpers.enumLabel(p.material.material_type) || '—',
         site:         p.site.country_region  || '—',
         latitude:     p.site.latitude        ?? null,
-        expo_type:    p.exposure.exposure_type   || '—',
-        expo_nature:  p.exposure.exposure_nature || '—',
+        expo_type:    GristHelpers.enumLabel(p.exposure.exposure_type)   || '—',
+        expo_nature:  GristHelpers.enumLabel(p.exposure.exposure_nature) || '—',
         liants,
         wc_ratio:     p.mix.wc_ratio    ?? null,
         wl_ratio:     p.mix.wl_ratio    ?? p.mix.wc_ratio ?? null,
@@ -942,7 +942,7 @@
         const measId = getMeasurementIdFromProfile(p);
         if (!measId) return null;
         const mat    = p.material.name || '?';
-        const nature = p.exposure.exposure_nature || '?';
+        const nature = GristHelpers.enumLabel(p.exposure.exposure_nature) || '?';
         const dur    = p.scalars.exposure_duration != null
                        ? p.scalars.exposure_duration.toFixed(0) + ' yr' : '?';
         const src    = p.source.designation ||
@@ -1128,10 +1128,10 @@
       const expo = currentExposure  || {};
       const fields = [
         { label: 'Material',       value: mat.name          || '—' },
-        { label: 'Material type',  value: mat.material_type || '—' },
+        { label: 'Material type',  value: GristHelpers.enumLabel(mat.material_type)   || '—' },
         { label: 'w/c',            value: mix.wc_ratio != null ? mix.wc_ratio.toFixed(2) : '—' },
-        { label: 'Exposure type',  value: expo.exposure_type   || '—' },
-        { label: 'Exposure nature',value: expo.exposure_nature || '—' },
+        { label: 'Exposure type',  value: GristHelpers.enumLabel(expo.exposure_type)   || '—' },
+        { label: 'Exposure nature',value: GristHelpers.enumLabel(expo.exposure_nature) || '—' },
       ];
       document.getElementById('context-info').innerHTML = fields.map(f => `
         <div class="info-item">

@@ -249,9 +249,6 @@
             <label>Type</label>
             <select id="f-mat-type" data-table="MATERIAL" data-field="material_type">
               <option value="">— choose —</option>
-              <option value="cement_paste">Cement paste</option>
-              <option value="mortar">Mortar</option>
-              <option value="concrete">Concrete</option>
             </select>
           </div>
           <div class="field-item"><!-- spacer --></div>
@@ -301,19 +298,12 @@
             <label>Exposure type</label>
             <select id="f-expo-type" data-table="EXPOSURE" data-field="exposure_type">
               <option value="">— choose —</option>
-              <option value="laboratory">Laboratory</option>
-              <option value="in-situ">In situ</option>
             </select>
           </div>
           <div class="field-item">
             <label>Exposure nature</label>
             <select id="f-expo-nature" data-table="EXPOSURE" data-field="exposure_nature">
               <option value="">— choose —</option>
-              <option value="atmospheric">Atmospheric</option>
-              <option value="spray">Spray</option>
-              <option value="splash">Splash</option>
-              <option value="tidal">Tidal</option>
-              <option value="submerged">Submerged</option>
             </select>
           </div>
           <div class="field-item">
@@ -351,9 +341,6 @@
             <label>Water type</label>
             <select id="f-mix-watertype" data-table="MIX_DESIGN" data-field="water_type">
               <option value="">— choose —</option>
-              <option value="tap_water">Tap water</option>
-              <option value="pure_water">Pure water</option>
-              <option value="sea_water">Sea water</option>
             </select>
           </div>
           <div class="field-item">
@@ -414,12 +401,6 @@
             <label>Curing method</label>
             <select id="f-cure-method" data-table="CURING_CONDITION" data-field="curing_method">
               <option value="">— choose —</option>
-              <option value="water_spraying">Water spraying</option>
-              <option value="wet_covering">Wet covering</option>
-              <option value="curing_compounds">Curing compounds</option>
-              <option value="forms_left_in_place">Forms left in place</option>
-              <option value="wet_curing">Wet curing</option>
-              <option value="water_immersion">Water immersion</option>
             </select>
           </div>
           <div class="field-item">
@@ -668,6 +649,10 @@ function setField(id, val, isDate = false, isBool = false) {
   } else if (isDate) {
     el.value = tsToDateInput(val);
   } else {
+    // A value added by hand to a Choice column in Grist may be missing from the <select>.
+    if (el.tagName === 'SELECT' && val != null && val !== '' && ![...el.options].some(o => o.value == val)) {
+      el.add(new Option(GristHelpers.enumLabel(val), val));
+    }
     el.value = (val != null) ? val : '';
   }
 }
@@ -825,7 +810,7 @@ async function loadBinders() {
     allBinders.forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
-      opt.textContent = (b.fields.name || 'Binder #' + b.id) + ' (' + (b.fields.binder_type || '') + ')';
+      opt.textContent = (b.fields.name || 'Binder #' + b.id) + ' (' + GristHelpers.enumLabel(b.fields.binder_type) + ')';
       sel.appendChild(opt);
     });
 
@@ -843,7 +828,7 @@ async function loadBinders() {
       row.dataset.mbId = mb.id;
       row.innerHTML = `
         <span class="b-name">${binder.name || '(no name)'}</span>
-        <span class="b-type">${binder.binder_type || '—'}</span>
+        <span class="b-type">${GristHelpers.enumLabel(binder.binder_type) || '—'}</span>
         <input type="number" step="any" min="0" value="${mb.fields.content_kg_m3 != null ? mb.fields.content_kg_m3 : ''}" placeholder="kg/m³" data-mb-id="${mb.id}">
         <button class="btn-del" data-mb-id="${mb.id}" title="Remove">✕</button>
       `;
@@ -903,7 +888,7 @@ function confirmAddBinder() {
   tempRow.style.fontStyle = 'italic';
   tempRow.innerHTML = `
     <span class="b-name">${binder?.fields?.name || '(new)'} <span style="color:var(--accent);font-size:10px;">●</span></span>
-    <span class="b-type">${binder?.fields?.binder_type || ''}</span>
+    <span class="b-type">${GristHelpers.enumLabel(binder?.fields?.binder_type)}</span>
     <span>${kg != null ? kg + ' kg/m³' : '—'}</span>
     <span></span>
   `;
@@ -943,7 +928,7 @@ async function loadAggregates() {
       opt.value = a.id;
       const size = (a.fields.size_min_mm != null && a.fields.size_max_mm != null)
         ? ` ${a.fields.size_min_mm}/${a.fields.size_max_mm} mm` : '';
-      opt.textContent = (a.fields.name || 'Aggregate #' + a.id) + size + ' (' + (a.fields.aggregate_type || '') + ')';
+      opt.textContent = (a.fields.name || 'Aggregate #' + a.id) + size + ' (' + GristHelpers.enumLabel(a.fields.aggregate_type) + ')';
       sel.appendChild(opt);
     });
 
@@ -1162,8 +1147,11 @@ function renderMeasTable() {
   // Text filter
   if (query) {
     rows = rows.filter(r => {
+      const L = GristHelpers.enumLabel;
       const all = [r.test, r.testType, r.mat_name, r.source, r.sample_type, r.dimensions, r.operator, r.prep, r.result,
                    r.mat_type, r.expo_type, r.expo_nature,
+                   L(r.test), L(r.testType), L(r.sample_type), L(r.dimensions),
+                   L(r.mat_type), L(r.expo_type), L(r.expo_nature),
                    r.wc_ratio != null ? String(r.wc_ratio) : '',
                    r.wl_ratio != null ? String(r.wl_ratio) : '',
                    ...r.scalars.map(v => v != null ? String(v) : ''),
@@ -1214,7 +1202,7 @@ function renderMeasTable() {
   }
 
   function clTag(ct) {
-    const label = ct === 'free_cl' ? 'Free Cl' : ct === 'total_cl' ? 'Total Cl' : ct || '';
+    const label = ct === 'free_cl' ? 'Free Cl' : ct === 'total_cl' ? 'Total Cl' : GristHelpers.enumLabel(ct);
     return ct ? `<span class="tag ${ct}">${label}</span>` : '<span style="color:var(--text-dim)">—</span>';
   }
 
@@ -1223,9 +1211,9 @@ function renderMeasTable() {
   for (const [, grp] of sortedGroups) {
     const rep = grp[0];
     const matInfo = [
-      rep.mat_type || '',
-      rep.expo_type || '',
-      rep.expo_nature || '',
+      GristHelpers.enumLabel(rep.mat_type),
+      GristHelpers.enumLabel(rep.expo_type),
+      GristHelpers.enumLabel(rep.expo_nature),
       rep.wc_ratio != null ? `w/c ${Number(rep.wc_ratio).toFixed(2)}` : '',
       rep.wl_ratio != null ? `w/b ${Number(rep.wl_ratio).toFixed(2)}` : '',
       rep.water_kg != null ? `${Math.round(rep.water_kg)} kg/m³` : '',
@@ -1240,7 +1228,7 @@ function renderMeasTable() {
       const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
       const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
       html += `<tr${sel} data-meas-id="${r.id}">
-        <td><span class="meas-badge">${r.test || '?'}</span></td>
+        <td><span class="meas-badge">${GristHelpers.enumLabel(r.test) || '?'}</span></td>
         <td>${clTag(r.testType)}</td>
         <td>${r.time_days != null ? r.time_days : '—'}</td>
         <td>${r.prep || '—'}</td>
@@ -1261,7 +1249,7 @@ function renderMeasTable() {
 }
 
 function measRowVal(r, col) {
-  const fixed = [r.test, r.testType, r.time_days, r.prep, r.result];
+  const fixed = [GristHelpers.enumLabel(r.test), GristHelpers.enumLabel(r.testType), r.time_days, r.prep, r.result];
   if (col < fixed.length) return fixed[col];
   const scIdx = col - fixed.length;
   if (scIdx < r.scalars.length) return r.scalars[scIdx] ?? -Infinity;
@@ -1311,7 +1299,7 @@ function selectMeasRow(measId) {
   const prep   = tsToDateInput(m.fields.preparation_date) || '—';
   const result = tsToDateInput(m.fields.result_date) || '—';
   document.getElementById('meas-detail-subtitle').textContent =
-    `${test.name || '?'} · ${prep} → ${result}`;
+    `${GristHelpers.enumLabel(test.name) || '?'} · ${prep} → ${result}`;
 
   // Form body
   const detailBody = document.getElementById('meas-detail-body');
@@ -1331,15 +1319,11 @@ function selectMeasRow(measId) {
 function buildDetailForm(m, mScalars, mCurves) {
   const f = m.fields;
 
-  const sampleTypeOpts = ['', 'laboratory_sample', 'bridge_pier'].map(v =>
-    `<option value="${v}" ${f.sample_type === v ? 'selected' : ''}>${v || '— choose —'}</option>`
-  ).join('');
-
-  const dimValues = ['','cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320',
-    'cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'];
-  const dimOpts = dimValues.map(v =>
-    `<option value="${v}" ${f.sample_dimensions === v ? 'selected' : ''}>${v || '— choose —'}</option>`
-  ).join('');
+  // Keep a value added by hand in Grist that is not in ENUMS
+  const withCurrent = (enumKey, v) => enumOptions(enumKey, v) +
+    (v && !GristHelpers.ENUMS[enumKey].includes(v) ? `<option value="${v}" selected>${GristHelpers.enumLabel(v)}</option>` : '');
+  const sampleTypeOpts = withCurrent('sample_type', f.sample_type);
+  const dimOpts        = withCurrent('sample_dimensions', f.sample_dimensions);
 
   const scalarsHtml = mScalars.length > 0
     ? `<div class="scalar-cols-header"><span>Parameter</span><span>Value</span><span>Unit</span><span></span></div>`
@@ -1642,7 +1626,19 @@ function resetChanges() {
 function fillDatalist(id, values) {
   let dl = document.getElementById(id);
   if (!dl) { dl = document.createElement('datalist'); dl.id = id; document.body.appendChild(dl); }
-  dl.innerHTML = values.map(v => `<option value="${v}">`).join('');
+  dl.innerHTML = values.map(v => `<option value="${v}">${GristHelpers.enumLabel(v)}</option>`).join('');
+}
+
+// Enum <select>: stored value as option value, display label as text
+function enumOptions(enumKey, current, placeholder = '— choose —') {
+  return ['', ...GristHelpers.ENUMS[enumKey]].map(v =>
+    `<option value="${v}" ${current === v ? 'selected' : ''}>${v ? GristHelpers.enumLabel(v) : placeholder}</option>`
+  ).join('');
+}
+
+function fillEnumSelect(elId, enumKey) {
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = enumOptions(enumKey, el.value);
 }
 
 // INIT
@@ -1650,6 +1646,11 @@ function fillDatalist(id, values) {
 (async function() {
   GristHelpers.log('Initializing Editor…');
   fillDatalist('dl-admix', GristHelpers.ENUMS.admix_type);
+  fillEnumSelect('f-mat-type',      'material_type');
+  fillEnumSelect('f-expo-type',     'exposure_type');
+  fillEnumSelect('f-expo-nature',   'exposure_nature');
+  fillEnumSelect('f-mix-watertype', 'water_type');
+  fillEnumSelect('f-cure-method',   'curing_method');
   fillDatalist('dl-sc-name', GristHelpers.ENUMS.scalar_name);
   grist.ready({ requiredAccess: 'full' });
   grist.onRecord(async (record) => {
