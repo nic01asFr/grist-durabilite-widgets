@@ -30,7 +30,7 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 ### Shared code (`assets/`)
 - `shared-styles.css` — CSS custom properties (`:root` variables), base reset, shared components (`.card`, `.header`, `.status`, `.info-grid`, `.btn`, `.log`, `.tabs`, `.filter-bar`, `.mode-selector`)
 - `grist-helpers.js` — `GristHelpers` namespace:
-  - Schema: `SCHEMA` (15 table definitions), `ENUMS` (allowed values of Choice columns), `SCALAR_PARAMETERS` (dictionary of `SCALAR.name` values with default unit + RILEM label), `VALUE_RENAMES` (stored values renamed across versions), `ensureSchema()`
+  - Schema: `SCHEMA` (15 table definitions), `ENUMS` (allowed values of Choice columns), `ENUM_LABELS` + `enumLabel(value)` (display labels for enum values; stored values unchanged), `SCALAR_PARAMETERS` (dictionary of `SCALAR.name` values with default unit + RILEM label), `VALUE_RENAMES` (stored values renamed across versions), `ensureSchema()`
   - Binders: `CEMENT_LABELS`, `SCM_LABELS`, `isCement(type)`, `binderSignature(binders)` (e.g. "Portland + FA + SF")
   - Data access: `fetchAllRecords(table)`, `createRecord(table, fields)`, `updateRecord()`, `bulkCreateRecords()`, `joinScalarData()`, `joinCurvePoints()`, `joinChlorideProfiles()`
   - UI: `log()`, `setStatus()`, `plotlyDarkLayout()`, `plotlyDarkAxis()`, `formatDapp()`, `formatKcarb()`, `formatDureeVie()`
@@ -77,6 +77,7 @@ Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement sto
 ### Vocabularies
 
 - Choice values are snake_case ids defined once in `GristHelpers.ENUMS`; `SCHEMA` columns reference them via `enum: '<key>'` (never inline `widgetOptions`). `ENUMS.scalar_name` is derived from `SCALAR_PARAMETERS`.
+- Widgets never hard-code `<option>` lists for enums: fill selects from `ENUMS` and display `enumLabel(v)` (humanized by default; add an entry to `ENUM_LABELS` for acronyms or ambiguous ids).
 - Binder types, test names, admixture types and SCALAR parameters were enriched from the RILEM metadata tool vocabularies (huggingface.co/spaces/raviapatel/rilem-metadata-tool): keep the matching RILEM label in `SCALAR_PARAMETERS[*].rilem` when adding a parameter.
 - SCALAR names written or read by widgets (`D`, `Dapp`, `Cs`, `R2`, `RMSE`, `duree_vie_ans`, `profondeur_crit`, `source_dapp`, `carbonation_rate_coeff`, `cover_depth`, `source_kcarb`, `mean_depth`, `exposure_duration`, `<test>_file`) must not be renamed without adding an entry to `VALUE_RENAMES` and updating the widgets.
 - To rename a stored value: change it in `ENUMS`/`SCALAR_PARAMETERS`, add `old → new` to `VALUE_RENAMES`, and update widget code; `ensureSchema()` migrates existing documents.

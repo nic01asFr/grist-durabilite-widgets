@@ -231,6 +231,49 @@ const GristHelpers = {
   },
 
   // =========================================================================
+  // ENUM_LABELS — Display labels for ENUMS values (stored values are unchanged)
+  // Values not listed here are humanized by enumLabel(): "wet_curing" → "Wet curing".
+  // =========================================================================
+  ENUM_LABELS: {
+    'in-situ':                'In situ',
+    cl_profil:                'Chloride profile',
+    diffusivity:              'Chloride diffusivity',
+    Rc:                       'Compressive strength (Rc)',
+    rcpt:                     'RCPT (rapid chloride permeability)',
+    ASR:                      'Alkali–silica reaction (ASR)',
+    freeze_thaw:              'Freeze–thaw',
+    org_density:              'Density',
+    SEM:                      'SEM (scanning electron microscopy)',
+    XRD:                      'XRD (X-ray diffraction)',
+    EDS:                      'EDS (energy-dispersive spectroscopy)',
+    MIP:                      'MIP (mercury intrusion porosimetry)',
+    NMR:                      'NMR (nuclear magnetic resonance)',
+    total_cl:                 'Total chloride',
+    free_cl:                  'Free chloride',
+    csa_cement:               'CSA cement',
+    calcium_aluminate_cement: 'Calcium aluminate cement (CAC)',
+    alkali_activated:         'Alkali-activated binder',
+    rice_husk_ash:            'Rice husk ash (RHA)',
+    air_entraining:           'Air-entraining agent',
+    powder:                   'Powder',
+  },
+
+  // "cylinder_110x220" → "Cylinder Ø110 × 220 mm", "prism_40x40x160" → "Prism 40 × 40 × 160 mm"
+  enumLabel(value) {
+    if (value == null || value === '') return '';
+    const v = String(value);
+    if (Object.prototype.hasOwnProperty.call(GristHelpers.ENUM_LABELS, v)) return GristHelpers.ENUM_LABELS[v];
+    const dims = v.match(/^(cylinder|cube|prism)_(\d+(?:x\d+)*)$/);
+    if (dims) {
+      const sizes = dims[2].split('x').join(' × ');
+      const shape = dims[1][0].toUpperCase() + dims[1].slice(1);
+      return `${shape} ${dims[1] === 'cylinder' ? 'Ø' : ''}${sizes} mm`;
+    }
+    const s = v.replace(/_/g, ' ');
+    return s[0].toUpperCase() + s.slice(1);
+  },
+
+  // =========================================================================
   // SCALAR_PARAMETERS — Dictionary of SCALAR.name values
   // unit: default unit; rilem: matching RILEM "Data_Categories" label (null if none)
   // Names already written by widgets (D, Dapp, Cs, duree_vie_ans…) must stay unchanged.

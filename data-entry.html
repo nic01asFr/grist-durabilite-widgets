@@ -92,6 +92,36 @@
     }
     .mini-table .row-actions { width: 30px; text-align: center; }
 
+    .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .dup-banner {
+      margin-bottom: 12px; padding: 8px 12px; font-size: 12px; color: var(--text-muted);
+      background: var(--bg); border: 1px solid var(--accent); border-left-width: 4px; border-radius: 6px;
+    }
+
+    .label-link {
+      float: right; text-transform: none; letter-spacing: 0; font-size: 11px;
+      color: var(--accent-light); cursor: pointer;
+    }
+    .label-link:hover { text-decoration: underline; }
+
+    .form-field .invalid  { border-color: var(--error) !important; }
+    .form-field .warning  { border-color: var(--warning) !important; }
+    .field-error { font-size: 11px; color: var(--error); margin-top: 3px; }
+    .field-error.warn { color: var(--warning); }
+
+    #toasts {
+      position: fixed; top: 12px; right: 12px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 6px; max-width: min(360px, calc(100vw - 24px));
+    }
+    .toast {
+      padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #fff;
+      background: var(--text-muted); box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: opacity 0.3s;
+    }
+    .toast.ok   { background: var(--success); }
+    .toast.warn { background: var(--warning); }
+    .toast.err  { background: var(--error); }
+
     .paste-zone {
       width: 100%; min-height: 34px; margin-bottom: 8px; padding: 8px 10px; resize: none;
       background: var(--surface); border: 1px dashed var(--border); border-radius: 6px;
@@ -134,6 +164,8 @@
       <div class="status" id="status"><span class="dot"></span><span id="status-text">Loading…</span></div>
     </div>
   </div>
+
+  <div id="toasts" aria-live="polite"></div>
 
   <!-- Breadcrumb -->
   <div class="card" style="padding:10px 16px;">
@@ -288,11 +320,6 @@
           <label>Type <span class="req">*</span></label>
           <select id="f-agg-type">
             <option value="">Choose…</option>
-            <option value="sand">sand</option>
-            <option value="gravel">gravel</option>
-            <option value="crushed_stone">crushed_stone</option>
-            <option value="lightweight">lightweight</option>
-            <option value="recycled">recycled</option>
           </select>
         </div>
         <div class="form-field"><label>D min (mm)</label><input type="number" id="f-agg-dmin" step="0.1" min="0" placeholder="0"></div>
@@ -320,8 +347,11 @@
           <option value="">— Select a mix design —</option>
         </select>
         <button class="btn btn-secondary" onclick="toggleForm('mix')">+ New</button>
+        <button class="btn btn-secondary" id="btn-dup-mix" onclick="duplicateMix()" disabled
+          title="Create a new mix design pre-filled from the selected one">⧉ Duplicate</button>
       </div>
       <div id="form-mix" style="display:none;">
+        <div class="dup-banner" id="dup-banner-mix" style="display:none;"></div>
 
         <!-- Binders section -->
         <div style="border:1px solid var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
@@ -357,9 +387,6 @@
             <label>Water type</label>
             <select id="f-mix-water-type">
               <option value="">—</option>
-              <option value="tap_water">tap_water</option>
-              <option value="pure_water">pure_water</option>
-              <option value="sea_water">sea_water</option>
             </select>
           </div>
           <div class="form-field" style="grid-column:1/-1;">
@@ -397,19 +424,12 @@
             <label>Type <span class="req">*</span></label>
             <select id="f-expo-type">
               <option value="">Choose…</option>
-              <option value="laboratory">laboratory</option>
-              <option value="in-situ">in-situ</option>
             </select>
           </div>
           <div class="form-field">
             <label>Nature <span class="req">*</span></label>
             <select id="f-expo-nature">
               <option value="">Choose…</option>
-              <option value="atmospheric">atmospheric</option>
-              <option value="spray">spray</option>
-              <option value="splash">splash</option>
-              <option value="tidal">tidal</option>
-              <option value="submerged">submerged</option>
             </select>
           </div>
           <div class="form-field"><label>Wetting (%)</label><input type="number" id="f-expo-wetting" step="1" min="0" max="100" placeholder="50"></div>
@@ -438,12 +458,6 @@
             <label>Method</label>
             <select id="f-cur-method">
               <option value="">Choose…</option>
-              <option value="water_spraying">water_spraying</option>
-              <option value="wet_covering">wet_covering</option>
-              <option value="curing_compounds">curing_compounds</option>
-              <option value="forms_left_in_place">forms_left_in_place</option>
-              <option value="wet_curing">wet_curing</option>
-              <option value="water_immersion">water_immersion</option>
             </select>
           </div>
           <div class="form-field"><label>Curing duration (days)</label><input type="number" id="f-cur-duration" step="1" min="0" placeholder="28"></div>
@@ -496,18 +510,35 @@
           <option value="">— Select a material —</option>
         </select>
         <button class="btn btn-secondary" onclick="toggleForm('material')">+ New</button>
+        <button class="btn btn-secondary" id="btn-dup-material" onclick="duplicateMaterial()" disabled
+          title="Create a new material pre-filled from the selected one">⧉ Duplicate</button>
       </div>
       <div id="form-material" style="display:none;">
-        <div class="context-bar" id="material-context-bar" style="margin-bottom:10px;"></div>
+        <div class="dup-banner" id="dup-banner-material" style="display:none;"></div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Mix design <span class="req">*</span><a class="label-link" onclick="showTab('mix')">new…</a></label>
+            <select id="f-mat-mix" onchange="onMaterialRef('mix', this)"><option value="">— Select —</option></select>
+          </div>
+          <div class="form-field">
+            <label>Exposure<a class="label-link" onclick="showTab('exposition')">new…</a></label>
+            <select id="f-mat-exposure" onchange="onMaterialRef('exposure', this)"><option value="">— None —</option></select>
+          </div>
+          <div class="form-field">
+            <label>Curing<a class="label-link" onclick="showTab('exposition')">new…</a></label>
+            <select id="f-mat-curing" onchange="onMaterialRef('curing', this)"><option value="">— None —</option></select>
+          </div>
+          <div class="form-field">
+            <label>Site<a class="label-link" onclick="showTab('site')">new…</a></label>
+            <select id="f-mat-site" onchange="onMaterialRef('site', this)"><option value="">— None —</option></select>
+          </div>
+        </div>
         <div class="form-grid">
           <div class="form-field"><label>Name <span class="req">*</span></label><input type="text" id="f-mat-name" placeholder="OPC-0.45-marseille"></div>
           <div class="form-field">
             <label>Material type <span class="req">*</span></label>
             <select id="f-mat-type">
               <option value="">Choose…</option>
-              <option value="cement_paste">cement_paste</option>
-              <option value="mortar">mortar</option>
-              <option value="concrete">concrete</option>
             </select>
           </div>
           <div class="form-field"><label>Manufacturing date</label><input type="date" id="f-mat-manuf"></div>
@@ -533,8 +564,11 @@
           <option value="">— Select a measurement —</option>
         </select>
         <button class="btn btn-secondary" onclick="toggleForm('measurement')">+ New</button>
+        <button class="btn btn-secondary" id="btn-dup-measurement" onclick="duplicateMeasurement()" disabled
+          title="Create a new measurement pre-filled from the selected one">⧉ Duplicate</button>
       </div>
       <div id="form-measurement" style="display:none;">
+        <div class="dup-banner" id="dup-banner-measurement" style="display:none;"></div>
         <div class="context-bar" id="measurement-context-bar" style="margin-bottom:10px;"></div>
         <div class="form-grid">
           <!-- Test linked to the campaign -->
@@ -548,26 +582,12 @@
             <label>Sample type</label>
             <select id="f-meas-sample-type">
               <option value="">—</option>
-              <option value="laboratory_sample">laboratory_sample</option>
-              <option value="bridge_pier">bridge_pier</option>
             </select>
           </div>
           <div class="form-field">
             <label>Dimensions</label>
             <select id="f-meas-dims">
               <option value="">—</option>
-              <option value="cylinder_100x200">cylinder_100x200</option>
-              <option value="cylinder_110x220">cylinder_110x220</option>
-              <option value="cylinder_150x300">cylinder_150x300</option>
-              <option value="cylinder_160x320">cylinder_160x320</option>
-              <option value="cube_100">cube_100</option>
-              <option value="cube_150">cube_150</option>
-              <option value="cube_200">cube_200</option>
-              <option value="prism_40x40x160">prism_40x40x160</option>
-              <option value="prism_70x70x280">prism_70x70x280</option>
-              <option value="prism_100x100x400">prism_100x100x400</option>
-              <option value="powder">powder</option>
-              <option value="other">other</option>
             </select>
           </div>
           <div class="form-field"><label>Mass (g)</label><input type="number" id="f-meas-mass" step="0.1" min="0" placeholder="500"></div>
@@ -594,10 +614,6 @@
                 <label>Test type <span class="req">*</span></label>
                 <select id="f-test-type">
                   <option value="">Choose…</option>
-                  <option value="natural">natural</option>
-                  <option value="accelerated">accelerated</option>
-                  <option value="total_cl">total_cl</option>
-                  <option value="free_cl">free_cl</option>
                 </select>
               </div>
               <div class="form-field"><label>Standard</label><input type="text" id="f-test-std" placeholder="NT BUILD 443"></div>
@@ -650,6 +666,7 @@
     let allSources = [], allBinders = [], allAggregates = [], allMixes = [];
     let allExposures = [], allCurings = [], allSites = [];
     let allMaterials = [], allMeasurements = [], allTests = [];
+    let allMixBinders = [], allMixAggregates = [];
 
     const sel = {
       source: null,
@@ -680,7 +697,6 @@
         p.classList.toggle('active', p.id === 'panel-' + tabName)
       );
       if (tabName === 'mix')         { updateMixContextBar(); updateMixAggSummary(); }
-      if (tabName === 'material')    updateMaterialContextBar();
       if (tabName === 'measurement') updateMeasurementContextBar();
       if (tabName === 'results')     updateResultsPanel();
       populateDropdowns();
@@ -715,6 +731,225 @@
     function toggleForm(section) {
       const form = document.getElementById('form-' + section);
       if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
+      const banner = document.getElementById('dup-banner-' + section);
+      if (banner) banner.style.display = 'none';
+    }
+
+    // =========================================================================
+    // FEEDBACK — toasts and inline field validation
+    // =========================================================================
+    // Logs the message and shows it as a toast (the log stays at the bottom of the page).
+    function notify(msg, cls = 'ok') {
+      GristHelpers.log(msg, cls);
+      const box = document.getElementById('toasts');
+      const t = document.createElement('div');
+      t.className = 'toast ' + cls;
+      t.textContent = msg;
+      box.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, cls === 'err' ? 6000 : 3500);
+    }
+
+    function showFieldMessage(id, msg, level) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add(level === 'warn' ? 'warning' : 'invalid');
+      const field = el.closest('.form-field') || el.parentElement;
+      const div = document.createElement('div');
+      div.className = 'field-error' + (level === 'warn' ? ' warn' : '');
+      div.textContent = (level === 'warn' ? '⚠ ' : '') + msg;
+      field.appendChild(div);
+    }
+
+    function clearFieldMessages(container) {
+      container.querySelectorAll('.field-error').forEach(e => e.remove());
+      container.querySelectorAll('.invalid, .warning').forEach(e => e.classList.remove('invalid', 'warning'));
+    }
+
+    // rules: [{ id, msg, fails: () => bool, level?: 'warn' }]
+    // Errors block saving. Warnings block the first click only: saving again confirms them,
+    // unless a field of the form was changed in between.
+    function validateForm(containerId, rules) {
+      const container = document.getElementById(containerId);
+      clearFieldMessages(container);
+      const failed = rules.filter(r => r.fails());
+      failed.forEach(r => showFieldMessage(r.id, r.msg, r.level));
+      const errors   = failed.filter(r => r.level !== 'warn');
+      const warnings = failed.filter(r => r.level === 'warn');
+      if (errors.length) {
+        document.getElementById(errors[0].id)?.focus();
+        notify(`${errors.length} field(s) to fix before saving`, 'warn');
+        return false;
+      }
+      if (warnings.length && container.dataset.warningsShown !== '1') {
+        container.dataset.warningsShown = '1';
+        notify('Please check the highlighted values — click Save again to confirm', 'warn');
+        return false;
+      }
+      delete container.dataset.warningsShown;
+      return true;
+    }
+
+    // Editing a field clears its message and re-arms the warning confirmation.
+    ['input', 'change'].forEach(evt => document.addEventListener(evt, e => {
+      const el = e.target;
+      if (!el.closest) return;
+      const form = el.closest('[data-warnings-shown]');
+      if (form) delete form.dataset.warningsShown;
+      if (!el.classList?.contains('invalid') && !el.classList?.contains('warning')) return;
+      el.classList.remove('invalid', 'warning');
+      (el.closest('.form-field') || el.parentElement).querySelectorAll('.field-error').forEach(d => d.remove());
+    }));
+
+    // Rule builders
+    const val      = id => document.getElementById(id)?.value.trim() ?? '';
+    const num      = id => floatOrNull(id);
+    const required = (id, msg = 'Required') => ({ id, msg, fails: () => val(id) === '' });
+    const range    = (id, min, max, msg) => ({
+      id, msg: msg || `Must be between ${min} and ${max}`,
+      fails: () => num(id) != null && (num(id) < min || num(id) > max),
+    });
+    const dateOrder = (firstId, secondId, msg) => ({
+      id: secondId, msg, fails: () => val(firstId) && val(secondId) && val(secondId) < val(firstId),
+    });
+
+    // =========================================================================
+    // DUPLICATION — open the creation form pre-filled from the selected record
+    // =========================================================================
+    function updateDuplicateButtons() {
+      ['mix', 'material', 'measurement'].forEach(key => {
+        const btn = document.getElementById('btn-dup-' + key);
+        if (btn) btn.disabled = !sel[key];
+      });
+    }
+
+    function openDuplicateForm(section, message) {
+      document.getElementById('form-' + section).style.display = '';
+      const banner = document.getElementById('dup-banner-' + section);
+      banner.innerHTML = message;
+      banner.style.display = '';
+    }
+
+    function setVal(id, v) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      // A value added by hand to a Choice column in Grist may be missing from the <select>.
+      if (el.tagName === 'SELECT' && v != null && v !== '' && ![...el.options].some(o => o.value == v)) {
+        el.add(new Option(GristHelpers.enumLabel(v), v));
+      }
+      el.value = v ?? '';
+    }
+
+    // Numeric fields saved as 0 when left empty: show 0 as empty so the round trip is identical.
+    function numOrEmpty(v) {
+      return v == null || v === 0 ? '' : v;
+    }
+
+    // Grist Date columns hold seconds since epoch (UTC midnight).
+    function gristDateToInput(sec) {
+      return sec ? new Date(sec * 1000).toISOString().slice(0, 10) : '';
+    }
+
+    function duplicateMix() {
+      const mix = allMixes.find(m => m.id === sel.mix);
+      if (!mix) return;
+      try {
+        selectedBinders = allMixBinders
+          .filter(r => r.fields.id_mix_design === mix.id)
+          .map(r => {
+            const b = allBinders.find(x => x.id === r.fields.id_binder);
+            return {
+              id_binder:     r.fields.id_binder,
+              content_kg_m3: r.fields.content_kg_m3 ?? null,
+              _name:         b?.fields.name || `Binder #${r.fields.id_binder}`,
+              _type:         GristHelpers.enumLabel(b?.fields.binder_type),
+            };
+          });
+        selectedAggregates = allMixAggregates
+          .filter(r => r.fields.id_mix_design === mix.id)
+          .map(r => {
+            const a = allAggregates.find(x => x.id === r.fields.id_aggregate);
+            const size = (a?.fields.size_min_mm != null && a?.fields.size_max_mm != null)
+              ? `${a.fields.size_min_mm}/${a.fields.size_max_mm} mm`
+              : GristHelpers.enumLabel(a?.fields.aggregate_type);
+            return {
+              id_aggregate:  r.fields.id_aggregate,
+              content_kg_m3: r.fields.content_kg_m3 ?? null,
+              _name:         a?.fields.name || `Aggregate #${r.fields.id_aggregate}`,
+              _size:         size,
+            };
+          });
+
+        const f = mix.fields;
+        setVal('f-mix-wc',            numOrEmpty(f.wc_ratio));
+        setVal('f-mix-water-kg',      numOrEmpty(f.water_content_kg));
+        setVal('f-mix-water-type',    f.water_type);
+        setVal('f-mix-gwp',           numOrEmpty(f.global_warming_performance_kg_eq_m3));
+        setVal('f-mix-admix',         f.admix_type);
+        setVal('f-mix-admix-content', numOrEmpty(f.adjuvant_content));
+        setVal('f-mix-air',           numOrEmpty(f.entrained_air));
+        // Keep w/b only if it was entered by hand; a computed one would go stale when water or binders change.
+        const total = selectedBinders.reduce((s, b) => s + (b.content_kg_m3 ?? 0), 0);
+        const wbComputed = f.water_content_kg && total > 0 ? f.water_content_kg / total : null;
+        const wbManual = f.wl_ratio != null && (wbComputed == null || Math.abs(f.wl_ratio - wbComputed) > 0.001);
+        setVal('f-mix-wl', wbManual ? f.wl_ratio : '');
+
+        renderSelectedBinders();
+        renderSelectedAggregates();
+        openDuplicateForm('mix',
+          `⧉ Copy of mix design <strong>#${mix.id}</strong> (${selectedBinders.length} binder(s), ` +
+          `${selectedAggregates.length} aggregate(s) — edit them in the Aggregates tab). ` +
+          `Change what differs, then save: a <strong>new</strong> mix design will be created.`);
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
+    }
+
+    function duplicateMaterial() {
+      const mat = allMaterials.find(m => m.id === sel.material);
+      if (!mat) return;
+      const f = mat.fields;
+      // The new material is attached to the same context (mix, exposure, curing, site).
+      sel.mix      = f.id_mix_design       || null;
+      sel.exposure = f.id_exposure         || null;
+      sel.curing   = f.id_curing_condition || null;
+      sel.site     = f.id_site             || null;
+      populateDropdowns();
+
+      setVal('f-mat-name',   `${f.name || 'Material'} (copy)`);
+      setVal('f-mat-type',   f.material_type);
+      setVal('f-mat-manuf',  gristDateToInput(f.manufacturing_date));
+      setVal('f-mat-demold', gristDateToInput(f.demolding_date));
+      updateBreadcrumb();
+      openDuplicateForm('material',
+        `⧉ Copy of <strong>${escapeHtml(f.name || '#' + mat.id)}</strong>, with the same mix design, exposure, ` +
+        `curing and site (change them below if needed). Rename it, then save: ` +
+        `a <strong>new</strong> material will be created.`);
+      document.getElementById('f-mat-name').select();
+    }
+
+    function duplicateMeasurement() {
+      const meas = allMeasurements.find(m => m.id === sel.measurement);
+      if (!meas) return;
+      const f = meas.fields;
+      // The new measurement belongs to the same material and source.
+      sel.material = f.id_material || sel.material;
+      sel.source   = f.id_source   || sel.source;
+      sel.test     = f.id_test     || null;
+      populateDropdowns();
+
+      setVal('f-meas-test',        f.id_test || '');
+      setVal('f-meas-sample-type', f.sample_type);
+      setVal('f-meas-dims',        f.sample_dimensions);
+      setVal('f-meas-mass',        numOrEmpty(f.sample_mass_g));
+      setVal('f-meas-operator',    f.operator);
+      setVal('f-meas-prep-date',   gristDateToInput(f.preparation_date));
+      setVal('f-meas-result-date', gristDateToInput(f.result_date));
+      updateMeasurementContextBar();
+      updateBreadcrumb();
+      const test = allTests.find(t => t.id === f.id_test);
+      openDuplicateForm('measurement',
+        `⧉ Copy of measurement <strong>#${meas.id}</strong> (${escapeHtml(test?.fields.name || '?')}), ` +
+        `same material and source. Typically change the result date (next age), then save: ` +
+        `a <strong>new</strong> measurement will be created, without results.`);
+      document.getElementById('f-meas-result-date').focus();
     }
 
     // =========================================================================
@@ -726,7 +961,8 @@
       try {
         [allSources, allBinders, allAggregates, allMixes,
          allExposures, allCurings, allSites,
-         allMaterials, allMeasurements, allTests] = await Promise.all([
+         allMaterials, allMeasurements, allTests,
+         allMixBinders, allMixAggregates] = await Promise.all([
           GristHelpers.fetchAllRecords('SOURCE'),
           GristHelpers.fetchAllRecords('BINDER'),
           GristHelpers.fetchAllRecords('AGGREGATE'),
@@ -737,6 +973,8 @@
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
           GristHelpers.fetchAllRecords('TEST'),
+          GristHelpers.fetchAllRecords('MIX_DESIGN_BINDER'),
+          GristHelpers.fetchAllRecords('MIX_DESIGN_AGGREGATE'),
         ]);
         GristHelpers.log(
           `${allSources.length} sources, ${allBinders.length} binders, ` +
@@ -745,7 +983,7 @@
         populateDropdowns();
         GristHelpers.setStatus('Ready', 'ready');
       } catch (err) {
-        GristHelpers.log('Loading error: ' + err.message, 'err');
+        notify('Loading error: ' + err.message, 'err');
         GristHelpers.setStatus('Error', 'error');
       }
     }
@@ -753,6 +991,44 @@
     // =========================================================================
     // DROPDOWNS
     // =========================================================================
+    // ---- Record labels shared by selectors ----
+    function mixLabel(m) {
+      const binders = allMixBinders
+        .filter(r => r.fields.id_mix_design === m.id)
+        .map(r => allBinders.find(b => b.id === r.fields.id_binder)?.fields)
+        .filter(Boolean);
+      const sig   = binders.length ? GristHelpers.binderSignature(binders) : null;
+      const total = allMixBinders.filter(r => r.fields.id_mix_design === m.id)
+        .reduce((sum, r) => sum + (r.fields.content_kg_m3 || 0), 0);
+      const parts = [
+        m.fields.wc_ratio ? `w/c ${m.fields.wc_ratio}` : '',
+        m.fields.wl_ratio ? `w/b ${m.fields.wl_ratio}` : '',
+        total ? `${total} kg binder` : '',
+      ].filter(Boolean).join(' · ');
+      return `#${m.id} — ${sig || 'no binder'}${parts ? ' — ' + parts : ''}`;
+    }
+    function exposureLabel(e) {
+      const L = GristHelpers.enumLabel;
+      return `#${e.id} — ${[L(e.fields.exposure_type), L(e.fields.exposure_nature)].filter(Boolean).join(' / ') || '?'}`;
+    }
+    function curingLabel(c) {
+      const method = GristHelpers.enumLabel(c.fields.curing_method);
+      const temp   = c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : '';
+      const dur    = c.fields.curing_duration_days != null ? c.fields.curing_duration_days + ' d' : '';
+      return `#${c.id} — ${[method, temp, dur].filter(Boolean).join(' · ') || '?'}`;
+    }
+    function siteLabel(s) {
+      const region = s.fields.country_region || '';
+      const coords = s.fields.latitude != null
+        ? `${s.fields.latitude.toFixed(1)}°N ${s.fields.longitude != null ? s.fields.longitude.toFixed(1) + '°E' : ''}` : '';
+      return `#${s.id} — ${region || coords || '?'}`;
+    }
+    function testLabel(t) {
+      if (!t) return '?';
+      const type = GristHelpers.enumLabel(t.fields.test_type);
+      return `${GristHelpers.enumLabel(t.fields.name) || '?'}${type ? ' (' + type.toLowerCase() + ')' : ''}`;
+    }
+
     function populateDropdowns() {
       fillDrop('sel-source', allSources, s => {
         const label = s.fields.designation
@@ -761,49 +1037,34 @@
         const suffix = s.fields.title ? ' — ' + s.fields.title.substring(0, 35) : '';
         return label + suffix;
       });
-      fillDrop('sel-binder-add',    allBinders, b => `${b.fields.name || 'Binder #' + b.id} (${b.fields.binder_type || '?'})`);
+      const L = GristHelpers.enumLabel;
+      fillDrop('sel-binder-add',    allBinders, b => `${b.fields.name || 'Binder #' + b.id} (${L(b.fields.binder_type) || '?'})`);
       fillDrop('sel-aggregate-add', allAggregates, a => {
         const name = a.fields.name || `Aggregate #${a.id}`;
-        const type = a.fields.aggregate_type || '';
+        const type = L(a.fields.aggregate_type);
         const size = (a.fields.size_min_mm != null || a.fields.size_max_mm != null)
           ? ` ${a.fields.size_min_mm ?? '?'}–${a.fields.size_max_mm ?? '?'} mm` : '';
         return `${name}${type ? ' (' + type + ')' : ''}${size}`;
       });
-      fillDrop('sel-mix', allMixes, m => {
-        const wc  = m.fields.wc_ratio != null ? `w/c=${m.fields.wc_ratio}` : '';
-        const wb  = m.fields.wl_ratio != null ? `w/b=${m.fields.wl_ratio}` : '';
-        const wat = m.fields.water_content_kg != null ? `water=${m.fields.water_content_kg} kg` : '';
-        const parts = [wc, wb, wat].filter(Boolean).join(' · ');
-        return `#${m.id}${parts ? ' — ' + parts : ''}`;
-      });
-      fillDrop('sel-exposure', allExposures, e => {
-        const type = e.fields.exposure_type   || '';
-        const nat  = e.fields.exposure_nature || '';
-        return `#${e.id} — ${[type, nat].filter(Boolean).join(' / ') || '?'}`;
-      });
-      fillDrop('sel-curing', allCurings, c => {
-        const method = c.fields.curing_method || '';
-        const temp   = c.fields.temperature_c != null ? c.fields.temperature_c + '°C' : '';
-        const dur    = c.fields.curing_duration_days != null ? c.fields.curing_duration_days + 'd' : '';
-        return `#${c.id} — ${[method, temp, dur].filter(Boolean).join(' · ') || '?'}`;
-      });
-      fillDrop('sel-site', allSites, s => {
-        const region = s.fields.country_region || '';
-        const coords = s.fields.latitude != null
-          ? `${s.fields.latitude.toFixed(1)}°N ${s.fields.longitude != null ? s.fields.longitude.toFixed(1) + '°E' : ''}` : '';
-        return `#${s.id} — ${region || coords || '?'}`;
-      });
-      fillDrop('sel-material',  allMaterials,  m => `${m.fields.name || 'Material #' + m.id} (${m.fields.material_type || '?'})`);
+      fillDrop('sel-mix',      allMixes,     mixLabel);
+      fillDrop('sel-exposure', allExposures, exposureLabel);
+      fillDrop('sel-curing',   allCurings,   curingLabel);
+      fillDrop('sel-site',     allSites,     siteLabel);
+      fillDrop('f-mat-mix',      allMixes,     mixLabel);
+      fillDrop('f-mat-exposure', allExposures, exposureLabel);
+      fillDrop('f-mat-curing',   allCurings,   curingLabel);
+      fillDrop('f-mat-site',     allSites,     siteLabel);
+      fillDrop('sel-material',  allMaterials,  m => `${m.fields.name || 'Material #' + m.id} (${L(m.fields.material_type) || '?'})`);
 
       const matMeasures = sel.material
         ? allMeasurements.filter(m => m.fields.id_material === sel.material)
         : allMeasurements;
       fillDrop('sel-measurement', matMeasures, m => {
         const test = allTests.find(t => t.id === m.fields.id_test);
-        return `#${m.id} — ${test?.fields.name || '?'} (${test?.fields.test_type || '?'}) — ${m.fields.sample_dimensions || m.fields.sample_type || '?'}`;
+        const when = m.fields.result_date ? gristDateToInput(m.fields.result_date) : '';
+        return `#${m.id} — ${testLabel(test)} — ${[L(m.fields.sample_dimensions) || L(m.fields.sample_type), when].filter(Boolean).join(' · ') || '?'}`;
       });
-
-      fillDrop('f-meas-test', allTests, t => `${t.fields.name || '?'} (${t.fields.test_type || '?'}) — ${t.fields.standard_name || 'no standard'}`);
+      fillDrop('f-meas-test', allTests, t => `${testLabel(t)} — ${t.fields.standard_name || 'no standard'}`);
 
       // Restore selections
       const map = {
@@ -811,15 +1072,18 @@
         'sel-mix': 'mix', 'sel-exposure': 'exposure',
         'sel-curing': 'curing', 'sel-site': 'site', 'sel-material': 'material',
         'sel-measurement': 'measurement',
+        'f-mat-mix': 'mix', 'f-mat-exposure': 'exposure',
+        'f-mat-curing': 'curing', 'f-mat-site': 'site',
       };
       Object.entries(map).forEach(([elId, key]) => {
         const el = document.getElementById(elId);
-        if (el && sel[key]) el.value = sel[key];
+        if (el) el.value = sel[key] || '';
       });
       if (sel.test) {
         const el = document.getElementById('f-meas-test');
         if (el) el.value = sel.test;
       }
+      updateDuplicateButtons();
     }
 
     // Fills a <select> with the allowed values of a Choice column (GristHelpers.ENUMS)
@@ -828,7 +1092,7 @@
       if (!el) return;
       const defaultText = el.options[0].text;
       el.innerHTML = `<option value="">${defaultText}</option>` +
-        GristHelpers.ENUMS[enumKey].map(v => `<option value="${v}">${v}</option>`).join('');
+        GristHelpers.ENUMS[enumKey].map(v => `<option value="${v}">${GristHelpers.enumLabel(v)}</option>`).join('');
     }
 
     // Pre-fills the unit of a known SCALAR parameter (if the unit field is empty)
@@ -860,12 +1124,20 @@
       const v = parseInt(document.getElementById(elId)?.value) || null;
       sel[key] = v;
       if (key === 'material') { sel.measurement = null; populateDropdowns(); }
+      updateDuplicateButtons();
       updateBreadcrumb();
     }
 
     // =========================================================================
     // BINDER FORM
     // =========================================================================
+    // Material form reference selects mirror the selection made in the other tabs.
+    function onMaterialRef(key, el) {
+      sel[key] = parseInt(el.value) || null;
+      populateDropdowns();
+      updateBreadcrumb();
+    }
+
     function resetBinderForm() {
       ['f-b-name','f-b-density','f-b-surface','f-b-loi',
        'f-b-C3S','f-b-C2S','f-b-C3A','f-b-C4AF','f-b-Gp',
@@ -896,7 +1168,30 @@
     async function saveBinder() {
       const name = document.getElementById('f-b-name').value.trim();
       const type = document.getElementById('f-b-type').value;
-      if (!name || !type) { GristHelpers.log('Name and type required', 'warn'); return; }
+      const sum = ids => ids.reduce((t, id) => t + (num(id) ?? 0), 0);
+      if (!validateForm('panel-binder', [
+        required('f-b-name'), required('f-b-type'),
+        range('f-b-loi', 0, 100),
+        range('f-b-C3S', 0, 100),
+        range('f-b-C2S', 0, 100),
+        range('f-b-C3A', 0, 100),
+        range('f-b-C4AF', 0, 100),
+        range('f-b-Gp', 0, 100),
+        range('f-b-SiO2', 0, 100),
+        range('f-b-Al2O3', 0, 100),
+        range('f-b-Fe2O3', 0, 100),
+        range('f-b-CaO', 0, 100),
+        range('f-b-MgO', 0, 100),
+        range('f-b-SO3', 0, 100),
+        range('f-b-K2O', 0, 100),
+        range('f-b-Na2O', 0, 100),
+        { id: 'f-b-density', level: 'warn', msg: 'Unusual density for a binder (expected 1000–4000 kg/m³)',
+          fails: () => num('f-b-density') != null && (num('f-b-density') < 1000 || num('f-b-density') > 4000) },
+        { id: 'f-b-C3S', level: 'warn', msg: 'Bogue phases sum to more than 100 %',
+          fails: () => sum(['f-b-C3S', 'f-b-C2S', 'f-b-C3A', 'f-b-C4AF', 'f-b-Gp']) > 100.5 },
+        { id: 'f-b-SiO2', level: 'warn', msg: 'Oxides sum to more than 100 %',
+          fails: () => sum(['f-b-SiO2', 'f-b-Al2O3', 'f-b-Fe2O3', 'f-b-CaO', 'f-b-MgO', 'f-b-SO3', 'f-b-K2O', 'f-b-Na2O']) > 100.5 },
+      ])) return;
       try {
         const fields = {
           name, binder_type: type,
@@ -914,10 +1209,10 @@
         };
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('BINDER', fields);
-        GristHelpers.log(`Binder "${name}" created (id=${result.id}) ✓`, 'ok');
+        notify(`Binder "${name}" created (id=${result.id}) ✓`, 'ok');
         resetBinderForm();
         await refreshAll();
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -926,7 +1221,14 @@
     async function saveAggregate() {
       const name = document.getElementById('f-agg-name').value.trim();
       const type = document.getElementById('f-agg-type').value;
-      if (!name || !type) { GristHelpers.log('Name and type required', 'warn'); return; }
+      if (!validateForm('form-aggregate', [
+        required('f-agg-name'), required('f-agg-type'),
+        range('f-agg-wa', 0, 100),
+        { id: 'f-agg-dmax', msg: 'D max must be greater than D min',
+          fails: () => num('f-agg-dmin') != null && num('f-agg-dmax') != null && num('f-agg-dmax') < num('f-agg-dmin') },
+        { id: 'f-agg-density', level: 'warn', msg: 'Unusual density for an aggregate (expected 1000–3500 kg/m³)',
+          fails: () => num('f-agg-density') != null && (num('f-agg-density') < 1000 || num('f-agg-density') > 3500) },
+      ])) return;
       try {
         const fields = {
           name, aggregate_type: type,
@@ -938,10 +1240,10 @@
         };
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('AGGREGATE', fields);
-        GristHelpers.log(`Aggregate "${name}" created (id=${result.id}) ✓`, 'ok');
+        notify(`Aggregate "${name}" created (id=${result.id}) ✓`, 'ok');
         const sizeStr = (fields.size_min_mm != null && fields.size_max_mm != null)
           ? `${fields.size_min_mm}/${fields.size_max_mm} mm`
-          : (fields.aggregate_type || '');
+          : GristHelpers.enumLabel(fields.aggregate_type);
         selectedAggregates.push({
           id_aggregate:  result.id,
           content_kg_m3: null,
@@ -955,7 +1257,7 @@
         document.getElementById('f-agg-type').value = '';
         await refreshAll();
         renderSelectedAggregates();
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -971,17 +1273,6 @@
       document.getElementById('mix-context-bar').innerHTML =
         tagHTML('Binders', nBinders > 0 ? `${nBinders} component${nBinders > 1 ? 's' : ''}` : null) +
         tagHTML('Aggregates', nAgg > 0 ? `${nAgg} fraction${nAgg > 1 ? 's' : ''}` : null);
-    }
-
-    function updateMaterialContextBar() {
-      const mx  = allMixes.find(m => m.id === sel.mix);
-      const exp = allExposures.find(e => e.id === sel.exposure);
-      const si  = allSites.find(s => s.id === sel.site);
-      document.getElementById('material-context-bar').innerHTML =
-        tagHTML('Mix design', mx ? `#${mx.id}` : null) +
-        tagHTML('Exposure',   exp ? `${exp.fields.exposure_nature || '#' + exp.id}` : null) +
-        tagHTML('Site',       si?.fields.country_region) +
-        tagHTML('Curing',     sel.curing ? `#${sel.curing}` : null);
     }
 
     function updateMeasurementContextBar() {
@@ -1040,7 +1331,7 @@
       document.getElementById('sel-source').value = id;
       toggleForm('source');
       updateBreadcrumb();
-      GristHelpers.log(`Existing source #${id} selected`, 'ok');
+      notify(`Existing source #${id} selected`, 'ok');
     }
 
     async function fetchDoiMetadata() {
@@ -1084,7 +1375,7 @@
         GristHelpers.log(`DOI ${doi} resolved via Crossref ✓`, 'ok');
       } catch (err) {
         setDoiHint(`Crossref lookup failed (${escapeHtml(err.message)}). Fill the fields manually.`, 'err');
-        GristHelpers.log('Crossref error: ' + err.message, 'err');
+        notify('Crossref error: ' + err.message, 'err');
       } finally {
         btn.disabled = false;
       }
@@ -1096,7 +1387,12 @@
     async function saveSource() {
       const authors = document.getElementById('f-source-authors').value.trim();
       const title   = document.getElementById('f-source-title').value.trim();
-      if (!authors || !title) { GristHelpers.log('Authors and title required', 'warn'); return; }
+      if (!validateForm('form-source', [
+        required('f-source-authors'), required('f-source-title'),
+        range('f-source-year', 1900, new Date().getFullYear() + 1),
+        { id: 'f-source-doi', msg: 'Not a valid DOI (expected 10.xxxx/…)',
+          fails: () => val('f-source-doi') !== '' && !normalizeDoi(val('f-source-doi')) },
+      ])) return;
       try {
         const result = await GristHelpers.createRecord('SOURCE', {
           authors, title,
@@ -1108,19 +1404,36 @@
           designation: document.getElementById('f-source-designation').value.trim() || '',
           notes:       document.getElementById('f-source-notes').value.trim() || '',
         });
-        GristHelpers.log(`Source created (id=${result.id}) ✓`, 'ok');
+        notify(`Source created (id=${result.id}) ✓`, 'ok');
         sel.source = result.id;
         toggleForm('source');
         await refreshAll();
         showTab('binder');
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
     // SAVE: MIX_DESIGN
     // =========================================================================
     async function saveMix() {
-      if (selectedBinders.length === 0) { GristHelpers.log('Add at least one binder component', 'warn'); return; }
+      const content  = pred => selectedBinders.filter(pred).reduce((t, b) => t + (b.content_kg_m3 ?? 0), 0);
+      const rawType  = b => allBinders.find(x => x.id === b.id_binder)?.fields.binder_type;
+      const cement   = content(b => GristHelpers.isCement(rawType(b)));
+      const binder   = content(() => true);
+      const water    = num('f-mix-water-kg');
+      const mismatch = (id, denom) => num(id) != null && water != null && denom > 0
+        && Math.abs(num(id) - water / denom) > 0.02;
+      if (!validateForm('form-mix', [
+        { id: 'sel-binder-add', msg: 'Add at least one binder component', fails: () => selectedBinders.length === 0 },
+        { id: 'sel-binder-add', level: 'warn', msg: 'Some binders have no quantity: w/b and w/c cannot be checked',
+          fails: () => selectedBinders.some(b => b.content_kg_m3 == null) },
+        range('f-mix-wc', 0, 3), range('f-mix-wl', 0, 3),
+        range('f-mix-air', 0, 30), range('f-mix-water-kg', 0, 1000),
+        { id: 'f-mix-wc', level: 'warn', msg: `Differs from water / cement = ${cement ? (water / cement).toFixed(3) : '?'}`,
+          fails: () => mismatch('f-mix-wc', cement) },
+        { id: 'f-mix-wl', level: 'warn', msg: `Differs from water / binder = ${binder ? (water / binder).toFixed(3) : '?'}`,
+          fails: () => mismatch('f-mix-wl', binder) },
+      ])) return;
       try {
         // w/b: entered value or computed from water / sum(binders)
         const wlEntered = floatOrNull('f-mix-wl');
@@ -1141,7 +1454,7 @@
           entrained_air:                       floatOrNull('f-mix-air')           ?? 0,
         };
         const result = await GristHelpers.createRecord('MIX_DESIGN', mixFields);
-        GristHelpers.log(`Mix design created (id=${result.id}) ✓`, 'ok');
+        notify(`Mix design created (id=${result.id}) ✓`, 'ok');
 
         // All binders → MIX_DESIGN_BINDER
         for (const b of selectedBinders) {
@@ -1171,7 +1484,7 @@
         toggleForm('mix');
         await refreshAll();
         showTab('exposition');
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1180,24 +1493,35 @@
     async function saveExposure() {
       const type   = document.getElementById('f-expo-type').value;
       const nature = document.getElementById('f-expo-nature').value;
-      if (!type || !nature) { GristHelpers.log('Type and nature required', 'warn'); return; }
+      if (!validateForm('form-exposure', [
+        required('f-expo-type'), required('f-expo-nature'),
+        range('f-expo-wetting', 0, 100), range('f-expo-drying', 0, 100),
+        { id: 'f-expo-drying', level: 'warn', msg: 'Wetting + drying should add up to 100 %',
+          fails: () => num('f-expo-wetting') != null && num('f-expo-drying') != null
+            && Math.abs(num('f-expo-wetting') + num('f-expo-drying') - 100) > 0.5 },
+      ])) return;
       try {
         const result = await GristHelpers.createRecord('EXPOSURE', {
           exposure_type: type, exposure_nature: nature,
           wetting_duration_pct: floatOrNull('f-expo-wetting') ?? 0,
           drying_duration_pct:  floatOrNull('f-expo-drying')  ?? 0,
         });
-        GristHelpers.log(`Exposure created (id=${result.id}) ✓`, 'ok');
+        notify(`Exposure created (id=${result.id}) ✓`, 'ok');
         sel.exposure = result.id;
         toggleForm('exposure');
         await refreshAll();
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
     // SAVE: CURING_CONDITION
     // =========================================================================
     async function saveCuring() {
+      if (!validateForm('form-curing', [
+        range('f-cur-hum', 0, 100), range('f-cur-duration', 0, 3650),
+        { id: 'f-cur-temp', level: 'warn', msg: 'Unusual curing temperature (expected 0–90 °C)',
+          fails: () => num('f-cur-temp') != null && (num('f-cur-temp') < 0 || num('f-cur-temp') > 90) },
+      ])) return;
       try {
         const windVal  = document.getElementById('f-cur-wind').value;
         const solarVal = document.getElementById('f-cur-solar').value;
@@ -1212,11 +1536,11 @@
         };
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('CURING_CONDITION', fields);
-        GristHelpers.log(`Curing created (id=${result.id}) ✓`, 'ok');
+        notify(`Curing created (id=${result.id}) ✓`, 'ok');
         sel.curing = result.id;
         toggleForm('curing');
         await refreshAll();
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1224,19 +1548,24 @@
     // =========================================================================
     async function saveSite() {
       const region = document.getElementById('f-site-region').value.trim();
-      if (!region) { GristHelpers.log('Country/Region required', 'warn'); return; }
+      if (!validateForm('form-site', [
+        required('f-site-region'),
+        range('f-site-lat', -90, 90), range('f-site-lng', -180, 180),
+        { id: 'f-site-lng', level: 'warn', msg: 'Latitude and longitude should be given together (the site map needs both)',
+          fails: () => (num('f-site-lat') == null) !== (num('f-site-lng') == null) },
+      ])) return;
       try {
         const result = await GristHelpers.createRecord('SITE', {
           country_region: region,
           latitude:  floatOrNull('f-site-lat') ?? 0,
           longitude: floatOrNull('f-site-lng') ?? 0,
         });
-        GristHelpers.log(`Site created (id=${result.id}) ✓`, 'ok');
+        notify(`Site created (id=${result.id}) ✓`, 'ok');
         sel.site = result.id;
         toggleForm('site');
         await refreshAll();
         showTab('material');
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1245,8 +1574,12 @@
     async function saveMaterial() {
       const name = document.getElementById('f-mat-name').value.trim();
       const type = document.getElementById('f-mat-type').value;
-      if (!name || !type) { GristHelpers.log('Name and type required', 'warn'); return; }
-      if (!sel.mix) { GristHelpers.log('Select a mix design', 'warn'); return; }
+      if (!validateForm('form-material', [
+        required('f-mat-mix', 'Select a mix design'), required('f-mat-name'), required('f-mat-type'),
+        dateOrder('f-mat-manuf', 'f-mat-demold', 'Demolding must be after manufacturing'),
+        { id: 'f-mat-name', level: 'warn', msg: 'A material with this name already exists',
+          fails: () => allMaterials.some(m => (m.fields.name || '').trim().toLowerCase() === name.toLowerCase()) },
+      ])) return;
       try {
         const manuf  = document.getElementById('f-mat-manuf').value;
         const demold = document.getElementById('f-mat-demold').value;
@@ -1259,12 +1592,12 @@
           manufacturing_date:  manuf  ? Math.floor(new Date(manuf).getTime()  / 1000) : null,
           demolding_date:      demold ? Math.floor(new Date(demold).getTime() / 1000) : null,
         });
-        GristHelpers.log(`Material "${name}" created (id=${result.id}) ✓`, 'ok');
+        notify(`Material "${name}" created (id=${result.id}) ✓`, 'ok');
         sel.material = result.id;
         toggleForm('material');
         await refreshAll();
         showTab('measurement');
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1273,20 +1606,22 @@
     async function saveTestAndSelect() {
       const name = document.getElementById('f-test-name').value;
       const type = document.getElementById('f-test-type').value;
-      if (!name || !type) { GristHelpers.log('Property and type required', 'warn'); return; }
+      if (!validateForm('body-new-test', [
+        required('f-test-name'), required('f-test-type'), range('f-test-dur', 0, 36500),
+      ])) return;
       try {
         const result = await GristHelpers.createRecord('TEST', {
           name, test_type: type,
           standard_name:       document.getElementById('f-test-std').value.trim() || '',
           experiment_duration: floatOrNull('f-test-dur') ?? 0,
         });
-        GristHelpers.log(`Test created (id=${result.id}) ✓`, 'ok');
+        notify(`Test created (id=${result.id}) ✓`, 'ok');
         sel.test = result.id;
         await refreshAll();
         // close the collapsible
         document.getElementById('body-new-test').classList.remove('open');
         document.getElementById('toggle-new-test').textContent = '▶';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1294,9 +1629,17 @@
     // id_test is required in MEASUREMENT
     // =========================================================================
     async function saveMeasurement() {
-      if (!sel.material) { GristHelpers.log('Select a material', 'warn'); return; }
-      const testId = parseInt(document.getElementById('f-meas-test').value) || null;
-      if (!testId)  { GristHelpers.log('Select or create a test', 'warn'); return; }
+      if (!sel.material) { notify('Select a material first (Material tab)', 'warn'); return; }
+      const mat   = allMaterials.find(m => m.id === sel.material);
+      const manuf = gristDateToInput(mat?.fields.manufacturing_date);
+      if (!validateForm('form-measurement', [
+        required('f-meas-test', 'Select or create a test'),
+        { id: 'f-meas-mass', msg: 'Must be positive', fails: () => num('f-meas-mass') != null && num('f-meas-mass') <= 0 },
+        dateOrder('f-meas-prep-date', 'f-meas-result-date', 'Result date must be after preparation date'),
+        { id: 'f-meas-prep-date', level: 'warn', msg: `Before the material manufacturing date (${manuf})`,
+          fails: () => manuf && val('f-meas-prep-date') && val('f-meas-prep-date') < manuf },
+      ])) return;
+      const testId = parseInt(document.getElementById('f-meas-test').value);
       try {
         const prepDate   = document.getElementById('f-meas-prep-date').value;
         const resultDate = document.getElementById('f-meas-result-date').value;
@@ -1313,23 +1656,23 @@
         };
         Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
         const result = await GristHelpers.createRecord('MEASUREMENT', fields);
-        GristHelpers.log(`Measurement created (id=${result.id}) ✓`, 'ok');
+        notify(`Measurement created (id=${result.id}) ✓`, 'ok');
         sel.measurement = result.id;
         toggleForm('measurement');
         await refreshAll();
         showTab('results');
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
     // SAVE: SCALAR
     // =========================================================================
     async function saveScalar() {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const name  = document.getElementById('f-sc-name').value.trim();
       const value = parseFloat(document.getElementById('f-sc-value').value);
-      if (!name)      { GristHelpers.log('Parameter name required', 'warn'); return; }
-      if (isNaN(value)) { GristHelpers.log('Numeric value required', 'warn'); return; }
+      if (!name)      { notify('Parameter name required', 'warn'); return; }
+      if (isNaN(value)) { notify('Numeric value required', 'warn'); return; }
       try {
         const result = await GristHelpers.createRecord('SCALAR', {
           id_measurement: sel.measurement,
@@ -1339,11 +1682,11 @@
           is_derived: document.getElementById('f-sc-derived').value === '1',
           notes:      document.getElementById('f-sc-notes').value.trim() || '',
         });
-        GristHelpers.log(`Scalar "${name}" = ${value} created (id=${result.id}) ✓`, 'ok');
+        notify(`Scalar "${name}" = ${value} created (id=${result.id}) ✓`, 'ok');
         // Clear the form for adding another scalar
         document.getElementById('f-sc-name').value  = '';
         document.getElementById('f-sc-value').value = '';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1361,9 +1704,9 @@
     }
 
     async function saveCurve() {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const rows = document.getElementById('curve-rows').querySelectorAll('tr');
-      if (rows.length === 0) { GristHelpers.log('Add at least one point', 'warn'); return; }
+      if (rows.length === 0) { notify('Add at least one point', 'warn'); return; }
       try {
         // CURVE directly linked to MEASUREMENT (no intermediate RESULT table)
         const curveRec = await GristHelpers.createRecord('CURVE', {
@@ -1381,10 +1724,10 @@
           if (!isNaN(x) && !isNaN(y)) points.push({ id_curve: curveRec.id, x, y });
         });
         if (points.length > 0) await GristHelpers.bulkCreateRecords('DATA_CURVE', points);
-        GristHelpers.log(`Curve created: CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
+        notify(`Curve created: CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
         document.getElementById('curve-rows').innerHTML = '';
         document.getElementById('f-cv-notes').value = '';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1507,7 +1850,7 @@
         document.getElementById('results-context-bar').innerHTML =
           tagHTML('Measurement', `#${sel.measurement}`) +
           tagHTML('Material',    mat?.fields.name) +
-          tagHTML('Test',        test ? `${test.fields.name} (${test.fields.test_type})` : null);
+          tagHTML('Test',        test ? testLabel(test) : null);
         renderResultsForm(test?.fields.name);
       }
     }
@@ -1737,19 +2080,19 @@
     // SAVE: chloride scalars (D and/or Cs)
     // =========================================================================
     async function saveClScalars() {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const D         = parseFloat(document.getElementById('f-cl-D')?.value);
       const Cs        = parseFloat(document.getElementById('f-cl-Cs')?.value);
       const isDerived = document.getElementById('f-cl-derived')?.value === '1';
       const notes     = document.getElementById('f-cl-notes')?.value.trim() || '';
-      if (isNaN(D) && isNaN(Cs)) { GristHelpers.log('Enter at least D or Cs', 'warn'); return; }
+      if (isNaN(D) && isNaN(Cs)) { notify('Enter at least D or Cs', 'warn'); return; }
       try {
         if (!isNaN(D)) {
           await GristHelpers.createRecord('SCALAR', {
             id_measurement: sel.measurement, name: 'D', value: D,
             unit: 'm²/s', is_derived: isDerived, notes,
           });
-          GristHelpers.log(`Scalar D = ${D} m²/s saved ✓`, 'ok');
+          notify(`Scalar D = ${D} m²/s saved ✓`, 'ok');
           document.getElementById('f-cl-D').value = '';
         }
         if (!isNaN(Cs)) {
@@ -1757,10 +2100,10 @@
             id_measurement: sel.measurement, name: 'Cs', value: Cs,
             unit: '% binder', is_derived: isDerived, notes,
           });
-          GristHelpers.log(`Scalar Cs = ${Cs} % binder saved ✓`, 'ok');
+          notify(`Scalar Cs = ${Cs} % binder saved ✓`, 'ok');
           document.getElementById('f-cl-Cs').value = '';
         }
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     function addClProfileRow() {
@@ -1775,9 +2118,9 @@
     }
 
     async function saveClProfile() {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const rows = document.getElementById('cl-profile-rows')?.querySelectorAll('tr') || [];
-      if (rows.length === 0) { GristHelpers.log('Add at least one point', 'warn'); return; }
+      if (rows.length === 0) { notify('Add at least one point', 'warn'); return; }
       const time  = parseFloat(document.getElementById('f-cl-cv-time')?.value);
       const yunit = document.getElementById('f-cl-cv-yunit')?.value.trim() || '% binder';
       const notes = document.getElementById('f-cl-cv-notes')?.value.trim() || '';
@@ -1794,27 +2137,27 @@
           if (!isNaN(x) && !isNaN(y)) points.push({ id_curve: curveRec.id, x, y });
         });
         if (points.length > 0) await GristHelpers.bulkCreateRecords('DATA_CURVE', points);
-        GristHelpers.log(`Cl profile: CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
+        notify(`Cl profile: CURVE #${curveRec.id}, ${points.length} points ✓`, 'ok');
         document.getElementById('cl-profile-rows').innerHTML = '';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
     // SAVE: carbonation scalar (mean depth)
     // =========================================================================
     async function saveCarbScalar() {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const depth = parseFloat(document.getElementById('f-carb-mean')?.value);
-      if (isNaN(depth)) { GristHelpers.log('Enter a mean depth value', 'warn'); return; }
+      if (isNaN(depth)) { notify('Enter a mean depth value', 'warn'); return; }
       const notes = document.getElementById('f-carb-mean-notes')?.value.trim() || '';
       try {
         await GristHelpers.createRecord('SCALAR', {
           id_measurement: sel.measurement, name: 'mean_depth', value: depth,
           unit: 'mm', is_derived: false, notes,
         });
-        GristHelpers.log(`Scalar mean_depth = ${depth} mm saved ✓`, 'ok');
+        notify(`Scalar mean_depth = ${depth} mm saved ✓`, 'ok');
         document.getElementById('f-carb-mean').value = '';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     function addCarbProfileRow() {
@@ -1831,9 +2174,9 @@
     }
 
     async function saveCarbProfile() {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const rows = document.getElementById('carb-profile-rows')?.querySelectorAll('tr') || [];
-      if (rows.length === 0) { GristHelpers.log('Add at least one pair', 'warn'); return; }
+      if (rows.length === 0) { notify('Add at least one pair', 'warn'); return; }
       const time  = parseFloat(document.getElementById('f-carb-cv-time')?.value);
       const notes = document.getElementById('f-carb-cv-notes')?.value.trim() || '';
       const baseNotes = [!isNaN(time) ? `t=${time} days` : '', notes].filter(Boolean).join(' — ');
@@ -1852,7 +2195,7 @@
             notes: [baseNotes, 'face A'].filter(Boolean).join(' — '),
           });
           await GristHelpers.bulkCreateRecords('DATA_CURVE', ptsA.map(p => ({ id_curve: cA.id, x: p.x, y: p.y })));
-          GristHelpers.log(`Face A: CURVE #${cA.id}, ${ptsA.length} points ✓`, 'ok');
+          notify(`Face A: CURVE #${cA.id}, ${ptsA.length} points ✓`, 'ok');
         }
         if (ptsB.length > 0) {
           const cB = await GristHelpers.createRecord('CURVE', {
@@ -1861,22 +2204,22 @@
             notes: [baseNotes, 'face B'].filter(Boolean).join(' — '),
           });
           await GristHelpers.bulkCreateRecords('DATA_CURVE', ptsB.map(p => ({ id_curve: cB.id, x: p.x, y: p.y })));
-          GristHelpers.log(`Face B: CURVE #${cB.id}, ${ptsB.length} points ✓`, 'ok');
+          notify(`Face B: CURVE #${cB.id}, ${ptsB.length} points ✓`, 'ok');
         }
         document.getElementById('carb-profile-rows').innerHTML = '';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
     // SAVE: file reference (SEM, XRD, EDS, NMR) stored as SCALAR
     // =========================================================================
     async function saveFileRef(testName) {
-      if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
+      if (!sel.measurement) { notify('Select a measurement', 'warn'); return; }
       const url   = document.getElementById('f-file-url')?.value.trim();
       const fname = document.getElementById('f-file-name')?.value.trim() || '';
       const ftype = document.getElementById('f-file-type')?.value || '';
       const notes = document.getElementById('f-file-notes')?.value.trim() || '';
-      if (!url) { GristHelpers.log('Path / URL required', 'warn'); return; }
+      if (!url) { notify('Path / URL required', 'warn'); return; }
       const combinedNotes = [fname, ftype, url, notes].filter(Boolean).join(' | ');
       try {
         await GristHelpers.createRecord('SCALAR', {
@@ -1887,13 +2230,13 @@
           is_derived: false,
           notes: combinedNotes,
         });
-        GristHelpers.log(`File reference saved: ${fname || url} ✓`, 'ok');
+        notify(`File reference saved: ${fname || url} ✓`, 'ok');
         ['f-file-url', 'f-file-name', 'f-file-notes'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.value = '';
         });
         document.getElementById('f-file-type').value = '';
-      } catch (err) { GristHelpers.log('Error: ' + err.message, 'err'); }
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
     // =========================================================================
@@ -1926,14 +2269,14 @@
       const selEl = document.getElementById('sel-aggregate-add');
       const qtyEl = document.getElementById('agg-add-qty');
       const id    = parseInt(selEl.value);
-      if (!id) { GristHelpers.log('Choose an aggregate from the list', 'warn'); return; }
+      if (!id) { notify('Choose an aggregate from the list', 'warn'); return; }
       if (selectedAggregates.some(a => a.id_aggregate === id)) {
-        GristHelpers.log('This aggregate is already in the selection', 'warn'); return;
+        notify('This aggregate is already in the selection', 'warn'); return;
       }
       const agg  = allAggregates.find(a => a.id === id);
       const size = (agg?.fields.size_min_mm != null && agg?.fields.size_max_mm != null)
         ? `${agg.fields.size_min_mm}/${agg.fields.size_max_mm} mm`
-        : (agg?.fields.aggregate_type || '');
+        : GristHelpers.enumLabel(agg?.fields.aggregate_type);
       selectedAggregates.push({
         id_aggregate:  id,
         content_kg_m3: qtyEl.value === '' ? null : parseFloat(qtyEl.value),
@@ -1982,16 +2325,16 @@
       const selEl = document.getElementById('sel-binder-add');
       const qtyEl = document.getElementById('binder-add-qty');
       const id    = parseInt(selEl.value);
-      if (!id) { GristHelpers.log('Choose a binder from the list', 'warn'); return; }
+      if (!id) { notify('Choose a binder from the list', 'warn'); return; }
       if (selectedBinders.some(b => b.id_binder === id)) {
-        GristHelpers.log('This binder is already in the selection', 'warn'); return;
+        notify('This binder is already in the selection', 'warn'); return;
       }
       const binder = allBinders.find(b => b.id === id);
       selectedBinders.push({
         id_binder:     id,
         content_kg_m3: qtyEl.value === '' ? null : parseFloat(qtyEl.value),
         _name:         binder?.fields.name || `Binder #${id}`,
-        _type:         binder?.fields.binder_type || '',
+        _type:         GristHelpers.enumLabel(binder?.fields.binder_type),
       });
       selEl.value = '';
       qtyEl.value = '';
@@ -2027,6 +2370,15 @@
       fillEnumSelect('f-b-type',    'binder_type');
       fillEnumSelect('f-test-name', 'test_name');
       fillEnumSelect('f-mix-admix', 'admix_type');
+      fillEnumSelect('f-agg-type',         'aggregate_type');
+      fillEnumSelect('f-mix-water-type',   'water_type');
+      fillEnumSelect('f-expo-type',        'exposure_type');
+      fillEnumSelect('f-expo-nature',      'exposure_nature');
+      fillEnumSelect('f-cur-method',       'curing_method');
+      fillEnumSelect('f-mat-type',         'material_type');
+      fillEnumSelect('f-meas-sample-type', 'sample_type');
+      fillEnumSelect('f-meas-dims',        'sample_dimensions');
+      fillEnumSelect('f-test-type',        'test_type');
       await GristHelpers.ensureSchema();
       await refreshAll();
       updateBreadcrumb();
