@@ -2195,9 +2195,12 @@
         </div>`;
     }
 
+    let climateRenderSeq = 0;  // only the latest render may draw (renders can overlap while Plotly loads)
+
     async function renderClimateChart() {
       const el = document.getElementById('climate-chart');
       if (!el || !climatePreview) return;
+      const seq = ++climateRenderSeq;
       const { result } = climatePreview;
       const step = document.querySelector('input[name="clim-step"]:checked')?.value || 'monthly';
       const series = step === 'daily' ? result.daily : result.monthly;
@@ -2215,9 +2218,12 @@
         el.innerHTML = '<p class="field-hint">Select at least one parameter.</p>';
         return;
       }
+      // Clearing the container behind Plotly's back leaves it with a stale state: purge first.
+      if (window.Plotly) Plotly.purge(el);
       el.innerHTML = '';
       try { await loadScriptOnce(PLOTLY_URL, 'Plotly', 'the charting library'); }
-      catch (err) { el.innerHTML = `<p class="field-hint err">${escapeHtml(err.message)}.</p>`; return; }
+      catch (err) { if (seq === climateRenderSeq) el.innerHTML = `<p class="field-hint err">${escapeHtml(err.message)}.</p>`; return; }
+      if (seq !== climateRenderSeq) return;
 
       const css = getComputedStyle(el);
       const tok = n => css.getPropertyValue(n).trim();
