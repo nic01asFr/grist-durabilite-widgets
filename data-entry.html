@@ -178,6 +178,24 @@
     .toast.err  { background: var(--error); }
 
     .climate-table { max-width: 560px; margin-bottom: 8px; }
+    .climate-viz { --series-1: #2a78d6; --series-2: #eb6834; margin: 12px 0; }
+    .climate-viz-controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 6px; }
+    .climate-viz .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .climate-viz .chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; font-size: 12px;
+      border: 1px solid var(--surface2); border-radius: 999px; cursor: pointer; color: var(--text-muted);
+    }
+    .climate-viz .chip:has(input:checked) { border-color: var(--accent); color: var(--text); }
+    .climate-viz .chip input { width: auto; margin: 0; }
+    .climate-viz .seg { display: inline-flex; border: 1px solid var(--surface2); border-radius: 6px; overflow: hidden; }
+    .climate-viz .seg label { padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--text-muted); }
+    .climate-viz .seg input { position: absolute; opacity: 0; pointer-events: none; }
+    .climate-viz .seg label:has(input:checked) { background: var(--accent); color: #fff; }
+    .climate-viz .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .climate-chart { width: 100%; min-height: 60px; }
+    .climate-table-view summary { font-size: 12px; color: var(--text-muted); cursor: pointer; margin-top: 4px; }
+    .climate-table-view .mini-table { margin-top: 6px; }
+    .climate-table-view > div { max-height: 280px; overflow: auto; }
     .climate-table td { padding: 6px; }
     .climate-table .cov-low { color: var(--warning); }
 
@@ -2117,7 +2135,7 @@
               <td><strong>${v != null ? `${v} ${unit}` : '—'}</strong></td>
               <td class="${c < GristHelpers.CLIMATE_MIN_COVERAGE * 100 ? 'cov-low' : ''}">${c} % of days</td></tr>`;
           }).join('');
-        const temps = result.monthly.map(m => m.T).filter(v => v != null);
+        const temps = result.monthly.T.filter(v => v != null);
         const nSaved = Object.values(result.indicators).filter(v => v != null).length;
         out.innerHTML = `
           <table class="mini-table climate-table">
@@ -2130,15 +2148,167 @@
             ${temps.length ? `Monthly mean temperature from ${Math.min(...temps).toFixed(1)} to ${Math.max(...temps).toFixed(1)} °C.` : ''}
             Indicators with less than ${GristHelpers.CLIMATE_MIN_COVERAGE * 100} % of days covered are not saved.
           </p>
+          ${climateChartControlsHTML(result, marine)}
           ${existing.length ? `<p class="field-hint warn">${existing.length} climate value(s) already stored for this measurement will be replaced.</p>` : ''}
           <div class="form-actions" style="justify-content:flex-start;">
             <button class="btn btn-primary" onclick="saveClimate()" ${nSaved ? '' : 'disabled'}>💾 Save ${nSaved} value(s) as scalars</button>
           </div>`;
+        renderClimateChart();
       } catch (err) {
         out.innerHTML = `<p class="field-hint err">Climate lookup failed (${escapeHtml(err.message)}).</p>`;
       } finally {
         btn.disabled = false;
       }
+    }
+
+    // ---- Climate chart: one small panel per parameter on a shared time axis (no dual axis) ----
+    const PLOTLY_URL = 'https://cdn.plot.ly/plotly-2.35.0.min.js';
+    const CLIMATE_CHART_PARAMS = [
+      { key: 'T',    label: 'Air temperature',         unit: '°C',   on: true  },
+      { key: 'sea',  label: 'Sea surface temperature', unit: '°C',   on: true  },
+      { key: 'RH',   label: 'Relative humidity',       unit: '%',    on: true  },
+      { key: 'P',    label: 'Precipitation',           unit: 'mm',   on: true  },
+      { key: 'wind', label: 'Wind speed (mean)',       unit: 'km/h', on: false },
+    ];
+
+    function climateChartControlsHTML(result, marine) {
+      const hasSea = marine && result.daily.sea.some(v => v != null);
+      const chips = CLIMATE_CHART_PARAMS
+        .filter(p => p.key !== 'sea' || hasSea)
+        .map(p => `<label class="chip"><input type="checkbox" name="clim-param" value="${p.key}" ${p.on ? 'checked' : ''}
+          onchange="renderClimateChart()">${p.label}</label>`).join('');
+      return `
+        <div class="climate-viz">
+          <div class="climate-viz-controls">
+            <div class="chips">${chips}</div>
+            <div class="seg" role="radiogroup" aria-label="Time step">
+              <label><input type="radio" name="clim-step" value="monthly" checked onchange="renderClimateChart()">Monthly</label>
+              <label><input type="radio" name="clim-step" value="daily" onchange="renderClimateChart()">Daily</label>
+            </div>
+          </div>
+          <div id="climate-chart" class="climate-chart"></div>
+          <p class="field-hint" id="climate-chart-note"></p>
+          <details class="climate-table-view">
+            <summary>Data table</summary>
+            <div id="climate-data-table"></div>
+          </details>
+        </div>`;
+    }
+
+    async function renderClimateChart() {
+      const el = document.getElementById('climate-chart');
+      if (!el || !climatePreview) return;
+      const { result } = climatePreview;
+      const step = document.querySelector('input[name="clim-step"]:checked')?.value || 'monthly';
+      const series = step === 'daily' ? result.daily : result.monthly;
+      const chosen = new Set([...document.querySelectorAll('input[name="clim-param"]:checked')].map(i => i.value));
+      renderClimateTable(result.monthly, chosen);
+
+      // Temperatures share one panel (same unit); every other parameter gets its own.
+      const panels = [];
+      if (chosen.has('T') || chosen.has('sea')) panels.push({ id: 'temp', title: 'Temperature (°C)' });
+      if (chosen.has('RH'))   panels.push({ id: 'RH',   title: 'Relative humidity (%)' });
+      if (chosen.has('P'))    panels.push({ id: 'P',    title: `Precipitation (mm per ${step === 'daily' ? 'day' : 'month'})` });
+      if (chosen.has('wind')) panels.push({ id: 'wind', title: 'Wind speed, mean (km/h)' });
+      if (panels.length === 0) {
+        if (window.Plotly) Plotly.purge(el);
+        el.innerHTML = '<p class="field-hint">Select at least one parameter.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      try { await loadScriptOnce(PLOTLY_URL, 'Plotly', 'the charting library'); }
+      catch (err) { el.innerHTML = `<p class="field-hint err">${escapeHtml(err.message)}.</p>`; return; }
+
+      const css = getComputedStyle(el);
+      const tok = n => css.getPropertyValue(n).trim();
+      const c1 = tok('--series-1'), c2 = tok('--series-2');
+      const ink = tok('--text-muted'), grid = tok('--surface2'), axis = tok('--border');
+      const n = panels.length, gap = 0.07, h = (1 - gap * (n - 1)) / n;
+      const x = series.time;
+      const traces = [], layout = {
+        height: 90 + 170 * n, margin: { l: 52, r: 16, t: 28, b: 36 },
+        paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { family: getComputedStyle(document.body).fontFamily, size: 11, color: ink },
+        hovermode: 'x unified', hoverlabel: { bgcolor: '#ffffff', bordercolor: axis, font: { color: tok('--text') } },
+        showlegend: false, bargap: 0.25, annotations: [],
+        // Shared time axis, drawn under the bottom panel
+        xaxis: { type: 'date', anchor: n === 1 ? 'y' : `y${n}`, gridcolor: grid, linecolor: axis, zeroline: false,
+                 showspikes: true, spikemode: 'across', spikethickness: 1, spikecolor: ink, spikedash: 'solid' },
+      };
+      const fmt = unit => `%{y:.1f} ${unit}`;
+      panels.forEach((p, i) => {
+        const ax = i === 0 ? 'y' : `y${i + 1}`;
+        const top = 1 - i * (h + gap);
+        layout[i === 0 ? 'yaxis' : `yaxis${i + 1}`] = {
+          domain: [top - h, top], gridcolor: grid, linecolor: axis, zeroline: false, automargin: true,
+          rangemode: p.id === 'P' || p.id === 'wind' ? 'tozero' : 'normal',
+        };
+        layout.annotations.push({ text: `<b>${p.title}</b>`, xref: 'paper', yref: 'paper', x: 0, y: top,
+          xanchor: 'left', yanchor: 'bottom', showarrow: false, font: { size: 12, color: tok('--text') } });
+        const line = (y, name, color, unit) => ({ x, y, name, yaxis: ax, type: 'scatter', mode: 'lines',
+          line: { color, width: 2 }, connectgaps: false, hovertemplate: fmt(unit) });
+        if (p.id === 'temp') {
+          if (chosen.has('T')) {
+            // Min–max envelope (daily extremes, or monthly means of them), then the mean on top
+            traces.push({ x, y: series.Tmax, yaxis: ax, type: 'scatter', mode: 'lines', line: { width: 0 },
+              hoverinfo: 'skip', showlegend: false });
+            traces.push({ x, y: series.Tmin, yaxis: ax, type: 'scatter', mode: 'lines', line: { width: 0 },
+              fill: 'tonexty', fillcolor: hexToRgba(c1, 0.16), hoverinfo: 'skip', showlegend: false });
+            traces.push(line(series.T, 'Air (mean)', c1, '°C'));
+          }
+          if (chosen.has('sea')) traces.push(line(series.sea, 'Sea surface', c2, '°C'));
+          if (chosen.has('T') && chosen.has('sea')) {
+            // Two series: a legend plus a direct label at the end of each line (identity is not color alone)
+            layout.showlegend = true;
+            layout.legend = { orientation: 'h', traceorder: 'normal', x: 1, xanchor: 'right', y: top, yanchor: 'bottom', font: { color: ink } };
+            [[series.T, 'Air'], [series.sea, 'Sea']].forEach(([y, text]) => {
+              let k = y.length - 1;
+              while (k >= 0 && y[k] == null) k--;
+              if (k >= 0) layout.annotations.push({ text, x: x[k], y: y[k], xref: 'x', yref: ax, xanchor: 'left',
+                xshift: 4, showarrow: false, font: { size: 11, color: ink } });
+            });
+            layout.margin.r = 40;
+          }
+        } else if (p.id === 'P') {
+          traces.push({ x, y: series.P, name: 'Precipitation', yaxis: ax, type: 'bar',
+            marker: { color: c1 }, hovertemplate: fmt('mm') });
+        } else if (p.id === 'RH') {
+          traces.push(line(series.RH, 'Relative humidity', c1, '%'));
+        } else {
+          traces.push(line(series.wind, 'Wind speed', c1, 'km/h'));
+        }
+      });
+      // Only the named series appear in the legend
+      traces.forEach(t => { if (t.showlegend !== false) t.showlegend = t.name === 'Air (mean)' || t.name === 'Sea surface'; });
+      document.getElementById('climate-chart-note').textContent = chosen.has('T')
+        ? (step === 'daily'
+            ? 'Shaded band: daily minimum to maximum air temperature.'
+            : 'Shaded band: monthly means of the daily minimum and maximum air temperature.')
+        : '';
+      Plotly.react(el, traces, layout, {
+        displaylogo: false, responsive: true,
+        modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'toggleSpikelines'],
+        toImageButtonOptions: { filename: 'climate', scale: 2 },
+      });
+    }
+
+    function hexToRgba(hex, a) {
+      const n = parseInt(hex.replace('#', ''), 16);
+      return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+    }
+
+    // Accessible alternative to the chart: monthly values of the selected parameters
+    function renderClimateTable(monthly, chosen) {
+      const box = document.getElementById('climate-data-table');
+      if (!box) return;
+      const cols = [
+        ['T', 'T mean (°C)'], ['Tmin', 'T min (°C)'], ['Tmax', 'T max (°C)'], ['sea', 'Sea (°C)'],
+        ['RH', 'RH (%)'], ['P', 'Precip. (mm)'], ['wind', 'Wind (km/h)'],
+      ].filter(([k]) => chosen.has(k) || (chosen.has('T') && (k === 'Tmin' || k === 'Tmax')));
+      const f = v => (v == null ? '—' : (Math.round(v * 10) / 10).toString());
+      box.innerHTML = `<table class="mini-table"><thead><tr><th>Month</th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>` +
+        monthly.time.map((t, i) => `<tr><td>${t.slice(0, 7)}</td>${cols.map(([k]) => `<td>${f(monthly[k][i])}</td>`).join('')}</tr>`).join('') +
+        '</tbody></table>';
     }
 
     async function saveClimate() {
@@ -2257,22 +2427,27 @@
       setPasteHint(tbodyId, '');
     }
 
+    // Loads a CDN script the first time it is needed; resolves once window[globalName] exists.
+    const scriptPromises = {};
+    function loadScriptOnce(url, globalName, what) {
+      if (window[globalName]) return Promise.resolve();
+      scriptPromises[url] ??= new Promise((resolve, reject) => {
+        const sc = document.createElement('script');
+        sc.src = url;
+        sc.onload = resolve;
+        sc.onerror = () => { delete scriptPromises[url]; reject(new Error(`could not load ${what}`)); };
+        document.head.appendChild(sc);
+      });
+      return scriptPromises[url];
+    }
+
     // ---- Import from a file (spreadsheet or delimited text) ----
     const SHEETJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    let sheetJsPromise = null;
     const importedBooks = {};  // tbodyId → { wb, fileName } for switching sheets
 
     // SheetJS is only loaded the first time a spreadsheet file is opened.
     function loadSheetJS() {
-      if (window.XLSX) return Promise.resolve();
-      sheetJsPromise ??= new Promise((resolve, reject) => {
-        const sc = document.createElement('script');
-        sc.src = SHEETJS_URL;
-        sc.onload = resolve;
-        sc.onerror = () => { sheetJsPromise = null; reject(new Error('could not load the spreadsheet reader')); };
-        document.head.appendChild(sc);
-      });
-      return sheetJsPromise;
+      return loadScriptOnce(SHEETJS_URL, 'XLSX', 'the spreadsheet reader');
     }
 
     async function importTableFile(tbodyId, input) {

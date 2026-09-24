@@ -686,8 +686,10 @@ const GristHelpers = {
   CLIMATE_SCALARS: ['mean_temperature', 'mean_rh', 'time_of_wetness', 'annual_precipitation', 'mean_sea_temperature'],
   CLIMATE_MIN_COVERAGE: 0.8,  // share of days with data required to keep an indicator
 
-  // start / end: 'YYYY-MM-DD'. Returns { grid, days, years, coverage, indicators, monthly }.
+  // start / end: 'YYYY-MM-DD'. Returns { grid, days, years, coverage, indicators, daily, monthly }.
   // indicators values are null when coverage is below CLIMATE_MIN_COVERAGE.
+  // daily / monthly: aligned series { time, T, Tmin, Tmax, RH, P, wind, sea } (null where missing);
+  // monthly P is the monthly total, the others are monthly means of the daily values.
   async fetchClimate({ lat, lon, start, end, marine = false }) {
     const q = (base, params) => fetch(`${base}?${new URLSearchParams(params)}`).then(async r => {
       if (!r.ok) throw new Error(`Open-Meteo HTTP ${r.status}: ${(await r.text()).slice(0, 120)}`);
@@ -696,7 +698,7 @@ const GristHelpers = {
     const common = { latitude: lat, longitude: lon, start_date: start, end_date: end, timezone: 'GMT' };
     const [land, sea] = await Promise.all([
       q('https://archive-api.open-meteo.com/v1/archive',
-        { ...common, daily: 'temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum' }),
+        { ...common, daily: 'temperature_2m_mean,temperature_2m_min,temperature_2m_max,relative_humidity_2m_mean,precipitation_sum,wind_speed_10m_mean' }),
       marine
         ? q('https://marine-api.open-meteo.com/v1/marine', { ...common, daily: 'sea_surface_temperature_mean' })
             .catch(() => null)  // marine data is optional: never block the land indicators
@@ -729,21 +731,38 @@ const GristHelpers = {
       mean_sea_temperature: sea ? keep(round(mean(sea.daily.sea_surface_temperature_mean), 1), coverage.sea) : null,
     };
 
-    // Monthly means, for a quick look at seasonality
-    const byMonth = new Map();
+    // Sea data aligned on the land dates
+    const seaByDate = new Map();
+    if (sea) sea.daily.time.forEach((t, i) => seaByDate.set(t, sea.daily.sea_surface_temperature_mean[i]));
+    const daily = {
+      time: d.time,
+      T:    d.temperature_2m_mean,
+      Tmin: d.temperature_2m_min,
+      Tmax: d.temperature_2m_max,
+      RH:   d.relative_humidity_2m_mean,
+      P,
+      wind: d.wind_speed_10m_mean,
+      sea:  d.time.map(t => seaByDate.get(t) ?? null),
+    };
+
+    // Monthly aggregation (means; precipitation = total over the days with data)
+    const keys = ['T', 'Tmin', 'Tmax', 'RH', 'P', 'wind', 'sea'];
+    const groups = new Map();
     d.time.forEach((t, i) => {
       const k = t.slice(0, 7);
-      if (!byMonth.has(k)) byMonth.set(k, { T: [], RH: [], P: [] });
-      const m = byMonth.get(k);
-      m.T.push(d.temperature_2m_mean[i]); m.RH.push(d.relative_humidity_2m_mean[i]); m.P.push(P[i]);
+      if (!groups.has(k)) groups.set(k, Object.fromEntries(keys.map(x => [x, []])));
+      keys.forEach(x => groups.get(k)[x].push(daily[x][i]));
     });
-    const monthly = [...byMonth].map(([month, m]) => ({
-      month, T: mean(m.T), RH: mean(m.RH), P: valid(m.P).reduce((a, b) => a + b, 0),
-    }));
+    const monthly = { time: [...groups.keys()].map(k => `${k}-15`) };
+    keys.forEach(x => {
+      monthly[x] = [...groups.values()].map(g => (x === 'P'
+        ? (valid(g.P).length ? valid(g.P).reduce((a, b) => a + b, 0) : null)
+        : mean(g[x])));
+    });
 
     return {
       grid: { lat: land.latitude, lon: land.longitude, elevation: land.elevation },
-      days, years, coverage, indicators, monthly,
+      days, years, coverage, indicators, daily, monthly,
     };
   },
 
