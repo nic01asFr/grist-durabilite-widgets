@@ -369,27 +369,16 @@ async function loadAllData() {
 // =========================================================================
 // Build flat rows
 // =========================================================================
-const SCM_LABELS = {
-  fly_ash:           'FA',
-  silica_fume:       'SF',
-  slag:              'Slag',
-  metakaolin:        'MK',
-  limestone_filler:  'Limestone',
-  natural_pozzolan:  'Pozzolan',
-  zeolite:           'Zeolite',
-  other:             'Other',
-};
-
 function buildFlatRows() {
   return allProfiles.map(p => {
     const cem  = p.binders.find(b =>
-      b.binder_type === 'portland_cement' || b.binder_type === 'blended_cement'
+      GristHelpers.isCement(b.binder_type)
     );
     const scms = p.binders.filter(b =>
-      b.binder_type !== 'portland_cement' && b.binder_type !== 'blended_cement'
+      !GristHelpers.isCement(b.binder_type)
     );
     const scm_str = scms.map(b =>
-      (SCM_LABELS[b.binder_type] || b.binder_type) +
+      (GristHelpers.SCM_LABELS[b.binder_type] || b.binder_type) +
       (b.content_kg_m3 != null ? ` ${b.content_kg_m3}kg` : '')
     ).join(' + ') || '—';
 

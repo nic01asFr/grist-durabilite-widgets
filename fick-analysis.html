@@ -471,11 +471,6 @@
       '#06b6d4','#ec4899','#84cc16','#f97316','#6366f1',
       '#14b8a6','#78716c','#b45309','#1d4ed8','#be123c',
     ];
-    const SCM_LABELS = {
-      fly_ash: 'FA', silica_fume: 'SF', slag: 'Slag',
-      metakaolin: 'MK', limestone_filler: 'Limestone',
-      natural_pozzolan: 'Pozzolan', zeolite: 'Zeolite', other: 'Other',
-    };
 
     function contColor(t) {
       const r = Math.round(59  + (239 -  59) * t);
@@ -555,19 +550,12 @@
     // PROFILE UTILITIES
     // =========================================================================
     function getBinderSignature(p) {
-      if (!p.binders || p.binders.length === 0) return 'Unknown';
-      const scms = p.binders.filter(b =>
-        b.binder_type !== 'portland_cement' && b.binder_type !== 'blended_cement'
-      );
-      if (scms.length === 0) return 'Portland only';
-      return 'Portland + ' + scms.map(b => SCM_LABELS[b.binder_type] || b.binder_type).join(' + ');
+      return GristHelpers.binderSignature(p.binders);
     }
 
     function primaryCementName(p) {
       if (!p.binders || p.binders.length === 0) return null;
-      const cem = p.binders.find(b =>
-        b.binder_type === 'portland_cement' || b.binder_type === 'blended_cement'
-      ) || p.binders[0];
+      const cem = p.binders.find(b => GristHelpers.isCement(b.binder_type)) || p.binders[0];
       return cem.name || null;
     }
 

@@ -358,7 +358,8 @@
           </div>
           <div class="field-item">
             <label>Admixture type</label>
-            <input type="text" id="f-mix-admix" data-table="MIX_DESIGN" data-field="admix_type">
+            <input type="text" id="f-mix-admix" list="dl-admix" data-table="MIX_DESIGN" data-field="admix_type">
+            <datalist id="dl-admix"></datalist>
           </div>
           <div class="field-item">
             <label>Admixture (kg/m³)</label>
@@ -1344,7 +1345,7 @@ function buildDetailForm(m, mScalars, mCurves) {
     ? `<div class="scalar-cols-header"><span>Parameter</span><span>Value</span><span>Unit</span><span></span></div>`
       + mScalars.map(s => `
         <div class="scalar-row" data-scalar-id="${s.id}">
-          <input type="text" value="${s.fields.name || ''}" placeholder="Parameter"
+          <input type="text" value="${s.fields.name || ''}" placeholder="Parameter" list="dl-sc-name"
             data-table="SCALAR" data-field="name" data-scalar-id="${s.id}">
           <input type="number" step="any" value="${s.fields.value != null ? s.fields.value : ''}" placeholder="Value"
             data-table="SCALAR" data-field="value" data-scalar-id="${s.id}">
@@ -1637,10 +1638,19 @@ function resetChanges() {
 }
 
 // =========================================================================
+// Suggested values for free-text inputs bound to Choice columns
+function fillDatalist(id, values) {
+  let dl = document.getElementById(id);
+  if (!dl) { dl = document.createElement('datalist'); dl.id = id; document.body.appendChild(dl); }
+  dl.innerHTML = values.map(v => `<option value="${v}">`).join('');
+}
+
 // INIT
 // =========================================================================
 (async function() {
   GristHelpers.log('Initializing Editor…');
+  fillDatalist('dl-admix', GristHelpers.ENUMS.admix_type);
+  fillDatalist('dl-sc-name', GristHelpers.ENUMS.scalar_name);
   grist.ready({ requiredAccess: 'full' });
   grist.onRecord(async (record) => {
     await loadMaterial(record);

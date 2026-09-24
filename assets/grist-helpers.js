@@ -1,6 +1,8 @@
 // =========================================================================
 // GristHelpers — Shared utilities for durability widgets
-// Schema v2.4 — 15 tables, 11 enums (generic architecture)
+// Schema v2.5 — 15 tables, 13 enums (generic architecture)
+// v2.5: vocabularies enriched from the RILEM metadata tool (binders, tests,
+//       admixtures, SCALAR parameters); MEB/DRX renamed SEM/XRD
 // Results: SCALAR (scalars 0..n) + CURVE+DATA_CURVE (curves 0..n)
 //          directly linked to MEASUREMENT (no RESULT table)
 // Aggregates by fraction: MIX_DESIGN_AGGREGATE (junction table)
@@ -8,7 +10,7 @@
 const GristHelpers = {
 
   // =========================================================================
-  // SCHEMA — Complete definition of 13 tables
+  // SCHEMA — Complete definition of 15 tables
   // =========================================================================
   SCHEMA: {
 
@@ -24,8 +26,8 @@ const GristHelpers = {
     // --- Exposure conditions ---
     EXPOSURE: {
       columns: [
-        { id: 'exposure_type',        fields: { type: 'Choice',  label: 'Exposure type',   widgetOptions: '{"choices":["laboratory","in-situ"]}' } },
-        { id: 'exposure_nature',      fields: { type: 'Choice',  label: 'Exposure nature', widgetOptions: '{"choices":["atmospheric","spray","splash","tidal","submerged"]}' } },
+        { id: 'exposure_type',        enum: 'exposure_type', fields: { type: 'Choice',  label: 'Exposure type' } },
+        { id: 'exposure_nature',      enum: 'exposure_nature', fields: { type: 'Choice',  label: 'Exposure nature' } },
         { id: 'wetting_duration_pct', fields: { type: 'Numeric', label: 'Wetting (%)' } },
         { id: 'drying_duration_pct',  fields: { type: 'Numeric', label: 'Drying (%)' } },
       ]
@@ -49,7 +51,7 @@ const GristHelpers = {
     BINDER: {
       columns: [
         { id: 'name',             fields: { type: 'Text',    label: 'Name' } },
-        { id: 'binder_type',      fields: { type: 'Choice',  label: 'Binder type', widgetOptions: '{"choices":["portland_cement","blended_cement","fly_ash","slag","silica_fume","limestone_filler","natural_pozzolan","other"]}' } },
+        { id: 'binder_type',      enum: 'binder_type', fields: { type: 'Choice',  label: 'Binder type' } },
         { id: 'density_kg_m3',    fields: { type: 'Numeric', label: 'Density (kg/m³)' } },
         { id: 'specific_surface', fields: { type: 'Numeric', label: 'Blaine fineness (cm²/g)' } },
         { id: 'loss_on_ignition', fields: { type: 'Numeric', label: 'LOI (%)' } },
@@ -76,7 +78,7 @@ const GristHelpers = {
     AGGREGATE: {
       columns: [
         { id: 'name',                 fields: { type: 'Text',    label: 'Name' } },
-        { id: 'aggregate_type',       fields: { type: 'Choice',  label: 'Aggregate type', widgetOptions: '{"choices":["sand","gravel","crushed_stone","lightweight","recycled"]}' } },
+        { id: 'aggregate_type',       enum: 'aggregate_type', fields: { type: 'Choice',  label: 'Aggregate type' } },
         { id: 'size_min_mm',          fields: { type: 'Numeric', label: 'D min (mm)' } },
         { id: 'size_max_mm',          fields: { type: 'Numeric', label: 'D max (mm)' } },
         { id: 'density_kg_m3',        fields: { type: 'Numeric', label: 'Density (kg/m³)' } },
@@ -88,12 +90,12 @@ const GristHelpers = {
     // --- Concrete mix design ---
     MIX_DESIGN: {
       columns: [
-        { id: 'water_type',                          fields: { type: 'Choice',  label: 'Water type', widgetOptions: '{"choices":["tap_water","pure_water","sea_water"]}' } },
+        { id: 'water_type',                          enum: 'water_type', fields: { type: 'Choice',  label: 'Water type' } },
         { id: 'water_content_kg',                    fields: { type: 'Numeric', label: 'Water (kg/m³)' } },
         { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric', label: 'GWP (kg CO₂-eq/m³)' } },
         { id: 'wc_ratio',                            fields: { type: 'Numeric', label: 'w/c' } },
         { id: 'wl_ratio',                            fields: { type: 'Numeric', label: 'w/b' } },
-        { id: 'admix_type',                          fields: { type: 'Text',    label: 'Admixture type' } },
+        { id: 'admix_type',                          enum: 'admix_type', fields: { type: 'Choice',  label: 'Admixture type' } },
         { id: 'adjuvant_content',                    fields: { type: 'Numeric', label: 'Admixture (kg/m³)' } },
         { id: 'entrained_air',                       fields: { type: 'Numeric', label: 'Entrained air (%)' } },
       ]
@@ -124,7 +126,7 @@ const GristHelpers = {
         { id: 'humidity_pct',         fields: { type: 'Numeric', label: 'Humidity (%)' } },
         { id: 'wind_protection',      fields: { type: 'Bool',    label: 'Wind protection' } },
         { id: 'solar_protection',     fields: { type: 'Bool',    label: 'Solar protection' } },
-        { id: 'curing_method',        fields: { type: 'Choice',  label: 'Curing method', widgetOptions: '{"choices":["water_spraying","wet_covering","curing_compounds","forms_left_in_place","wet_curing","water_immersion"]}' } },
+        { id: 'curing_method',        enum: 'curing_method', fields: { type: 'Choice',  label: 'Curing method' } },
         { id: 'curing_duration_days', fields: { type: 'Numeric', label: 'Curing duration (days)' } },
         { id: 'standard_name',        fields: { type: 'Text',    label: 'Standard' } },
       ]
@@ -134,10 +136,10 @@ const GristHelpers = {
     // id_test: the test type is set at campaign creation
     TEST: {
       columns: [
-        { id: 'name',                fields: { type: 'Choice',  label: 'Measured property', widgetOptions: '{"choices":["calorimetry","carbonation","cl_profil","diffusivity","Rc","gas_permeability","sorptivity","porosity","total_porosity","resistivity","org_density","MEB","DRX"]}' } },
+        { id: 'name',                enum: 'test_name', fields: { type: 'Choice',  label: 'Measured property' } },
         { id: 'standard_name',       fields: { type: 'Text',    label: 'Standard' } },
         { id: 'experiment_duration', fields: { type: 'Numeric', label: 'Test duration (days)' } },
-        { id: 'test_type',           fields: { type: 'Choice',  label: 'Test type', widgetOptions: '{"choices":["natural","accelerated","total_cl","free_cl"]}' } },
+        { id: 'test_type',           enum: 'test_type', fields: { type: 'Choice',  label: 'Test type' } },
       ]
     },
 
@@ -151,7 +153,7 @@ const GristHelpers = {
         { id: 'manufacturing_date',  fields: { type: 'Date',                 label: 'Manufacturing date' } },
         { id: 'demolding_date',      fields: { type: 'Date',                 label: 'Demolding date' } },
         { id: 'name',                fields: { type: 'Text',                 label: 'Name' } },
-        { id: 'material_type',       fields: { type: 'Choice',               label: 'Material type', widgetOptions: '{"choices":["cement_paste","mortar","concrete"]}' } },
+        { id: 'material_type',       enum: 'material_type', fields: { type: 'Choice',               label: 'Material type' } },
       ]
     },
 
@@ -161,8 +163,8 @@ const GristHelpers = {
         { id: 'id_material',       fields: { type: 'Ref:MATERIAL', label: 'Material' } },
         { id: 'id_source',         fields: { type: 'Ref:SOURCE',   label: 'Source' } },
         { id: 'id_test',           fields: { type: 'Ref:TEST',     label: 'Test' } },
-        { id: 'sample_type',       fields: { type: 'Choice',       label: 'Sample type', widgetOptions: '{"choices":["laboratory_sample","bridge_pier"]}' } },
-        { id: 'sample_dimensions', fields: { type: 'Choice',       label: 'Sample dimensions', widgetOptions: '{"choices":["cylinder_100x200","cylinder_110x220","cylinder_150x300","cylinder_160x320","cube_100","cube_150","cube_200","prism_40x40x160","prism_70x70x280","prism_100x100x400","powder","other"]}' } },
+        { id: 'sample_type',       enum: 'sample_type', fields: { type: 'Choice',       label: 'Sample type' } },
+        { id: 'sample_dimensions', enum: 'sample_dimensions', fields: { type: 'Choice',       label: 'Sample dimensions' } },
         { id: 'preparation_date',  fields: { type: 'Date',         label: 'Preparation date' } },
         { id: 'result_date',       fields: { type: 'Date',         label: 'Result date' } },
         { id: 'sample_mass_g',     fields: { type: 'Numeric',      label: 'Mass (g)' } },
@@ -175,7 +177,7 @@ const GristHelpers = {
     SCALAR: {
       columns: [
         { id: 'id_measurement', fields: { type: 'Ref:MEASUREMENT', label: 'Measurement' } },
-        { id: 'name',           fields: { type: 'Text',            label: 'Parameter name' } },
+        { id: 'name',           enum: 'scalar_name', fields: { type: 'Choice',          label: 'Parameter name' } },
         { id: 'value',          fields: { type: 'Numeric',         label: 'Value' } },
         { id: 'unit',           fields: { type: 'Text',            label: 'Unit' } },
         { id: 'is_derived',     fields: { type: 'Bool',            label: 'Derived (computed)' } },
@@ -216,10 +218,113 @@ const GristHelpers = {
     curing_method:      ['water_spraying', 'wet_covering', 'curing_compounds', 'forms_left_in_place', 'wet_curing', 'water_immersion'],
     sample_type:        ['laboratory_sample', 'bridge_pier'],
     sample_dimensions:  ['cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320','cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'],
-    test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'org_density', 'MEB', 'DRX'],
+    // Additions from RILEM "Experiments" vocabulary: MIP, EDS, NMR, water_permeability,
+    // corrosion_*, rcpt, freeze_thaw, sulfate_resistance, ASR
+    test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'water_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'rcpt', 'corrosion_potential', 'corrosion_rate', 'freeze_thaw', 'sulfate_resistance', 'ASR', 'org_density', 'SEM', 'XRD', 'EDS', 'MIP', 'NMR'],
     test_type:          ['natural', 'accelerated', 'total_cl', 'free_cl'],
-    binder_type:        ['portland_cement', 'blended_cement', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'metakaolin', 'zeolite', 'other'],
+    // Additions from RILEM "Materials" vocabulary: CAC, CSA, alkali-activated, calcined clay, RHA, glass powder
+    binder_type:        ['portland_cement', 'blended_cement', 'calcium_aluminate_cement', 'csa_cement', 'alkali_activated', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'metakaolin', 'calcined_clay', 'zeolite', 'rice_husk_ash', 'glass_powder', 'other'],
     aggregate_type:     ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],
+    // From RILEM "Chemical Admixture" vocabulary
+    admix_type:         ['superplasticizer', 'plasticizer', 'accelerator', 'retarder', 'air_entraining', 'hydrophobic', 'other'],
+    // scalar_name is derived from SCALAR_PARAMETERS below
+  },
+
+  // =========================================================================
+  // SCALAR_PARAMETERS — Dictionary of SCALAR.name values
+  // unit: default unit; rilem: matching RILEM "Data_Categories" label (null if none)
+  // Names already written by widgets (D, Dapp, Cs, duree_vie_ans…) must stay unchanged.
+  // =========================================================================
+  SCALAR_PARAMETERS: {
+    // Chlorides
+    D:                          { unit: 'm²/s',     rilem: 'Chloride diffusion coefficient' },
+    Dapp:                       { unit: 'm²/s',     rilem: 'Chloride diffusion coefficient' },
+    Cs:                         { unit: '%',        rilem: null },
+    chloride_penetration_depth: { unit: 'mm',       rilem: 'Chloride penetration depth' },
+    chloride_threshold:         { unit: '%',        rilem: 'Chloride threshold level' },
+    chloride_binding_capacity:  { unit: 'mol/kg',   rilem: 'Chloride binding capacity' },
+    free_chloride:              { unit: 'mol/L',    rilem: 'Free chloride ion concentration' },
+    rcpt_charge:                { unit: 'C',        rilem: 'Chloride penetration' },
+    // Carbonation
+    mean_depth:                 { unit: 'mm',       rilem: 'Carbonation depth' },
+    carbonation_rate_coeff:     { unit: 'mm/yr^0.5', rilem: 'Carbonation rate coefficient' },
+    // Corrosion / service life
+    duree_vie_ans:              { unit: 'yr',       rilem: 'Time to corrosion initiation' },
+    profondeur_crit:            { unit: 'mm',       rilem: null },
+    cover_depth:                { unit: 'mm',       rilem: null },
+    corrosion_rate:             { unit: 'µA/cm²',   rilem: 'Corrosion rate' },
+    corrosion_potential:        { unit: 'mV',       rilem: 'Corrosion potential' },
+    // Transport / porosity
+    electrical_resistivity:     { unit: 'Ω·m',      rilem: 'Electrical resistivity' },
+    surface_resistivity:        { unit: 'kΩ·cm',    rilem: 'Surface resistivity' },
+    sorptivity:                 { unit: 'mm/min^0.5', rilem: 'Sorptivity' },
+    water_absorption:           { unit: '%',        rilem: 'Water absorption' },
+    gas_permeability:           { unit: 'm²',       rilem: 'Gas permeability' },
+    water_permeability:         { unit: 'm/s',      rilem: 'Water permeability' },
+    oxygen_diffusion_coeff:     { unit: 'm²/s',     rilem: 'Oxygen diffusion coefficient' },
+    porosity:                   { unit: '%',        rilem: 'Porosity' },
+    degree_of_saturation:       { unit: '%',        rilem: 'Degree of saturation' },
+    // Mechanical
+    Rc:                         { unit: 'MPa',      rilem: 'Compressive strength' },
+    // Fit quality / metadata
+    R2:                         { unit: '',         rilem: null },
+    RMSE:                       { unit: '',         rilem: null },
+    source_dapp:                { unit: '',         rilem: null },
+    source_kcarb:               { unit: '',         rilem: null },
+    exposure_duration:          { unit: 'yr',       rilem: null },  // read as years unless unit is days
+    // File references (SEM, XRD, EDS, NMR)
+    sem_file:                   { unit: 'file_ref', rilem: 'SEM analysis' },
+    xrd_file:                   { unit: 'file_ref', rilem: 'XRD peak intensity' },
+    eds_file:                   { unit: 'file_ref', rilem: null },
+    nmr_file:                   { unit: 'file_ref', rilem: null },
+  },
+
+  // =========================================================================
+  // VALUE_RENAMES — Stored values renamed across schema versions
+  // Applied to existing records by ensureSchema(); old values are dropped from choices.
+  // =========================================================================
+  VALUE_RENAMES: {
+    TEST:   { name: { MEB: 'SEM', DRX: 'XRD' } },
+    SCALAR: { name: { meb_file: 'sem_file', drx_file: 'xrd_file' } },
+  },
+
+  // =========================================================================
+  // BINDER CLASSIFICATION — main cements vs. SCMs (used for mix labels)
+  // =========================================================================
+  CEMENT_LABELS: {
+    portland_cement:          'Portland',
+    blended_cement:           'Portland',
+    calcium_aluminate_cement: 'CAC',
+    csa_cement:               'CSA',
+    alkali_activated:         'AAM',
+  },
+
+  SCM_LABELS: {
+    fly_ash:          'FA',
+    silica_fume:      'SF',
+    slag:             'Slag',
+    metakaolin:       'MK',
+    calcined_clay:    'CC',
+    limestone_filler: 'Limestone',
+    natural_pozzolan: 'Pozzolan',
+    zeolite:          'Zeolite',
+    rice_husk_ash:    'RHA',
+    glass_powder:     'GP',
+    other:            'Other',
+  },
+
+  isCement(binderType) {
+    return Object.prototype.hasOwnProperty.call(GristHelpers.CEMENT_LABELS, binderType);
+  },
+
+  // e.g. "Portland + FA + SF", "CAC only"
+  binderSignature(binders) {
+    if (!binders || binders.length === 0) return 'Unknown';
+    const cem  = binders.find(b => GristHelpers.isCement(b.binder_type));
+    const base = cem ? GristHelpers.CEMENT_LABELS[cem.binder_type] : 'Portland';
+    const scms = binders.filter(b => !GristHelpers.isCement(b.binder_type));
+    if (scms.length === 0) return base + ' only';
+    return base + ' + ' + scms.map(b => GristHelpers.SCM_LABELS[b.binder_type] || b.binder_type).join(' + ');
   },
 
   // =========================================================================
@@ -239,12 +344,16 @@ const GristHelpers = {
       const tableRowIdToName = {};
       metaTables.id.forEach((rowId, i) => { tableRowIdToName[rowId] = metaTables.tableId[i]; });
 
+      // tableName → colId → { type, widgetOptions }
       const existingColumns = {};
       metaCols.parentId.forEach((parentRowId, i) => {
         const tableName = tableRowIdToName[parentRowId];
         if (tableName) {
-          if (!existingColumns[tableName]) existingColumns[tableName] = new Set();
-          existingColumns[tableName].add(metaCols.colId[i]);
+          if (!existingColumns[tableName]) existingColumns[tableName] = {};
+          existingColumns[tableName][metaCols.colId[i]] = {
+            type:          metaCols.type[i],
+            widgetOptions: metaCols.widgetOptions[i],
+          };
         }
       });
 
@@ -258,8 +367,8 @@ const GristHelpers = {
           log(`Table ${tableName} created ✓ (${cols.length} columns)`, 'ok');
           created++;
         } else {
-          const existingColSet = existingColumns[tableName] || new Set();
-          const missingCols = tableDef.columns.filter(c => !existingColSet.has(c.id));
+          const existingCols = existingColumns[tableName] || {};
+          const missingCols = tableDef.columns.filter(c => !existingCols[c.id]);
           if (missingCols.length > 0) {
             log(`Adding ${missingCols.length} column(s) to ${tableName}…`);
             const actions = missingCols.map(c => ['AddColumn', tableName, c.id, c.fields]);
@@ -267,6 +376,8 @@ const GristHelpers = {
             log(`${tableName}: +${missingCols.length} column(s) ✓`, 'ok');
             updated++;
           }
+          await GristHelpers._renameValues(tableName, existingCols);
+          if (await GristHelpers._syncChoices(tableName, tableDef, existingCols)) updated++;
         }
       }
 
@@ -274,6 +385,73 @@ const GristHelpers = {
     } catch (err) {
       log('Schema verification error: ' + err.message, 'err');
     }
+  },
+
+  // Rewrites stored values listed in VALUE_RENAMES (e.g. TEST.name 'MEB' → 'SEM')
+  async _renameValues(tableName, existingCols) {
+    const renames = GristHelpers.VALUE_RENAMES[tableName];
+    if (!renames) return;
+    const cols = Object.keys(renames).filter(colId => existingCols[colId]);
+    if (cols.length === 0) return;
+
+    const data = await grist.docApi.fetchTable(tableName);
+    const actions = [];
+    for (const colId of cols) {
+      const map = renames[colId];
+      const ids = [], vals = [];
+      (data[colId] || []).forEach((v, i) => {
+        if (Object.prototype.hasOwnProperty.call(map, v)) { ids.push(data.id[i]); vals.push(map[v]); }
+      });
+      if (ids.length > 0) {
+        actions.push(['BulkUpdateRecord', tableName, ids, { [colId]: vals }]);
+        GristHelpers.log(`${tableName}.${colId}: ${ids.length} value(s) renamed (${Object.entries(map).map(([a, b]) => a + '→' + b).join(', ')})`, 'ok');
+      }
+    }
+    if (actions.length > 0) await grist.docApi.applyUserActions(actions);
+  },
+
+  // Brings Choice columns in line with ENUMS: converts Text → Choice and adds
+  // missing choices. Choices added by users are kept; renamed old values are dropped.
+  // Returns true if the table was modified.
+  async _syncChoices(tableName, tableDef, existingCols) {
+    const actions = [];
+    let tableData = null;
+
+    for (const c of tableDef.columns) {
+      if (!c.enum) continue;
+      const existing = existingCols[c.id];
+      if (!existing) continue;  // just created with the right options
+      if (existing.type !== 'Choice' && existing.type !== 'Text') continue;  // never touch other types
+
+      let opts = {};
+      try { opts = JSON.parse(existing.widgetOptions || '{}') || {}; } catch (e) { opts = {}; }
+      const current  = existing.type === 'Choice' ? (opts.choices || []) : [];
+      const dropped  = new Set(Object.keys((GristHelpers.VALUE_RENAMES[tableName] || {})[c.id] || {}));
+      const choices  = [...GristHelpers.ENUMS[c.enum]];
+      const extra    = current.filter(v => !choices.includes(v) && !dropped.has(v));
+
+      // Text → Choice: keep values already typed so they do not show as invalid
+      if (existing.type === 'Text') {
+        if (!tableData) tableData = await grist.docApi.fetchTable(tableName);
+        for (const v of (tableData[c.id] || [])) {
+          if (typeof v === 'string' && v && !choices.includes(v) && !extra.includes(v) && !dropped.has(v)) extra.push(v);
+        }
+      }
+      const merged = [...choices, ...extra];
+
+      const unchanged = existing.type === 'Choice' &&
+        merged.length === current.length && merged.every(v => current.includes(v));
+      if (unchanged) continue;
+
+      const fields = { widgetOptions: JSON.stringify({ ...opts, choices: merged }) };
+      if (existing.type === 'Text') fields.type = 'Choice';
+      actions.push(['ModifyColumn', tableName, c.id, fields]);
+      GristHelpers.log(`${tableName}.${c.id}: ${existing.type === 'Text' ? 'converted to Choice, ' : ''}${merged.length} choice(s)`, 'ok');
+    }
+
+    if (actions.length === 0) return false;
+    await grist.docApi.applyUserActions(actions);
+    return true;
   },
 
   // =========================================================================
@@ -520,3 +698,12 @@ const GristHelpers = {
     return ans.toFixed(1) + ' yr';
   }
 };
+
+// Derived enums + Choice options: SCHEMA columns reference ENUMS by key (`enum`)
+// so the two can never drift apart.
+GristHelpers.ENUMS.scalar_name = Object.keys(GristHelpers.SCALAR_PARAMETERS);
+for (const tableDef of Object.values(GristHelpers.SCHEMA)) {
+  for (const c of tableDef.columns) {
+    if (c.enum) c.fields.widgetOptions = JSON.stringify({ choices: GristHelpers.ENUMS[c.enum] });
+  }
+}

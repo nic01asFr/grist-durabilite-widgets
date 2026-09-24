@@ -182,16 +182,6 @@
           <label>Type <span class="req">*</span></label>
           <select id="f-b-type">
             <option value="">Choose…</option>
-            <option value="portland_cement">portland_cement</option>
-            <option value="blended_cement">blended_cement</option>
-            <option value="fly_ash">fly_ash</option>
-            <option value="slag">slag</option>
-            <option value="silica_fume">silica_fume</option>
-            <option value="limestone_filler">limestone_filler</option>
-            <option value="natural_pozzolan">natural_pozzolan</option>
-            <option value="metakaolin">metakaolin</option>
-            <option value="zeolite">zeolite</option>
-            <option value="other">other</option>
           </select>
         </div>
         <div class="form-field"><label>Density (kg/m³)</label><input type="number" id="f-b-density" step="10" placeholder="3150"></div>
@@ -349,7 +339,7 @@
             <div id="mix-agg-summary" style="padding:5px 0;font-size:12px;color:var(--text-dim);font-style:italic;">No aggregate configured.</div>
           </div>
           <div class="form-field"><label>GWP (kg CO₂eq/m³)</label><input type="number" id="f-mix-gwp" step="1" min="0" placeholder="250"></div>
-          <div class="form-field"><label>Admixture type</label><input type="text" id="f-mix-admix" placeholder="Superplasticizer"></div>
+          <div class="form-field"><label>Admixture type</label><select id="f-mix-admix"><option value="">—</option></select></div>
           <div class="form-field"><label>Admixture (kg/m³)</label><input type="number" id="f-mix-admix-content" step="0.1" min="0" placeholder="1.0"></div>
           <div class="form-field"><label>Entrained air (%)</label><input type="number" id="f-mix-air" step="0.1" min="0" placeholder="2.5"></div>
         </div>
@@ -570,19 +560,6 @@
                 <label>Property <span class="req">*</span></label>
                 <select id="f-test-name">
                   <option value="">Choose…</option>
-                  <option value="calorimetry">calorimetry</option>
-                  <option value="carbonation">carbonation</option>
-                  <option value="cl_profil">cl_profil</option>
-                  <option value="diffusivity">diffusivity</option>
-                  <option value="Rc">Rc</option>
-                  <option value="gas_permeability">gas_permeability</option>
-                  <option value="sorptivity">sorptivity</option>
-                  <option value="porosity">porosity</option>
-                  <option value="total_porosity">total_porosity</option>
-                  <option value="resistivity">resistivity</option>
-                  <option value="org_density">org_density</option>
-                  <option value="MEB">MEB (SEM)</option>
-                  <option value="DRX">DRX (XRD)</option>
                 </select>
               </div>
               <div class="form-field">
@@ -815,6 +792,22 @@
         const el = document.getElementById('f-meas-test');
         if (el) el.value = sel.test;
       }
+    }
+
+    // Fills a <select> with the allowed values of a Choice column (GristHelpers.ENUMS)
+    function fillEnumSelect(elId, enumKey) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const defaultText = el.options[0].text;
+      el.innerHTML = `<option value="">${defaultText}</option>` +
+        GristHelpers.ENUMS[enumKey].map(v => `<option value="${v}">${v}</option>`).join('');
+    }
+
+    // Pre-fills the unit of a known SCALAR parameter (if the unit field is empty)
+    function fillScalarUnit() {
+      const param  = GristHelpers.SCALAR_PARAMETERS[document.getElementById('f-sc-name').value.trim()];
+      const unitEl = document.getElementById('f-sc-unit');
+      if (param && unitEl && !unitEl.value.trim()) unitEl.value = param.unit;
     }
 
     function fillDrop(elId, records, labelFn) {
@@ -1272,7 +1265,7 @@
     // =========================================================================
     const CHLORIDE_TESTS    = new Set(['cl_profil', 'diffusivity']);
     const CARBONATION_TESTS = new Set(['carbonation']);
-    const FILE_TESTS        = new Set(['MEB', 'DRX']);
+    const FILE_TESTS        = new Set(['SEM', 'XRD', 'EDS', 'NMR']);
 
     function updateResultsPanel() {
       const hasM = !!sel.measurement;
@@ -1403,7 +1396,7 @@
         </div>`;
     }
 
-    // ---- File reference form (MEB, DRX) ----
+    // ---- File reference form (SEM, XRD, EDS, NMR) ----
     function buildFileRefForm(testName) {
       return `
         <div class="result-section">
@@ -1453,7 +1446,8 @@
           <div class="form-grid">
             <div class="form-field">
               <label>Parameter name <span class="req">*</span></label>
-              <input type="text" id="f-sc-name" placeholder="D, Cs, mean_depth, depth_1, Rc…">
+              <input type="text" id="f-sc-name" list="dl-sc-name" placeholder="D, Cs, mean_depth, Rc…" onchange="fillScalarUnit()">
+              <datalist id="dl-sc-name">${Object.keys(GristHelpers.SCALAR_PARAMETERS).map(n => `<option value="${n}">`).join('')}</datalist>
             </div>
             <div class="form-field">
               <label>Value <span class="req">*</span></label>
@@ -1637,7 +1631,7 @@
     }
 
     // =========================================================================
-    // SAVE: file reference (MEB, DRX) stored as SCALAR
+    // SAVE: file reference (SEM, XRD, EDS, NMR) stored as SCALAR
     // =========================================================================
     async function saveFileRef(testName) {
       if (!sel.measurement) { GristHelpers.log('Select a measurement', 'warn'); return; }
@@ -1793,6 +1787,9 @@
       GristHelpers.log('Initializing Data Entry…');
       grist.ready({ requiredAccess: 'full', columns: [] });
       GristHelpers.log('Connected to Grist ✓', 'ok');
+      fillEnumSelect('f-b-type',    'binder_type');
+      fillEnumSelect('f-test-name', 'test_name');
+      fillEnumSelect('f-mix-admix', 'admix_type');
       await GristHelpers.ensureSchema();
       await refreshAll();
       updateBreadcrumb();

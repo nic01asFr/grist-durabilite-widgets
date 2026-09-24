@@ -30,7 +30,7 @@
   <div id="empty-state" class="empty-state">
     <div class="icon">🏗️</div>
     <h3>Waiting for data</h3>
-    <p>Select a <strong>measurement</strong> (MEASUREMENT) linked to a carbonation front (result_type=curve, test=carbonation).</p>
+    <p>Select a <strong>measurement</strong> (MEASUREMENT) with a carbonation test: the depth vs time series is built from all carbonation measurements of the same material.</p>
   </div>
 
   <div id="main-content" style="display:none">
@@ -124,7 +124,7 @@
     let currentMaterial      = null;
     let currentMix           = null;
     let currentExposure      = null;
-    let currentProfilePoints = null; // [{x: time_days, y: depth_mm}]
+    let currentProfilePoints = null; // [{x: time_days, y: depth_mm, id: measurement id}]
     let lastFitResult = null;
     let gristReady = false;
     let currentMode = 'profile';
@@ -224,58 +224,91 @@
     }
 
     // =========================================================================
-    // FETCH PROFILE — RESULT(curve, carbonation) → CURVE → DATA_CURVE
+    // FETCH SERIES — one point per carbonation MEASUREMENT of the same material
     // =========================================================================
+    // One MEASUREMENT = one specimen tested at one age. The depth vs time series is
+    // built from all measurements of the selected material that share its test
+    // (same TEST.name and test_type, so natural and accelerated are never mixed):
+    //   depth: SCALAR 'mean_depth', else mean of the per-section curves (x_name='section')
+    //   time:  SCALAR 'exposure_duration' (years unless unit is days),
+    //          else result_date − preparation_date,
+    //          else "t=<n> days" in the section curve notes (data-entry form)
+    const DAY_UNITS = /^(d|day|days|j|jour|jours)$/i;
+
+    function measurementDepth(mId, scalars, curves, dataPoints) {
+      const means = scalars.filter(s => s.fields.id_measurement === mId && s.fields.name === 'mean_depth' && s.fields.value != null);
+      if (means.length > 0) return means.reduce((a, s) => a + s.fields.value, 0) / means.length;
+      const sectionIds = new Set(curves.filter(c => c.fields.id_measurement === mId && c.fields.x_name === 'section').map(c => c.id));
+      const ys = dataPoints.filter(p => sectionIds.has(p.fields.id_curve) && p.fields.y != null).map(p => p.fields.y);
+      return ys.length > 0 ? ys.reduce((a, y) => a + y, 0) / ys.length : null;
+    }
+
+    function measurementTimeDays(m, scalars, curves) {
+      const dur = scalars.find(s => s.fields.id_measurement === m.id && s.fields.name === 'exposure_duration' && s.fields.value != null);
+      if (dur) return DAY_UNITS.test((dur.fields.unit || '').trim()) ? dur.fields.value : dur.fields.value * 365.25;
+      const { preparation_date: prep, result_date: res } = m.fields;
+      if (prep != null && res != null && res > prep) return (res - prep) / 86400;
+      for (const c of curves.filter(c => c.fields.id_measurement === m.id && c.fields.x_name === 'section')) {
+        const match = /t=([\d.]+) days/.exec(c.fields.notes || '');
+        if (match) return parseFloat(match[1]);
+      }
+      return null;
+    }
+
     async function fetchResults(measurementId) {
       currentProfilePoints = null;
       try {
-        const [tests, results, curves, dataPoints] = await Promise.all([
+        const [measurements, tests, scalars, curves, dataPoints] = await Promise.all([
+          GristHelpers.fetchAllRecords('MEASUREMENT'),
           GristHelpers.fetchAllRecords('TEST'),
-          GristHelpers.fetchAllRecords('RESULT'),
+          GristHelpers.fetchAllRecords('SCALAR'),
           GristHelpers.fetchAllRecords('CURVE'),
           GristHelpers.fetchAllRecords('DATA_CURVE'),
         ]);
 
-        const carbTest = tests.find(t => t.fields.name === 'carbonation');
-        if (!carbTest) {
-          GristHelpers.log('No "carbonation" test found in TEST table', 'warn');
-          return;
-        }
-
-        const curveResult = results.find(r =>
-          r.fields.id_measurement === measurementId &&
-          r.fields.result_type === 'curve' &&
-          r.fields.id_test === carbTest.id
-        );
-        if (!curveResult) {
-          GristHelpers.log('No carbonation front (result_type=curve, test=carbonation) for this measurement', 'warn');
+        const selected = measurements.find(m => m.id === measurementId);
+        const testOf   = m => tests.find(t => t.id === m.fields.id_test)?.fields || {};
+        const selTest  = selected ? testOf(selected) : {};
+        if (!selected || !selected.fields.id_material || selTest.name !== 'carbonation') {
+          GristHelpers.log('Select a MEASUREMENT of a material with a "carbonation" test', 'warn');
           Plotly.purge('chart');
+          document.getElementById('nb-points').textContent = '';
           return;
         }
 
-        const curve = curves.find(c => c.fields.id_result === curveResult.id);
-        if (!curve) {
-          GristHelpers.log('Curve metadata (CURVE) not found', 'warn');
-          return;
-        }
+        const series = measurements.filter(m =>
+          m.fields.id_material === selected.fields.id_material &&
+          testOf(m).name === 'carbonation' &&
+          (testOf(m).test_type || '') === (selTest.test_type || '')
+        );
 
-        // Sort by x (time_days)
-        const points = dataPoints
-          .filter(p => p.fields.id_curve === curve.id && p.fields.x != null && p.fields.y != null)
-          .sort((a, b) => a.fields.x - b.fields.x)
-          .map(p => ({ x: p.fields.x, y: p.fields.y }));
+        const points = [], skipped = [];
+        for (const m of series) {
+          const y = measurementDepth(m.id, scalars, curves, dataPoints);
+          const x = measurementTimeDays(m, scalars, curves);
+          if (x == null || y == null) { skipped.push(m.id); continue; }
+          points.push({ x, y, id: m.id });
+        }
+        points.sort((a, b) => a.x - b.x);
 
         currentProfilePoints = points;
-        GristHelpers.log(`${points.length} points (${curve.fields.x_name || 'time'} vs ${curve.fields.y_name || 'depth'})`, points.length > 1 ? 'ok' : 'warn');
+        GristHelpers.log(
+          `${points.length} point(s) from ${series.length} carbonation measurement(s) of this material` +
+          (selTest.test_type ? ` (${selTest.test_type})` : ''),
+          points.length > 1 ? 'ok' : 'warn'
+        );
+        if (skipped.length > 0) {
+          GristHelpers.log(`Ignored (no depth or no exposure time): measurement(s) #${skipped.join(', #')}`, 'warn');
+        }
 
         if (points.length > 0) {
           plotProfile(points);
         } else {
-          GristHelpers.log('Empty curve — no DATA_CURVE points', 'warn');
           Plotly.purge('chart');
+          document.getElementById('nb-points').textContent = '';
         }
       } catch (err) {
-        GristHelpers.log('Fetch profile error: ' + err.message, 'err');
+        GristHelpers.log('Fetch series error: ' + err.message, 'err');
       }
     }
 
@@ -314,10 +347,17 @@
 
       document.getElementById('nb-points').textContent = `${points.length} points`;
 
+      const selId = currentMeasurement?.id;
       const traces = [{
         x: t, y: d,
         mode: 'markers', type: 'scatter', name: 'Measurements',
-        marker: { color: '#8b5cf6', size: 9, line: { color: '#4c1d95', width: 1.5 } }
+        text: points.map(p => p.id != null ? `Measurement #${p.id}` : ''),
+        hovertemplate: '%{text}<br>t = %{x:.0f} days<br>depth = %{y:.1f} mm<extra></extra>',
+        marker: {
+          color: points.map(p => p.id === selId ? '#f59e0b' : '#8b5cf6'),
+          size: points.map(p => p.id === selId ? 12 : 9),
+          line: { color: '#4c1d95', width: 1.5 }
+        }
       }];
 
       if (fitData) {
@@ -478,7 +518,7 @@ json.dumps(result)
     }
 
     // =========================================================================
-    // SAVE TO RESULT (scalar, carbonation)
+    // SAVE TO SCALAR (carbonation)
     // =========================================================================
     async function saveResults() {
       if (!lastFitResult || !currentMeasurement) { GristHelpers.log('Nothing to save', 'warn'); return; }
@@ -487,43 +527,32 @@ json.dumps(result)
       const btnD = document.getElementById('btn-save-direct');
       if (btnP) btnP.disabled = true;
       if (btnD) btnD.disabled = true;
-      GristHelpers.log('Saving to RESULT (carbonation scalars)…');
+      GristHelpers.log('Saving to SCALAR…');
 
       try {
-        const tests = await GristHelpers.fetchAllRecords('TEST');
-        let carbTest = tests.find(t => t.fields.name === 'carbonation' && t.fields.result_type !== 'curve');
-        // Prefer a scalar carbonation test (K_carb); fall back to any carbonation test
-        if (!carbTest) carbTest = tests.find(t => t.fields.name === 'carbonation');
-        if (!carbTest) {
-          const r = await GristHelpers.createRecord('TEST', {
-            name: 'carbonation', test_type: 'natural', standard_name: 'x=K*sqrt(t)'
-          });
-          carbTest = { id: r.id };
-          GristHelpers.log('"carbonation" test created ✓', 'ok');
-        }
-
-        const today = Math.floor(Date.now() / 1000);
+        // K_carb is fitted in mm/√day; stored in mm/√yr (RILEM "Carbonation rate coefficient")
         const params = [
-          { operator: 'K_carb',        value: lastFitResult.K_carb,                              unit: 'mm/sqrt_jour' },
-          { operator: 'R2',            value: lastFitResult.R2,                                   unit: ''             },
-          { operator: 'RMSE',          value: lastFitResult.RMSE,                                 unit: 'mm'           },
-          { operator: 'duree_vie_ans', value: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null, unit: 'yr' },
-          { operator: 'enrobage_mm',   value: lastFitResult.enrobage_mm,                          unit: 'mm'           },
-          { operator: 'source_kcarb',  value: lastFitResult.source === 'fitting' ? 1 : 0,         unit: ''             },
+          { name: 'carbonation_rate_coeff', value: lastFitResult.K_carb * Math.sqrt(365.25),          unit: 'mm/yr^0.5', is_derived: true  },
+          { name: 'R2',                     value: lastFitResult.R2,                                   unit: '',          is_derived: true  },
+          { name: 'RMSE',                   value: lastFitResult.RMSE,                                 unit: 'mm',        is_derived: true  },
+          { name: 'duree_vie_ans',          value: lastFitResult.duree_vie_ans > 0 ? lastFitResult.duree_vie_ans : null, unit: 'yr', is_derived: true },
+          { name: 'cover_depth',            value: lastFitResult.enrobage_mm,                          unit: 'mm',        is_derived: false },
+          { name: 'source_kcarb',           value: lastFitResult.source === 'fitting' ? 1 : 0,         unit: '',          is_derived: false },
         ].filter(p => p.value != null);
 
         const records = params.map(p => ({
           id_measurement: currentMeasurement.id,
-          id_test:        carbTest.id,
-          result_type:    'scalar',
-          name:           String(p.value),
+          name:           p.name,
+          value:          p.value,
           unit:           p.unit,
-          operator:       p.operator,
-          result_date:    today,
+          is_derived:     p.is_derived,
+          notes:          `Carbonation fitting (x = K·√t) — ${new Date().toLocaleDateString('en-US')}` +
+                          (lastFitResult.source === 'fitting' && currentProfilePoints
+                            ? ` — measurements #${currentProfilePoints.map(p => p.id).join(', #')}` : ''),
         }));
 
-        const results = await GristHelpers.bulkCreateRecords('RESULT', records);
-        GristHelpers.log(`${results.length} parameter(s) saved to RESULT ✓`, 'ok');
+        const results = await GristHelpers.bulkCreateRecords('SCALAR', records);
+        GristHelpers.log(`${results.length} scalar(s) saved to SCALAR ✓`, 'ok');
       } catch (err) {
         GristHelpers.log('Save error: ' + err.message, 'err');
       }

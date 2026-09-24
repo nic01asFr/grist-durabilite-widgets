@@ -7,10 +7,14 @@ Hébergés sur **GitHub Pages**, utilisables directement dans [Grist](https://gr
 
 | Widget | Fichier | Description |
 |--------|---------|-------------|
+| **Saisie** | `data-entry.html` | Formulaires de saisie : sources, sites, liants, granulats, formulations, matériaux, essais, résultats |
+| **Éditeur** | `editor.html` | Édition d'un matériau et de ses mesures (lié à MATERIAL) |
 | **Analyse Fick** | `fick-analysis.html` | Fitting profils Cl⁻ (scipy) ou saisie directe Dapp, calcul durée de vie |
 | **Analyse Carbonatation** | `carbonation-analysis.html` | Fitting K_carb (x = K·√t) ou saisie directe, calcul durée de vie |
+| **Profils chlorures** | `profil-chlorure.html` | Comparaison des profils Cl⁻ de toutes les mesures |
 | **Dashboard Comparatif** | `dashboard.html` | Box plots Dapp, scatter E/L vs Dapp, comparaison durées de vie |
 | **Carte des Sites** | `site-map.html` | Carte Leaflet des sites d'exposition avec indicateurs Dapp |
+| **Export** | `export.html` | Export CSV à plat des profils et formulations |
 
 ## Utilisation dans Grist
 
@@ -25,33 +29,36 @@ Hébergés sur **GitHub Pages**, utilisables directement dans [Grist](https://gr
 
 | Widget | Select By | Accès tables |
 |--------|-----------|--------------|
-| **Analyse Fick** | Lier à **CHLORIDE_PROTOCOL** | R: CHLORIDE_RESULTS, CONCRETE_MIX / W: CHLORIDE_ANALYSIS |
-| **Analyse Carbonatation** | Lier à **CARBONATION_PROTOCOL** | R: CARBONATION_RESULTS, CONCRETE_MIX / W: CARBONATION_ANALYSIS |
-| **Dashboard** | Aucun (lecture globale) | R: CHLORIDE_ANALYSIS, CHLORIDE_PROTOCOL, CONCRETE_MIX |
-| **Carte** | Aucun (lecture globale) | R: SITE, CHLORIDE_PROTOCOL, CHLORIDE_ANALYSIS, CONCRETE_MIX |
+| **Saisie** | Aucun | R/W : toutes les tables |
+| **Éditeur** | Lier à **MATERIAL** | R/W : MATERIAL et tables liées, MEASUREMENT, SCALAR, CURVE |
+| **Analyse Fick** | Lier à **MEASUREMENT** | R : CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN… / W : SCALAR, TEST |
+| **Analyse Carbonatation** | Lier à **MEASUREMENT** | R : MEASUREMENT, TEST, SCALAR, CURVE, DATA_CURVE, MATERIAL… / W : SCALAR — la série profondeur/temps regroupe toutes les mesures de carbonatation du matériau (un point par mesure) |
+| **Profils chlorures** | Aucun (lecture globale) | R : MEASUREMENT, CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN, BINDER, SITE… |
+| **Dashboard** | Aucun (lecture globale) | R : SCALAR, MEASUREMENT, MATERIAL, MIX_DESIGN, EXPOSURE, SOURCE |
+| **Carte** | Aucun (lecture globale) | R : SITE, MATERIAL, MEASUREMENT, SCALAR |
+| **Export** | Aucun (lecture globale) | R : toutes les tables |
 
-## Schéma de données (13 tables, v1.1)
+## Schéma de données (15 tables, v2.5)
 
 ```
-SOURCE ──→ CONCRETE_MIX ──→ CHLORIDE_PROTOCOL ──→ CHLORIDE_RESULTS
-               │                    │
-               │                    └──→ CHLORIDE_ANALYSIS (widget Fick)
-               │
-               ├──→ CARBONATION_PROTOCOL ──→ CARBONATION_RESULTS
-               │              │
-               │              └──→ CARBONATION_ANALYSIS (widget Carbo)
-               │
-               ├──→ AGGREGATES
-               ├──→ BINDER_COMPOSITION
-               ├──→ CEMENT_CHARACTERIZATION
-               └──→ MATERIAL_PROPERTIES
+SOURCE ─────────────────────────────────┐
+                                        ▼
+SITE ──────────┐                  MEASUREMENT ──→ SCALAR (0..n : D, Cs, mean_depth…)
+EXPOSURE ──────┤                   ▲       │
+MIX_DESIGN ────┼──→ MATERIAL ──────┘       └──→ CURVE (0..n) ──→ DATA_CURVE (points x, y)
+CURING_COND. ──┘                   TEST ──→ MEASUREMENT
 
-SITE ←── (ref) CHLORIDE_PROTOCOL, CARBONATION_PROTOCOL
+MIX_DESIGN ←── MIX_DESIGN_BINDER ──→ BINDER
+MIX_DESIGN ←── MIX_DESIGN_AGGREGATE ──→ AGGREGATE
 ```
+
+### Vocabulaires contrôlés
+
+Les valeurs des colonnes Choice sont définies une seule fois dans `GristHelpers.ENUMS`. Les listes de liants, d'essais, d'adjuvants et de paramètres SCALAR (`GristHelpers.SCALAR_PARAMETERS`, avec unité par défaut et libellé correspondant) ont été enrichies à partir des vocabulaires du [RILEM Metadata Tool](https://huggingface.co/spaces/raviapatel/rilem-metadata-tool).
 
 ### Auto-provisioning
 
-Les widgets **créent automatiquement** les tables et colonnes manquantes à l'initialisation via `GristHelpers.ensureSchema()`. Il suffit d'ouvrir un widget dans un document Grist vide — le schéma complet (13 tables) sera provisionné.
+Les widgets **créent automatiquement** les tables et colonnes manquantes à l'initialisation via `GristHelpers.ensureSchema()`. Il suffit d'ouvrir un widget dans un document Grist vide — le schéma complet (15 tables) sera provisionné. Sur un document existant, `ensureSchema()` ajoute aussi les nouveaux choix aux colonnes Choice (les choix ajoutés manuellement sont conservés) et migre les valeurs renommées (`GristHelpers.VALUE_RENAMES`, ex. `MEB` → `SEM`).
 
 Le schéma complet est défini dans `assets/grist-helpers.js` (`GristHelpers.SCHEMA`).
 
@@ -65,7 +72,7 @@ Navigateur de l'utilisateur
 │       ├── grist-plugin-api.js      ← CDN docs.getgrist.com
 │       ├── Pyodide v0.26             ← CDN jsdelivr (fick + carbonation)
 │       │   └── numpy + scipy (WASM)
-│       ├── Plotly.js v2.35           ← CDN plot.ly (fick, carbonation, dashboard)
+│       ├── Plotly.js v2.35           ← CDN plot.ly (fick, carbonation, profils, dashboard)
 │       └── Leaflet v1.9.4           ← CDN unpkg (site-map uniquement)
 ```
 
@@ -101,10 +108,14 @@ grist-durabilite-widgets/
 ├── CLAUDE.md                        ← Guide pour Claude Code
 ├── .nojekyll                        ← Désactive Jekyll sur GitHub Pages
 ├── index.html                       ← Page d'accueil / catalogue
+├── data-entry.html                  ← Widget : saisie des données
+├── editor.html                      ← Widget : édition d'un matériau
 ├── fick-analysis.html               ← Widget : analyse Fick (chlorures)
 ├── carbonation-analysis.html        ← Widget : analyse carbonatation
+├── profil-chlorure.html             ← Widget : comparaison des profils Cl⁻
 ├── dashboard.html                   ← Widget : dashboard comparatif
 ├── site-map.html                    ← Widget : carte Leaflet des sites
+├── export.html                      ← Widget : export CSV
 └── assets/
     ├── shared-styles.css            ← CSS partagé (variables, composants)
     └── grist-helpers.js             ← Utilitaires JS Grist (SCHEMA, API, etc.)
