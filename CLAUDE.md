@@ -32,7 +32,7 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 - `grist-helpers.js` — `GristHelpers` namespace:
   - Schema: `SCHEMA` (15 table definitions), `ENUMS` (allowed values of Choice columns), `ENUM_LABELS` + `enumLabel(value)` (display labels for enum values; stored values unchanged), `SCALAR_PARAMETERS` (dictionary of `SCALAR.name` values with default unit + RILEM label), `VALUE_RENAMES` (stored values renamed across versions), `ensureSchema()`
   - Binders: `CEMENT_LABELS`, `SCM_LABELS`, `isCement(type)`, `binderSignature(binders)` (e.g. "Portland + FA + SF")
-  - Data access: `fetchAllRecords(table)`, `createRecord(table, fields)`, `updateRecord()`, `bulkCreateRecords()`, `joinScalarData()`, `joinCurvePoints()`, `joinChlorideProfiles()`
+  - Data access: `fetchAllRecords(table)`, `createRecord(table, fields)`, `updateRecord()`, `bulkCreateRecords()`, `bulkRemoveRecords()`, `joinScalarData()`, `joinCurvePoints()`, `joinChlorideProfiles()`
   - UI: `log()`, `setStatus()`, `plotlyDarkLayout()`, `plotlyDarkAxis()`, `formatDapp()`, `formatKcarb()`, `formatDureeVie()`
 
 ### Grist integration pattern (all widgets follow this):
@@ -50,6 +50,7 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 - **Leaflet v1.9.4** — Map tiles and markers (site-map only)
 - **SheetJS v0.18.5** — Reads .xlsx/.xls/.ods files for curve/profile import (data-entry only, loaded on demand from cdnjs)
 - **Crossref REST API** — DOI → bibliographic metadata (data-entry only, `api.crossref.org`, no key)
+- **Open-Meteo** — historical weather (ERA5, `archive-api.open-meteo.com`) and marine (`marine-api.open-meteo.com`, sea temperature only for recent years), no key, free for non-commercial use; wrapped by `GristHelpers.fetchClimate()`
 
 ### Grist table schema (15 tables, v2.5)
 
@@ -69,7 +70,7 @@ Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement sto
 - **CURING_CONDITION**: `temperature_c`, `humidity_pct`, `wind_protection`, `solar_protection`, `curing_method` [curing_method], `curing_duration_days`, `standard_name`
 
 **Material, tests and results:**
-- **MATERIAL**: `id_site` (Ref→SITE), `id_exposure` (Ref→EXPOSURE), `id_mix_design` (Ref→MIX_DESIGN), `id_curing_condition` (Ref→CURING_CONDITION), `manufacturing_date`, `demolding_date`, `name`, `material_type` [material_type]
+- **MATERIAL**: `id_site` (Ref→SITE), `id_exposure` (Ref→EXPOSURE), `id_mix_design` (Ref→MIX_DESIGN), `id_curing_condition` (Ref→CURING_CONDITION), `manufacturing_date`, `demolding_date`, `exposure_start_date` (start of site exposure, used as the climate period start), `name`, `material_type` [material_type]
 - **TEST**: `name` [test_name], `standard_name`, `experiment_duration`, `test_type` [test_type]
 - **MEASUREMENT**: `id_material` (Ref→MATERIAL), `id_source` (Ref→SOURCE), `id_test` (Ref→TEST), `sample_type` [sample_type], `sample_dimensions` [sample_dimensions], `preparation_date`, `result_date`, `sample_mass_g`, `operator`
 - **SCALAR**: `id_measurement` (Ref→MEASUREMENT), `name` [scalar_name], `value`, `unit`, `is_derived`, `notes`
@@ -81,14 +82,14 @@ Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement sto
 - Choice values are snake_case ids defined once in `GristHelpers.ENUMS`; `SCHEMA` columns reference them via `enum: '<key>'` (never inline `widgetOptions`). `ENUMS.scalar_name` is derived from `SCALAR_PARAMETERS`.
 - Widgets never hard-code `<option>` lists for enums: fill selects from `ENUMS` and display `enumLabel(v)` (humanized by default; add an entry to `ENUM_LABELS` for acronyms or ambiguous ids).
 - Binder types, test names, admixture types and SCALAR parameters were enriched from the RILEM metadata tool vocabularies (huggingface.co/spaces/raviapatel/rilem-metadata-tool): keep the matching RILEM label in `SCALAR_PARAMETERS[*].rilem` when adding a parameter.
-- SCALAR names written or read by widgets (`D`, `Dapp`, `Cs`, `R2`, `RMSE`, `duree_vie_ans`, `profondeur_crit`, `source_dapp`, `carbonation_rate_coeff`, `cover_depth`, `source_kcarb`, `mean_depth`, `exposure_duration`, `<test>_file`) must not be renamed without adding an entry to `VALUE_RENAMES` and updating the widgets.
+- SCALAR names written or read by widgets (`D`, `Dapp`, `Cs`, `R2`, `RMSE`, `duree_vie_ans`, `profondeur_crit`, `source_dapp`, `carbonation_rate_coeff`, `cover_depth`, `source_kcarb`, `mean_depth`, `exposure_duration`, `<test>_file`, climate: `mean_temperature`, `mean_rh`, `time_of_wetness`, `annual_precipitation`, `mean_sea_temperature`) must not be renamed without adding an entry to `VALUE_RENAMES` and updating the widgets.
 - To rename a stored value: change it in `ENUMS`/`SCALAR_PARAMETERS`, add `old → new` to `VALUE_RENAMES`, and update widget code; `ensureSchema()` migrates existing documents.
 
 ## Widgets
 
 | Widget | File | Grist link | Tables | Libs |
 |--------|------|------------|--------|------|
-| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 4-step wizard (Source → Material → Measurement → Results); mix design, exposure, curing and site are collapsible building blocks of step 2; binders/aggregates are created in dialogs | SheetJS (on demand) |
+| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 4-step wizard (Source → Material → Measurement → Results); mix design, exposure, curing and site are collapsible building blocks of step 2; binders/aggregates are created in dialogs; step 4 fetches the site climate over the exposure period and saves it as derived SCALARs (`CLIMATE_SCALARS`) | SheetJS (on demand) |
 | Editor | `editor.html` | Select By MATERIAL | R: MATERIAL and related tables, MEASUREMENT, SCALAR, CURVE / W: via `applyUserActions` | — |
 | Fick Analysis | `fick-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN(_BINDER), BINDER… / W: SCALAR, TEST | Pyodide, Plotly |
 | Carbonation Analysis | `carbonation-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, TEST, SCALAR, CURVE, DATA_CURVE, MATERIAL, MIX_DESIGN, EXPOSURE / W: SCALAR — depth vs time series = one point per carbonation measurement of the selected material (same TEST name + test_type): depth from `mean_depth` (else mean of section curves), time from `exposure_duration` (else result − preparation date, else `t=<n> days` in curve notes) | Pyodide, Plotly |

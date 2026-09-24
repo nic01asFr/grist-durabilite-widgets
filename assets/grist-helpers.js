@@ -152,6 +152,7 @@ const GristHelpers = {
         { id: 'id_curing_condition', fields: { type: 'Ref:CURING_CONDITION', label: 'Curing' } },
         { id: 'manufacturing_date',  fields: { type: 'Date',                 label: 'Manufacturing date' } },
         { id: 'demolding_date',      fields: { type: 'Date',                 label: 'Demolding date' } },
+        { id: 'exposure_start_date', fields: { type: 'Date',                 label: 'Exposure start date' } },
         { id: 'name',                fields: { type: 'Text',                 label: 'Name' } },
         { id: 'material_type',       enum: 'material_type', fields: { type: 'Choice',               label: 'Material type' } },
       ]
@@ -315,6 +316,12 @@ const GristHelpers = {
     source_dapp:                { unit: '',         rilem: null },
     source_kcarb:               { unit: '',         rilem: null },
     exposure_duration:          { unit: 'yr',       rilem: null },  // read as years unless unit is days
+    // Site climate over the exposure period (derived from Open-Meteo, see fetchClimate)
+    mean_temperature:           { unit: '°C',       rilem: null },
+    mean_rh:                    { unit: '%',        rilem: null },
+    time_of_wetness:            { unit: 'd/yr',     rilem: null },  // days with precipitation ≥ 2.5 mm (fib Bulletin 34)
+    annual_precipitation:       { unit: 'mm/yr',    rilem: null },
+    mean_sea_temperature:       { unit: '°C',       rilem: null },
     // File references (SEM, XRD, EDS, NMR)
     sem_file:                   { unit: 'file_ref', rilem: 'SEM analysis' },
     xrd_file:                   { unit: 'file_ref', rilem: 'XRD peak intensity' },
@@ -556,6 +563,80 @@ const GristHelpers = {
     const actions = recordsArray.map(fields => ['AddRecord', tableName, null, fields]);
     const result = await grist.docApi.applyUserActions(actions);
     return result.retValues.map(id => ({ id }));
+  },
+
+  async bulkRemoveRecords(tableName, rowIds) {
+    if (rowIds.length === 0) return;
+    await grist.docApi.applyUserActions([['BulkRemoveRecord', tableName, rowIds]]);
+  },
+
+  // =========================================================================
+  // CLIMATE — site weather over an exposure period (Open-Meteo, no API key)
+  // Historical: ERA5 reanalysis (daily, since 1940). Marine: sea surface
+  // temperature, only available for recent years (coverage is reported).
+  // =========================================================================
+  CLIMATE_SCALARS: ['mean_temperature', 'mean_rh', 'time_of_wetness', 'annual_precipitation', 'mean_sea_temperature'],
+  CLIMATE_MIN_COVERAGE: 0.8,  // share of days with data required to keep an indicator
+
+  // start / end: 'YYYY-MM-DD'. Returns { grid, days, years, coverage, indicators, monthly }.
+  // indicators values are null when coverage is below CLIMATE_MIN_COVERAGE.
+  async fetchClimate({ lat, lon, start, end, marine = false }) {
+    const q = (base, params) => fetch(`${base}?${new URLSearchParams(params)}`).then(async r => {
+      if (!r.ok) throw new Error(`Open-Meteo HTTP ${r.status}: ${(await r.text()).slice(0, 120)}`);
+      return r.json();
+    });
+    const common = { latitude: lat, longitude: lon, start_date: start, end_date: end, timezone: 'GMT' };
+    const [land, sea] = await Promise.all([
+      q('https://archive-api.open-meteo.com/v1/archive',
+        { ...common, daily: 'temperature_2m_mean,relative_humidity_2m_mean,precipitation_sum' }),
+      marine
+        ? q('https://marine-api.open-meteo.com/v1/marine', { ...common, daily: 'sea_surface_temperature_mean' })
+            .catch(() => null)  // marine data is optional: never block the land indicators
+        : Promise.resolve(null),
+    ]);
+
+    const d = land.daily;
+    const days = d.time.length;
+    const years = days / 365.25;
+    const valid = arr => (arr || []).filter(v => v != null);
+    const mean = arr => { const v = valid(arr); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const cov  = arr => days ? valid(arr).length / days : 0;
+    const keep = (value, c) => (c >= GristHelpers.CLIMATE_MIN_COVERAGE ? value : null);
+    const round = (v, n) => (v == null ? null : Math.round(v * 10 ** n) / 10 ** n);
+
+    const P = d.precipitation_sum;
+    const coverage = {
+      temperature:   cov(d.temperature_2m_mean),
+      rh:            cov(d.relative_humidity_2m_mean),
+      precipitation: cov(P),
+      sea:           sea ? cov(sea.daily.sea_surface_temperature_mean) : 0,
+    };
+    // Rates per year are computed over the days that have data.
+    const pYears = valid(P).length / 365.25;
+    const indicators = {
+      mean_temperature:     keep(round(mean(d.temperature_2m_mean), 1), coverage.temperature),
+      mean_rh:              keep(round(mean(d.relative_humidity_2m_mean), 1), coverage.rh),
+      time_of_wetness:      keep(pYears ? round(valid(P).filter(v => v >= 2.5).length / pYears, 1) : null, coverage.precipitation),
+      annual_precipitation: keep(pYears ? round(valid(P).reduce((a, b) => a + b, 0) / pYears, 0) : null, coverage.precipitation),
+      mean_sea_temperature: sea ? keep(round(mean(sea.daily.sea_surface_temperature_mean), 1), coverage.sea) : null,
+    };
+
+    // Monthly means, for a quick look at seasonality
+    const byMonth = new Map();
+    d.time.forEach((t, i) => {
+      const k = t.slice(0, 7);
+      if (!byMonth.has(k)) byMonth.set(k, { T: [], RH: [], P: [] });
+      const m = byMonth.get(k);
+      m.T.push(d.temperature_2m_mean[i]); m.RH.push(d.relative_humidity_2m_mean[i]); m.P.push(P[i]);
+    });
+    const monthly = [...byMonth].map(([month, m]) => ({
+      month, T: mean(m.T), RH: mean(m.RH), P: valid(m.P).reduce((a, b) => a + b, 0),
+    }));
+
+    return {
+      grid: { lat: land.latitude, lon: land.longitude, elevation: land.elevation },
+      days, years, coverage, indicators, monthly,
+    };
   },
 
   // =========================================================================
