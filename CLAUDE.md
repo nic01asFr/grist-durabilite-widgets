@@ -48,6 +48,8 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 - **Pyodide v0.26.4** — Python WASM runtime for scipy/numpy (fick-analysis, carbonation-analysis)
 - **Plotly.js v2.35.0** — Interactive charts (fick-analysis, carbonation-analysis, profil-chlorure, dashboard)
 - **Leaflet v1.9.4** — Map tiles and markers (site-map only)
+- **SheetJS v0.18.5** — Reads .xlsx/.xls/.ods files for curve/profile import (data-entry only, loaded on demand from cdnjs)
+- **Crossref REST API** — DOI → bibliographic metadata (data-entry only, `api.crossref.org`, no key)
 
 ### Grist table schema (15 tables, v2.5)
 
@@ -86,7 +88,7 @@ Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement sto
 
 | Widget | File | Grist link | Tables | Libs |
 |--------|------|------------|--------|------|
-| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables | — |
+| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 4-step wizard (Source → Material → Measurement → Results); mix design, exposure, curing and site are collapsible building blocks of step 2; binders/aggregates are created in dialogs | SheetJS (on demand) |
 | Editor | `editor.html` | Select By MATERIAL | R: MATERIAL and related tables, MEASUREMENT, SCALAR, CURVE / W: via `applyUserActions` | — |
 | Fick Analysis | `fick-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN(_BINDER), BINDER… / W: SCALAR, TEST | Pyodide, Plotly |
 | Carbonation Analysis | `carbonation-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, TEST, SCALAR, CURVE, DATA_CURVE, MATERIAL, MIX_DESIGN, EXPOSURE / W: SCALAR — depth vs time series = one point per carbonation measurement of the selected material (same TEST name + test_type): depth from `mean_depth` (else mean of section curves), time from `exposure_duration` (else result − preparation date, else `t=<n> days` in curve notes) | Pyodide, Plotly |
