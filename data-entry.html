@@ -56,6 +56,19 @@
 
     .form-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
 
+    .doi-lookup { margin-bottom: 12px; }
+    .doi-row { display: flex; gap: 8px; }
+    .doi-row input { flex: 1; min-width: 0; }
+    .doi-row .btn { white-space: nowrap; }
+    .field-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .field-hint.ok   { color: var(--success); }
+    .field-hint.warn { color: var(--warning); }
+    .field-hint.err  { color: var(--error); }
+    .field-hint .link-btn {
+      background: none; border: none; padding: 0; color: var(--accent-light);
+      font: inherit; text-decoration: underline; cursor: pointer;
+    }
+
     .collapsible { border: 1px solid var(--surface2); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
     .collapsible-header {
       display: flex; justify-content: space-between; align-items: center;
@@ -78,6 +91,13 @@
       border: 1px solid var(--surface2); border-radius: 4px; color: var(--text); font-size: 12px;
     }
     .mini-table .row-actions { width: 30px; text-align: center; }
+
+    .paste-zone {
+      width: 100%; min-height: 34px; margin-bottom: 8px; padding: 8px 10px; resize: none;
+      background: var(--surface); border: 1px dashed var(--border); border-radius: 6px;
+      color: var(--text); font-size: 12px; font-family: inherit;
+    }
+    .paste-zone:focus { outline: none; border-color: var(--accent); background: var(--bg); }
     .btn-icon {
       background: none; border: none; color: var(--text-dim); cursor: pointer;
       font-size: 14px; padding: 2px 4px; border-radius: 4px;
@@ -148,12 +168,20 @@
         <button class="btn btn-secondary" onclick="toggleForm('source')">+ New</button>
       </div>
       <div id="form-source" style="display:none;">
+        <div class="form-field doi-lookup">
+          <label>DOI</label>
+          <div class="doi-row">
+            <input type="text" id="f-source-doi" placeholder="10.1016/... or https://doi.org/10.1016/..."
+              onkeydown="if (event.key === 'Enter') { event.preventDefault(); fetchDoiMetadata(); }">
+            <button class="btn btn-secondary" id="btn-doi-fetch" onclick="fetchDoiMetadata()">🔎 Fill from DOI</button>
+          </div>
+          <div class="field-hint" id="doi-hint">Paste a DOI to fill the fields below automatically (Crossref).</div>
+        </div>
         <div class="form-grid">
           <div class="form-field"><label>Authors <span class="req">*</span></label><input type="text" id="f-source-authors" placeholder="Dupont, Martin et al."></div>
           <div class="form-field"><label>Title <span class="req">*</span></label><input type="text" id="f-source-title" placeholder="Article title"></div>
           <div class="form-field"><label>Journal</label><input type="text" id="f-source-journal" placeholder="Cement and Concrete Research"></div>
           <div class="form-field"><label>Year</label><input type="number" id="f-source-year" placeholder="2023" min="1950" max="2030"></div>
-          <div class="form-field"><label>DOI</label><input type="text" id="f-source-doi" placeholder="10.1016/..."></div>
           <div class="form-field"><label>URL</label><input type="text" id="f-source-url" placeholder="https://..."></div>
           <div class="form-field"><label>Designation</label><input type="text" id="f-source-designation" placeholder="Dupont2023"></div>
           <div class="form-field" style="grid-column:1/-1;"><label>Notes</label><textarea id="f-source-notes" placeholder="Additional notes"></textarea></div>
@@ -965,6 +993,104 @@
     }
 
     // =========================================================================
+    // DOI LOOKUP (Crossref)
+    // =========================================================================
+    // Accepts "10.xxxx/...", "doi:10.xxxx/..." or "https://doi.org/10.xxxx/...".
+    function normalizeDoi(raw) {
+      const m = String(raw || '').trim().match(/10\.\d{4,9}\/\S+/);
+      return m ? m[0].replace(/[.,;]+$/, '').toLowerCase() : null;
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
+    // Crossref titles may contain JATS/HTML markup (<i>, <sub>…) and entities.
+    function stripMarkup(s) {
+      return new DOMParser().parseFromString(s || '', 'text/html').body.textContent
+        .replace(/\s+/g, ' ').trim();
+    }
+
+    function setDoiHint(html, cls = '') {
+      const el = document.getElementById('doi-hint');
+      el.className = 'field-hint' + (cls ? ' ' + cls : '');
+      el.innerHTML = html;
+    }
+
+    function formatCrossrefAuthors(authors) {
+      return (authors || []).map(a => {
+        if (!a.family) return a.name || '';
+        const initials = (a.given || '').split(/[\s-]+/).filter(Boolean)
+          .map(p => p[0].toUpperCase() + '.').join('');
+        return initials ? `${a.family} ${initials}` : a.family;
+      }).filter(Boolean).join(', ');
+    }
+
+    function crossrefYear(msg) {
+      for (const key of ['published-print', 'published-online', 'issued', 'created']) {
+        const y = msg[key]?.['date-parts']?.[0]?.[0];
+        if (y) return y;
+      }
+      return null;
+    }
+
+    function useExistingSource(id) {
+      sel.source = id;
+      document.getElementById('sel-source').value = id;
+      toggleForm('source');
+      updateBreadcrumb();
+      GristHelpers.log(`Existing source #${id} selected`, 'ok');
+    }
+
+    async function fetchDoiMetadata() {
+      const input = document.getElementById('f-source-doi');
+      const doi = normalizeDoi(input.value);
+      if (!doi) { setDoiHint('Not a valid DOI (expected 10.xxxx/…).', 'err'); return; }
+      input.value = doi;
+
+      const existing = allSources.find(s => normalizeDoi(s.fields.doi) === doi);
+      if (existing) {
+        const label = existing.fields.designation || existing.fields.authors || `#${existing.id}`;
+        setDoiHint(`This DOI is already in the document (${escapeHtml(label)}). ` +
+          `<button class="link-btn" onclick="useExistingSource(${existing.id})">Use it</button>`, 'warn');
+        return;
+      }
+
+      const btn = document.getElementById('btn-doi-fetch');
+      btn.disabled = true;
+      setDoiHint('Querying Crossref…');
+      try {
+        const resp = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
+        if (resp.status === 404) { setDoiHint('DOI not found in Crossref. Fill the fields manually.', 'err'); return; }
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const msg = (await resp.json()).message;
+
+        const authors = formatCrossrefAuthors(msg.author);
+        const year    = crossrefYear(msg);
+        const firstFamily = msg.author?.[0]?.family || msg.author?.[0]?.name || '';
+        const values = {
+          'f-source-authors':     authors,
+          'f-source-title':       stripMarkup(msg.title?.[0]),
+          'f-source-journal':     stripMarkup(msg['container-title']?.[0]),
+          'f-source-year':        year || '',
+          'f-source-url':         msg.URL || `https://doi.org/${doi}`,
+          'f-source-designation': firstFamily && year ? `${firstFamily.replace(/\s+/g, '')}${year}` : '',
+        };
+        Object.entries(values).forEach(([id, v]) => {
+          if (v !== '' && v != null) document.getElementById(id).value = v;
+        });
+        setDoiHint('Fields filled from Crossref. Check them, then save.', 'ok');
+        GristHelpers.log(`DOI ${doi} resolved via Crossref ✓`, 'ok');
+      } catch (err) {
+        setDoiHint(`Crossref lookup failed (${escapeHtml(err.message)}). Fill the fields manually.`, 'err');
+        GristHelpers.log('Crossref error: ' + err.message, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // =========================================================================
     // SAVE: SOURCE
     // =========================================================================
     async function saveSource() {
@@ -976,7 +1102,8 @@
           authors, title,
           journal:     document.getElementById('f-source-journal').value.trim() || '',
           year:        parseInt(document.getElementById('f-source-year').value) || 0,
-          doi:         document.getElementById('f-source-doi').value.trim() || '',
+          doi:         normalizeDoi(document.getElementById('f-source-doi').value)
+                       || document.getElementById('f-source-doi').value.trim() || '',
           url:         document.getElementById('f-source-url').value.trim() || '',
           designation: document.getElementById('f-source-designation').value.trim() || '',
           notes:       document.getElementById('f-source-notes').value.trim() || '',
@@ -1261,6 +1388,107 @@
     }
 
     // =========================================================================
+    // PASTE FROM SPREADSHEET — fills curve/profile tables from the clipboard
+    // =========================================================================
+    // tbody id → function appending one empty row
+    const PASTE_TABLES = {
+      'cl-profile-rows':   () => addClProfileRow(),
+      'carb-profile-rows': () => addCarbProfileRow(),
+      'curve-rows':        () => addCurveRow(),
+    };
+
+    function pasteZoneHTML(tbodyId, columns) {
+      return `<textarea class="paste-zone" data-paste-target="${tbodyId}" rows="1"
+        placeholder="📋 Paste cells from Excel, LibreOffice or a PDF table here (Ctrl+V) — columns: ${columns}"></textarea>`;
+    }
+
+    // Accepts decimal commas ("0,35"), unicode minus and spaces ("1 250").
+    function parseCellNumber(raw) {
+      let s = String(raw).trim().replace(/[−–]/g, '-').replace(/[\s  ]/g, '');
+      if (s === '') return NaN;
+      if (s.includes(',') && !s.includes('.')) s = s.replace(',', '.');
+      return /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s) ? parseFloat(s) : NaN;
+    }
+
+    // Splits clipboard text into rows of cells. Separator priority:
+    // tab (spreadsheets) → semicolon → comma when decimals use dots → whitespace (PDF tables).
+    function parseClipboardTable(text) {
+      const lines = text.replace(/\r\n?/g, '\n').split('\n').filter(l => l.trim() !== '');
+      let split;
+      if (lines.some(l => l.includes('\t')))      split = l => l.split('\t');
+      else if (lines.some(l => l.includes(';')))  split = l => l.split(';');
+      else if (/\d\.\d/.test(text) && lines.some(l => l.includes(','))) split = l => l.split(',');
+      else                                        split = l => l.trim().split(/\s+/);
+      return lines.map(split);
+    }
+
+    function setPasteHint(tbodyId, msg, cls = '') {
+      const el = document.getElementById(tbodyId + '-hint');
+      if (!el) return;
+      el.className = 'field-hint' + (cls ? ' ' + cls : '');
+      el.textContent = msg;
+    }
+
+    // Writes `matrix` into the table starting at (startRow, startCol), adding rows as needed.
+    // Rows without any numeric cell (headers, units) are skipped.
+    function fillTableFromMatrix(tbodyId, matrix, startRow, startCol) {
+      const tbody = document.getElementById(tbodyId);
+      let rowIdx = startRow, filled = 0, headers = 0, badCells = 0;
+      for (const cells of matrix) {
+        const nums = cells.map(parseCellNumber);
+        if (nums.every(isNaN)) { headers++; continue; }
+        while (tbody.rows.length <= rowIdx) PASTE_TABLES[tbodyId]();
+        const inputs = tbody.rows[rowIdx].querySelectorAll('input');
+        nums.forEach((v, j) => {
+          const input = inputs[startCol + j];
+          if (!input) return;
+          if (isNaN(v)) { badCells++; input.value = ''; }
+          else input.value = v;
+        });
+        rowIdx++; filled++;
+      }
+      const notes = [];
+      if (headers)  notes.push(`${headers} header line(s) ignored`);
+      if (badCells) notes.push(`${badCells} non-numeric cell(s) left empty`);
+      setPasteHint(tbodyId,
+        `${filled} row(s) pasted${notes.length ? ' — ' + notes.join(', ') : ''}. Check the values, then save.`,
+        badCells ? 'warn' : 'ok');
+    }
+
+    function rowIsEmpty(tr) {
+      return [...tr.querySelectorAll('input')].every(i => i.value === '');
+    }
+
+    function clearPasteTable(tbodyId) {
+      document.getElementById(tbodyId).innerHTML = '';
+      setPasteHint(tbodyId, '');
+    }
+
+    document.addEventListener('paste', e => {
+      const target = e.target;
+      let tbodyId, startRow, startCol;
+      if (target.matches?.('.paste-zone')) {
+        // Append after the last row holding data, reusing trailing empty rows.
+        tbodyId = target.dataset.pasteTarget;
+        const rows = [...document.getElementById(tbodyId).rows];
+        startRow = rows.length;
+        while (startRow > 0 && rowIsEmpty(rows[startRow - 1])) startRow--;
+        startCol = 0;
+      } else {
+        const tbody = target.closest?.('tbody');
+        if (!tbody || !PASTE_TABLES[tbody.id] || target.tagName !== 'INPUT') return;
+        tbodyId  = tbody.id;
+        startRow = target.closest('tr').sectionRowIndex;
+        startCol = [...target.closest('tr').querySelectorAll('input')].indexOf(target);
+      }
+      const matrix = parseClipboardTable(e.clipboardData?.getData('text/plain') || '');
+      if (matrix.length === 0) return;
+      e.preventDefault();
+      fillTableFromMatrix(tbodyId, matrix, startRow, startCol);
+      if (target.matches('.paste-zone')) target.value = '';
+    });
+
+    // =========================================================================
     // RESULTS PANEL — dynamic rendering based on test type
     // =========================================================================
     const CHLORIDE_TESTS    = new Set(['cl_profil', 'diffusivity']);
@@ -1339,14 +1567,17 @@
               <input type="text" id="f-cl-cv-notes" placeholder="Solution concentration, specimen ID…">
             </div>
           </div>
+          ${pasteZoneHTML('cl-profile-rows', 'depth (mm), Cl content')}
           <table class="mini-table">
             <thead><tr><th>Depth (mm)</th><th>Cl content</th><th class="row-actions"></th></tr></thead>
             <tbody id="cl-profile-rows"></tbody>
           </table>
           <div style="display:flex;gap:8px;margin-top:8px;">
             <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="addClProfileRow()">+ Point</button>
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="clearPasteTable('cl-profile-rows')">Clear</button>
             <button class="btn btn-primary"   style="font-size:11px;padding:4px 10px;" onclick="saveClProfile()">💾 Save profile</button>
           </div>
+          <div class="field-hint" id="cl-profile-rows-hint"></div>
         </div>`;
     }
 
@@ -1385,14 +1616,17 @@
               <input type="text" id="f-carb-cv-notes" placeholder="CO₂ %, RH %, specimen ID…">
             </div>
           </div>
+          ${pasteZoneHTML('carb-profile-rows', 'depth face A (mm), depth face B (mm)')}
           <table class="mini-table">
             <thead><tr><th>#</th><th>Depth face A (mm)</th><th>Depth face B (mm)</th><th class="row-actions"></th></tr></thead>
             <tbody id="carb-profile-rows"></tbody>
           </table>
           <div style="display:flex;gap:8px;margin-top:8px;">
             <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="addCarbProfileRow()">+ Pair</button>
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="clearPasteTable('carb-profile-rows')">Clear</button>
             <button class="btn btn-primary"   style="font-size:11px;padding:4px 10px;" onclick="saveCarbProfile()">💾 Save profile</button>
           </div>
+          <div class="field-hint" id="carb-profile-rows-hint"></div>
         </div>`;
     }
 
@@ -1485,14 +1719,17 @@
               <input type="text" id="f-cv-notes" placeholder="Conditions, carbonation state, specimen preparation…">
             </div>
           </div>
+          ${pasteZoneHTML('curve-rows', 'X, Y')}
           <table class="mini-table">
             <thead><tr><th>X</th><th>Y</th><th class="row-actions"></th></tr></thead>
             <tbody id="curve-rows"></tbody>
           </table>
           <div style="display:flex;gap:8px;margin-top:8px;">
             <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="addCurveRow()">+ Point</button>
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="clearPasteTable('curve-rows')">Clear</button>
             <button class="btn btn-primary"   style="font-size:11px;padding:4px 10px;" onclick="saveCurve()">💾 Save curve</button>
           </div>
+          <div class="field-hint" id="curve-rows-hint"></div>
         </div>`;
     }
 
