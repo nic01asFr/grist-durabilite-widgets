@@ -23,6 +23,12 @@ npx serve .
 
 Deployment: push to `main` → GitHub Pages publishes automatically. The `.nojekyll` file disables Jekyll processing.
 
+**Shared assets are versioned.** GitHub Pages lets browsers cache files for 10 minutes, so a new widget page can otherwise run against an older cached `grist-helpers.js` (symptoms: empty lists, stepper stuck, analyses blank). Widgets load `assets/grist-helpers.js?v=N` and `assets/shared-styles.css?v=N`, and show a "reload" banner if `GristHelpers.ASSETS_VERSION < N`. Whenever widgets start relying on new helper code, bump `ASSETS_VERSION` in `grist-helpers.js` and `N` in every widget (the `?v=` of both assets and the guard):
+
+```bash
+sed -i '' 's/?v=4"/?v=5"/g; s/ASSETS_VERSION || 0) < 4)/ASSETS_VERSION || 0) < 5)/' *.html   # then ASSETS_VERSION: 5
+```
+
 ## Architecture
 
 Each widget is a self-contained `.html` file that runs entirely client-side in the browser. No backend server.

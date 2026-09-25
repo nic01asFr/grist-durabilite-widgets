@@ -13,6 +13,11 @@
 // =========================================================================
 const GristHelpers = {
 
+  // Version of the shared assets. Widgets load them as assets/…?v=<n> (so a new release
+  // never runs against a cached older copy) and refuse to start with an older one.
+  // Bump it with the ?v= of every widget whenever widgets rely on new helper code.
+  ASSETS_VERSION: 4,
+
   // =========================================================================
   // SCHEMA — Complete definition of the tables (creation order matters: a Ref
   // column must point to a table defined above it)

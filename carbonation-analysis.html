@@ -5,11 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Carbonation Analysis — Depth vs Time</title>
 
-  <link rel="stylesheet" href="assets/shared-styles.css">
+  <link rel="stylesheet" href="assets/shared-styles.css?v=4">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
-  <script src="assets/grist-helpers.js"></script>
+  <script src="assets/grist-helpers.js?v=4"></script>
+  <script>
+    // An older cached copy of grist-helpers.js would break this page: say so instead of failing silently
+    if (typeof GristHelpers === 'undefined' || (GristHelpers.ASSETS_VERSION || 0) < 4) {
+      document.addEventListener('DOMContentLoaded', () => document.body.insertAdjacentHTML('afterbegin',
+        '<div style="padding:10px 14px;margin-bottom:12px;border:1px solid #dc2626;border-radius:8px;color:#dc2626;background:#fff;font-size:13px">' +
+        'An outdated version of the shared scripts is cached by the browser. Reload the page (Ctrl+Shift+R / Cmd+Shift+R).</div>'));
+    }
+  </script>
 
   <style>
     #chart { width: 100%; min-height: 340px; border-radius: 8px; overflow: hidden; }
