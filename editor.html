@@ -50,6 +50,19 @@
       border-radius: 5px; cursor: pointer;
     }
     .btn-del:hover { background: rgba(239,68,68,0.08); }
+    .shared-note:empty { display: none; }
+    .shared-note {
+      font-size: 11px; color: var(--warning); background: var(--bg); border: 1px solid var(--warning);
+      border-left-width: 3px; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px;
+    }
+    .placement-block { border: 1px solid var(--surface2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .placement-block .pl-head { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+    .placement-block details { margin-top: 8px; }
+    .placement-block summary { font-size: 11px; color: var(--text-muted); cursor: pointer; }
+    .code-row, .add-code-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+    .code-row input, .add-code-row input { flex: 1 1 140px; min-width: 0; }
+    .code-row select { flex: 1 1 160px; min-width: 0; }
+    .meas-sub { display: block; font-size: 10px; color: var(--text-dim); margin-top: 2px; }
     .btn-add-inline {
       padding: 5px 12px; font-size: 11px; cursor: pointer;
       background: rgba(59,130,246,0.1); color: var(--accent);
@@ -246,13 +259,6 @@
             <input type="text" id="f-mat-name" data-table="MATERIAL" data-field="name">
           </div>
           <div class="field-item">
-            <label>Type</label>
-            <select id="f-mat-type" data-table="MATERIAL" data-field="material_type">
-              <option value="">— choose —</option>
-            </select>
-          </div>
-          <div class="field-item"><!-- spacer --></div>
-          <div class="field-item">
             <label>Manufacturing date</label>
             <input type="date" id="f-mat-manuf" data-table="MATERIAL" data-field="manufacturing_date" data-date="true">
           </div>
@@ -261,60 +267,22 @@
             <input type="date" id="f-mat-demold" data-table="MATERIAL" data-field="demolding_date" data-date="true">
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- SECTION: SITE -->
-    <div class="card" id="card-site">
-      <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-site" onclick="toggleSection('site')">SITE</div>
-      </div>
-      <div class="section-body collapsed" id="body-site">
-        <div class="field-grid cols-3">
-          <div class="field-item">
-            <label>Country / Region</label>
-            <input type="text" id="f-site-region" data-table="SITE" data-field="country_region">
-          </div>
-          <div class="field-item">
-            <label>Latitude</label>
-            <input type="number" step="any" id="f-site-lat" data-table="SITE" data-field="latitude">
-          </div>
-          <div class="field-item">
-            <label>Longitude</label>
-            <input type="number" step="any" id="f-site-lon" data-table="SITE" data-field="longitude">
-          </div>
+        <div class="sub-section-title" style="margin-top:12px;">Campaign codes</div>
+        <div id="mat-codes"></div>
+        <div class="add-code-row">
+          <input type="text" id="new-code-label" placeholder="New code (e.g. M3)">
+          <button class="btn-add-inline" onclick="addCodeRow()">+ Code</button>
         </div>
       </div>
     </div>
 
-    <!-- SECTION: EXPOSURE -->
-    <div class="card" id="card-expo">
+    <!-- SECTION: EXPOSURES (PLACEMENT: site + exposure condition + dates, 0..n per material) -->
+    <div class="card" id="card-placements">
       <div class="card-header">
-        <div class="card-title section-toggle collapsed" id="toggle-expo" onclick="toggleSection('expo')">EXPOSURE</div>
+        <div class="card-title section-toggle" id="toggle-placements" onclick="toggleSection('placements')">EXPOSURES</div>
       </div>
-      <div class="section-body collapsed" id="body-expo">
-        <div class="field-grid">
-          <div class="field-item">
-            <label>Exposure type</label>
-            <select id="f-expo-type" data-table="EXPOSURE" data-field="exposure_type">
-              <option value="">— choose —</option>
-            </select>
-          </div>
-          <div class="field-item">
-            <label>Exposure nature</label>
-            <select id="f-expo-nature" data-table="EXPOSURE" data-field="exposure_nature">
-              <option value="">— choose —</option>
-            </select>
-          </div>
-          <div class="field-item">
-            <label>Wetting (%)</label>
-            <input type="number" step="any" min="0" max="100" id="f-expo-wet" data-table="EXPOSURE" data-field="wetting_duration_pct">
-          </div>
-          <div class="field-item">
-            <label>Drying (%)</label>
-            <input type="number" step="any" min="0" max="100" id="f-expo-dry" data-table="EXPOSURE" data-field="drying_duration_pct">
-          </div>
-        </div>
+      <div class="section-body" id="body-placements">
+        <div id="placements-list"></div>
       </div>
     </div>
 
@@ -324,7 +292,17 @@
         <div class="card-title section-toggle collapsed" id="toggle-mix" onclick="toggleSection('mix')">MIX DESIGN</div>
       </div>
       <div class="section-body collapsed" id="body-mix">
+        <div class="shared-note" id="shared-mix"></div>
         <div class="field-grid cols-3">
+          <div class="field-item">
+            <label>Name</label>
+            <input type="text" id="f-mix-name" data-table="MIX_DESIGN" data-field="name">
+          </div>
+          <div class="field-item">
+            <label>Material type</label>
+            <select id="f-mix-type" data-table="MIX_DESIGN" data-field="material_type"></select>
+          </div>
+          <div class="field-item"><!-- spacer --></div>
           <div class="field-item">
             <label>w/c ratio</label>
             <input type="number" step="0.01" min="0" id="f-mix-wc" data-table="MIX_DESIGN" data-field="wc_ratio">
@@ -378,6 +356,7 @@
         <div class="card-title section-toggle collapsed" id="toggle-binders" onclick="toggleSection('binders')">BINDERS</div>
       </div>
       <div class="section-body collapsed" id="body-binders">
+        <div class="shared-note" id="shared-binders"></div>
         <div id="binders-list"></div>
         <button class="btn-add-inline" onclick="showAddBinderRow()">+ Add binder</button>
         <div class="add-binder-row" id="add-binder-row" style="display:none;">
@@ -396,6 +375,7 @@
         <div class="card-title section-toggle collapsed" id="toggle-cure" onclick="toggleSection('cure')">CURING</div>
       </div>
       <div class="section-body collapsed" id="body-cure">
+        <div class="shared-note" id="shared-cure"></div>
         <div class="field-grid cols-3">
           <div class="field-item">
             <label>Curing method</label>
@@ -506,8 +486,6 @@
 // Global state
 // =========================================================================
 let currentRecord   = null;   // current MATERIAL record
-let currentSiteId   = null;
-let currentExpoId   = null;
 let currentMixId    = null;
 let currentCureId   = null;
 let currentSourceId = null;   // source of the first measurement
@@ -520,6 +498,10 @@ let pendingBinders = { toAdd: [], toDelete: [] };
 let pendingAggregates = { toAdd: [], toDelete: [] };
 // pendingScalars
 let pendingScalars = { toAdd: [], toDelete: [] };
+// Pending campaign code changes (LABEL)
+let pendingLabels = { toAdd: [], toDelete: [] };
+// v3 context tables, reloaded with each material
+let allPlacementsArr = [], allLabelsArr = [], allSitesArr = [], allExposuresArr = [], allSourcesArr = [];
 
 // Global cache
 let allBinders          = [];  // [{id, fields}]
@@ -534,7 +516,6 @@ let allSources       = new Map(); // id → fields
 
 // Fields of the current material and its linked tables (for edit forms)
 let currentMatFields  = {};
-let currentExpoFields = {};
 let currentMixFields  = {};
 
 // Global maps for the table (all measurements, all tables)
@@ -542,6 +523,7 @@ let allMaterialsArr = [];        // [{id, fields}]
 let allMaterialsMap = new Map(); // id → fields
 let allExposuresMap = new Map(); // id → fields
 let allMixesMap     = new Map(); // id → fields
+let measCtxMaps     = null;      // maps for GristHelpers.measurementContext()
 
 // Measurement table state
 let measLinked       = [];          // measurements for the current material
@@ -592,7 +574,8 @@ function markChanged(tableName, rowId, fieldId, value) {
 function countChanges() {
   let n = pendingBinders.toAdd.length    + pendingBinders.toDelete.length
         + pendingAggregates.toAdd.length + pendingAggregates.toDelete.length
-        + pendingScalars.toAdd.length    + pendingScalars.toDelete.length;
+        + pendingScalars.toAdd.length    + pendingScalars.toDelete.length
+        + pendingLabels.toAdd.length     + pendingLabels.toDelete.length;
   for (const [, rowMap] of pendingChanges) n += rowMap.size;
   return n;
 }
@@ -627,6 +610,8 @@ function attachListeners(container, tableName, rowId) {
         val = el.checked ? true : false;
       } else if (isDate) {
         val = dateInputToTs(el.value);
+      } else if (el.dataset.ref === 'true') {
+        val = parseInt(el.value) || 0;
       } else if (el.type === 'number') {
         val = el.value === '' ? null : parseFloat(el.value);
       } else {
@@ -675,6 +660,7 @@ async function loadMaterial(record) {
   pendingBinders    = { toAdd: [], toDelete: [] };
   pendingAggregates = { toAdd: [], toDelete: [] };
   pendingScalars    = { toAdd: [], toDelete: [] };
+  pendingLabels     = { toAdd: [], toDelete: [] };
   updateSaveBar();
 
   currentRecord = record;
@@ -683,8 +669,6 @@ async function loadMaterial(record) {
 
   try {
     // IDs of linked tables
-    currentSiteId   = record.fields?.id_site             || record.id_site   || null;
-    currentExpoId   = record.fields?.id_exposure         || record.id_exposure || null;
     currentMixId    = record.fields?.id_mix_design       || record.id_mix_design || null;
     currentCureId   = record.fields?.id_curing_condition || record.id_curing_condition || null;
 
@@ -694,28 +678,20 @@ async function loadMaterial(record) {
 
     // ---- MATERIAL ----
     setField('f-mat-name',    f.name);
-    setField('f-mat-type',    f.material_type);
     setField('f-mat-manuf',   f.manufacturing_date,  true);
     setField('f-mat-demold',  f.demolding_date,       true);
     attachListeners(document.getElementById('card-material'), 'MATERIAL', record.id);
 
-    // ---- SITE ----
-    await loadLinked('SITE', currentSiteId, {
-      'f-site-region': 'country_region',
-      'f-site-lat':    'latitude',
-      'f-site-lon':    'longitude',
-    }, 'card-site');
-
-    // ---- EXPOSURE ----
-    currentExpoFields = await loadLinked('EXPOSURE', currentExpoId, {
-      'f-expo-type':   'exposure_type',
-      'f-expo-nature': 'exposure_nature',
-      'f-expo-wet':    'wetting_duration_pct',
-      'f-expo-dry':    'drying_duration_pct',
-    }, 'card-expo') || {};
+    // ---- EXPOSURES and CAMPAIGN CODES ----
+    [allPlacementsArr, allLabelsArr, allSitesArr, allExposuresArr, allSourcesArr] = await Promise.all(
+      ['PLACEMENT', 'LABEL', 'SITE', 'EXPOSURE', 'SOURCE'].map(t => GristHelpers.fetchAllRecords(t)));
+    renderPlacements(record.id);
+    renderCodes(record.id);
 
     // ---- MIX DESIGN ----
     currentMixFields = await loadLinked('MIX_DESIGN', currentMixId, {
+      'f-mix-name':      'name',
+      'f-mix-type':      'material_type',
       'f-mix-wc':        'wc_ratio',
       'f-mix-wl':        'wl_ratio',
       'f-mix-water':     'water_content_kg',
@@ -746,6 +722,9 @@ async function loadMaterial(record) {
     // ---- SOURCE (first measurement of the material) ----
     await loadSource();
 
+    // ---- Records shared with other materials: say so before they are edited ----
+    renderSharedNotes(record.id);
+
     GristHelpers.setStatus('Ready', 'ready');
     GristHelpers.log('Material loaded ✓', 'ok');
   } catch(err) {
@@ -753,6 +732,127 @@ async function loadMaterial(record) {
     GristHelpers.log('Loading error: ' + err.message, 'err');
     console.error(err);
   }
+}
+
+// =========================================================================
+// EXPOSURES (PLACEMENT) — site, exposure condition and dates of each exposure
+// Changing the site / condition of an exposure only affects that exposure;
+// editing the site or condition details changes a record that may be shared.
+// =========================================================================
+function optionList(records, labelFn, current, emptyText) {
+  return `<option value="">${emptyText}</option>` + records.map(r =>
+    `<option value="${r.id}" ${r.id === current ? 'selected' : ''}>${escapeHtml(labelFn(r))}</option>`).join('');
+}
+const siteText = r => `#${r.id} — ${r.fields.country_region || '?'}`;
+const expoText = r => `#${r.id} — ${[GristHelpers.enumLabel(r.fields.exposure_type), GristHelpers.enumLabel(r.fields.exposure_nature)].filter(Boolean).join(' / ') || '?'}`;
+
+function sharedText(n, what) {
+  return n > 1 ? `⚠ Shared by ${n} ${what}: changes apply to all of them.` : '';
+}
+
+function renderPlacements(matId) {
+  const box = document.getElementById('placements-list');
+  const pls = allPlacementsArr.filter(p => p.fields.id_material === matId);
+  if (pls.length === 0) {
+    box.innerHTML = '<div class="no-binders">No exposure: laboratory tests only. Add exposures in the Data Entry widget (step 3).</div>';
+    return;
+  }
+  box.innerHTML = pls.map(p => {
+    const f = p.fields;
+    const site = allSitesArr.find(x => x.id === f.id_site);
+    const expo = allExposuresArr.find(x => x.id === f.id_exposure);
+    const nSite = allPlacementsArr.filter(x => x.fields.id_site === f.id_site).length;
+    const nExpo = allPlacementsArr.filter(x => x.fields.id_exposure === f.id_exposure).length;
+    const nMeas = allMeasurements.filter(m => m.fields.id_placement === p.id).length;
+    return `
+      <div class="placement-block" id="pl-${p.id}">
+        <div class="pl-head">Exposure #${p.id} — ${escapeHtml(f.name || '')} <span style="font-weight:400;color:var(--text-dim);">(${nMeas} measurement${nMeas > 1 ? 's' : ''})</span></div>
+        <div class="field-grid" data-scope="placement">
+          <div class="field-item"><label>Site</label>
+            <select data-table="PLACEMENT" data-field="id_site" data-ref="true">${optionList(allSitesArr, siteText, f.id_site, '— not specified —')}</select></div>
+          <div class="field-item"><label>Exposure condition</label>
+            <select data-table="PLACEMENT" data-field="id_exposure" data-ref="true">${optionList(allExposuresArr, expoText, f.id_exposure, '— not specified —')}</select></div>
+          <div class="field-item"><label>Start date</label>
+            <input type="date" value="${tsToDateInput(f.exposure_start_date)}" data-table="PLACEMENT" data-field="exposure_start_date" data-date="true"></div>
+          <div class="field-item"><label>End date</label>
+            <input type="date" value="${tsToDateInput(f.exposure_end_date)}" data-table="PLACEMENT" data-field="exposure_end_date" data-date="true"></div>
+        </div>
+        ${site ? `<details data-scope="site"><summary>Site details — #${site.id}</summary>
+          <div class="shared-note">${sharedText(nSite, 'exposures')}</div>
+          <div class="field-grid cols-3">
+            <div class="field-item"><label>Country / Region</label><input type="text" value="${escapeHtml(site.fields.country_region || '')}" data-table="SITE" data-field="country_region"></div>
+            <div class="field-item"><label>Latitude</label><input type="number" step="any" value="${site.fields.latitude ?? ''}" data-table="SITE" data-field="latitude"></div>
+            <div class="field-item"><label>Longitude</label><input type="number" step="any" value="${site.fields.longitude ?? ''}" data-table="SITE" data-field="longitude"></div>
+          </div></details>` : ''}
+        ${expo ? `<details data-scope="expo"><summary>Exposure condition details — #${expo.id}</summary>
+          <div class="shared-note">${sharedText(nExpo, 'exposures')}</div>
+          <div class="field-grid">
+            <div class="field-item"><label>Exposure type</label><select data-table="EXPOSURE" data-field="exposure_type">${enumOptions('exposure_type', expo.fields.exposure_type)}</select></div>
+            <div class="field-item"><label>Exposure nature</label><select data-table="EXPOSURE" data-field="exposure_nature">${enumOptions('exposure_nature', expo.fields.exposure_nature)}</select></div>
+            <div class="field-item"><label>Wetting (%)</label><input type="number" step="any" min="0" max="100" value="${expo.fields.wetting_duration_pct ?? ''}" data-table="EXPOSURE" data-field="wetting_duration_pct"></div>
+            <div class="field-item"><label>Drying (%)</label><input type="number" step="any" min="0" max="100" value="${expo.fields.drying_duration_pct ?? ''}" data-table="EXPOSURE" data-field="drying_duration_pct"></div>
+          </div></details>` : ''}
+      </div>`;
+  }).join('');
+  pls.forEach(p => {
+    const block = document.getElementById('pl-' + p.id);
+    attachListeners(block.querySelector('[data-scope="placement"]'), 'PLACEMENT', p.id);
+    const siteBox = block.querySelector('[data-scope="site"]');
+    if (siteBox) attachListeners(siteBox, 'SITE', p.fields.id_site);
+    const expoBox = block.querySelector('[data-scope="expo"]');
+    if (expoBox) attachListeners(expoBox, 'EXPOSURE', p.fields.id_exposure);
+  });
+}
+
+// =========================================================================
+// CAMPAIGN CODES (LABEL) — the names of the material in campaigns
+// =========================================================================
+function renderCodes(matId) {
+  const box = document.getElementById('mat-codes');
+  const codes = allLabelsArr.filter(l => l.fields.id_material === matId);
+  const pls = allPlacementsArr.filter(p => p.fields.id_material === matId);
+  const srcText = r => r.fields.designation || (r.fields.authors || '').split(',')[0] || `Source #${r.id}`;
+  const plText = r => r.fields.name || `Exposure #${r.id}`;
+  box.innerHTML = codes.length ? codes.map(l => `
+    <div class="code-row" id="code-${l.id}">
+      <input type="text" value="${escapeHtml(l.fields.label || '')}" data-table="LABEL" data-field="label" title="Code">
+      <select data-table="LABEL" data-field="id_source" data-ref="true" title="Campaign / source">${optionList(allSourcesArr, srcText, l.fields.id_source, '— no campaign —')}</select>
+      <select data-table="LABEL" data-field="id_placement" data-ref="true" title="Exposure designated by the code">${optionList(pls, plText, l.fields.id_placement, '— the material (any exposure) —')}</select>
+      <button class="btn-del" onclick="deleteCodeRow(${l.id})" title="Remove">✕</button>
+    </div>`).join('') : '<div class="no-binders" style="margin-bottom:6px;">No campaign code.</div>';
+  codes.forEach(l => attachListeners(document.getElementById('code-' + l.id), 'LABEL', l.id));
+}
+
+function addCodeRow() {
+  const input = document.getElementById('new-code-label');
+  const label = input.value.trim();
+  if (!label || !currentRecord) return;
+  pendingLabels.toAdd.push({ label, id_material: currentRecord.id, id_source: currentSourceId || 0 });
+  const box = document.getElementById('mat-codes');
+  box.insertAdjacentHTML('beforeend', `<div class="code-row" style="opacity:0.6;font-style:italic;">${escapeHtml(label)} (new)</div>`);
+  input.value = '';
+  updateSaveBar();
+}
+
+function deleteCodeRow(labelId) {
+  if (!pendingLabels.toDelete.includes(labelId)) pendingLabels.toDelete.push(labelId);
+  const row = document.getElementById('code-' + labelId);
+  if (row) { row.style.opacity = '0.4'; row.style.textDecoration = 'line-through'; }
+  updateSaveBar();
+}
+
+// Mix design, binders and curing may be shared by several materials
+function renderSharedNotes(matId) {
+  const nMix  = currentMixId  ? allMaterialsArr.filter(m => m.fields.id_mix_design === currentMixId).length : 0;
+  const nCure = currentCureId ? allMaterialsArr.filter(m => m.fields.id_curing_condition === currentCureId).length : 0;
+  document.getElementById('shared-mix').textContent     = sharedText(nMix, 'materials');
+  document.getElementById('shared-binders').textContent = sharedText(nMix, 'materials (same mix design)');
+  document.getElementById('shared-cure').textContent    = sharedText(nCure, 'materials');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
 // =========================================================================
@@ -1023,7 +1123,7 @@ function confirmAddAggregate() {
 // =========================================================================
 async function loadMeasurementsTable() {
   try {
-    const [measurements, tests, scalars, curves, sources, materials, exposures, mixes] = await Promise.all([
+    const [measurements, tests, scalars, curves, sources, materials, exposures, mixes, placements, sites] = await Promise.all([
       GristHelpers.fetchAllRecords('MEASUREMENT'),
       GristHelpers.fetchAllRecords('TEST'),
       GristHelpers.fetchAllRecords('SCALAR'),
@@ -1032,9 +1132,13 @@ async function loadMeasurementsTable() {
       GristHelpers.fetchAllRecords('MATERIAL'),
       GristHelpers.fetchAllRecords('EXPOSURE'),
       GristHelpers.fetchAllRecords('MIX_DESIGN'),
+      GristHelpers.fetchAllRecords('PLACEMENT'),
+      GristHelpers.fetchAllRecords('SITE'),
     ]);
 
     allMeasurements = measurements;
+    measCtxMaps     = GristHelpers.contextMaps(materials, placements, sites, exposures);
+    allPlacementsArr = placements;
     allTests        = new Map(tests.map(t => [t.id, t.fields]));
     allScalars      = scalars;
     allCurves       = curves;
@@ -1117,7 +1221,8 @@ function renderMeasTable() {
       ? (src.designation || (src.authors ? src.authors.split(',')[0].trim() + (src.year ? ' ' + src.year : '') : '—'))
       : '—';
     const matF  = allMaterialsMap.get(f.id_material) || {};
-    const expoF = allExposuresMap.get(matF.id_exposure) || {};
+    // Exposure of the measurement (its placement; none for laboratory tests)
+    const expoF = GristHelpers.measurementContext(f, measCtxMaps).exposure || {};
     const mixF  = allMixesMap.get(matF.id_mix_design) || {};
     return {
       id:          m.id,
@@ -1132,7 +1237,8 @@ function renderMeasTable() {
       prep:        tsToDateInput(f.preparation_date) || '',
       result:      tsToDateInput(f.result_date) || '',
       time_days:   (f.result_date && f.preparation_date) ? Math.round((f.result_date - f.preparation_date) / 86400) : null,
-      mat_type:    matF.material_type    || '',
+      mat_type:    mixF.material_type || matF.material_type || '',
+      specimen:    f.specimen_id || '',
       expo_type:   expoF.exposure_type   || '',
       expo_nature: expoF.exposure_nature || '',
       wc_ratio:    mixF.wc_ratio         ?? null,
@@ -1212,8 +1318,7 @@ function renderMeasTable() {
     const rep = grp[0];
     const matInfo = [
       GristHelpers.enumLabel(rep.mat_type),
-      GristHelpers.enumLabel(rep.expo_type),
-      GristHelpers.enumLabel(rep.expo_nature),
+
       rep.wc_ratio != null ? `w/c ${Number(rep.wc_ratio).toFixed(2)}` : '',
       rep.wl_ratio != null ? `w/b ${Number(rep.wl_ratio).toFixed(2)}` : '',
       rep.water_kg != null ? `${Math.round(rep.water_kg)} kg/m³` : '',
@@ -1228,7 +1333,8 @@ function renderMeasTable() {
       const scCells = r.scalars.map((v, i) => `<td>${fmtScal(v, r.scalarUnits[i])}</td>`).join('');
       const sel = r.id === selectedMeasId ? ' class="meas-selected"' : '';
       html += `<tr${sel} data-meas-id="${r.id}">
-        <td><span class="meas-badge">${GristHelpers.enumLabel(r.test) || '?'}</span></td>
+        <td><span class="meas-badge">${GristHelpers.enumLabel(r.test) || '?'}</span>
+          <span class="meas-sub">${escapeHtml([r.specimen, GristHelpers.enumLabel(r.expo_nature) || 'lab'].filter(Boolean).join(' · '))}</span></td>
         <td>${clTag(r.testType)}</td>
         <td>${r.time_days != null ? r.time_days : '—'}</td>
         <td>${r.prep || '—'}</td>
@@ -1349,9 +1455,21 @@ function buildDetailForm(m, mScalars, mCurves) {
       `).join('')
     : '<div class="no-binders">No curve.</div>';
 
+  const matPls = allPlacementsArr.filter(p => p.fields.id_material === f.id_material);
+  const plOpts = `<option value="0">— none: laboratory test —</option>` + matPls.map(p =>
+    `<option value="${p.id}" ${p.id === f.id_placement ? 'selected' : ''}>${escapeHtml(p.fields.name || 'Exposure #' + p.id)}</option>`).join('');
   return `
     <div class="sub-section-title">Measurement</div>
     <div class="field-grid cols-3">
+      <div class="field-item">
+        <label>Exposure</label>
+        <select data-table="MEASUREMENT" data-field="id_placement" data-ref="true">${plOpts}</select>
+      </div>
+      <div class="field-item">
+        <label>Specimen ID</label>
+        <input type="text" value="${escapeHtml(f.specimen_id || '')}" data-table="MEASUREMENT" data-field="specimen_id">
+      </div>
+      <div class="field-item"><!-- spacer --></div>
       <div class="field-item">
         <label>Sample type</label>
         <select data-table="MEASUREMENT" data-field="sample_type">${sampleTypeOpts}</select>
@@ -1413,6 +1531,8 @@ function attachDetailListeners(body, m, mScalars) {
       let val;
       if (isDate) {
         val = dateInputToTs(el.value);
+      } else if (el.dataset.ref === 'true') {
+        val = parseInt(el.value) || 0;
       } else if (el.type === 'number') {
         val = el.value === '' ? null : parseFloat(el.value);
       } else {
@@ -1584,6 +1704,21 @@ async function saveAll() {
     actions.push(['AddRecord', 'SCALAR', null, fields]);
   }
 
+  // 8. Campaign codes
+  for (const id of pendingLabels.toDelete) actions.push(['RemoveRecord', 'LABEL', id]);
+  for (const fields of pendingLabels.toAdd) actions.push(['AddRecord', 'LABEL', null, fields]);
+
+  // 9. Exposure names follow their site, condition and start date
+  const pend = t => pendingChanges.get(t) || new Map();
+  const merged = (arr, t, id) => ({ ...(arr.find(r => r.id === id)?.fields || {}), ...(pend(t).get(id) || {}) });
+  allPlacementsArr.forEach(p => {
+    const pf = merged(allPlacementsArr, 'PLACEMENT', p.id);
+    if (!pend('PLACEMENT').has(p.id) && !pend('SITE').has(pf.id_site) && !pend('EXPOSURE').has(pf.id_exposure)) return;
+    const name = GristHelpers.placementName(merged(allSitesArr, 'SITE', pf.id_site),
+      merged(allExposuresArr, 'EXPOSURE', pf.id_exposure), pf.exposure_start_date);
+    if (name !== p.fields.name) actions.push(['UpdateRecord', 'PLACEMENT', p.id, { name }]);
+  });
+
   if (actions.length === 0) {
     GristHelpers.log('No changes to save.', 'warn');
     return;
@@ -1601,6 +1736,7 @@ async function saveAll() {
     pendingBinders    = { toAdd: [], toDelete: [] };
     pendingAggregates = { toAdd: [], toDelete: [] };
     pendingScalars    = { toAdd: [], toDelete: [] };
+    pendingLabels     = { toAdd: [], toDelete: [] };
     updateSaveBar();
     await loadMaterial(currentRecord);
     // Re-select the measurement after reload
@@ -1613,6 +1749,7 @@ async function saveAll() {
 }
 
 function resetChanges() {
+  pendingLabels     = { toAdd: [], toDelete: [] };
   pendingChanges    = new Map();
   pendingBinders    = { toAdd: [], toDelete: [] };
   pendingAggregates = { toAdd: [], toDelete: [] };
@@ -1646,9 +1783,7 @@ function fillEnumSelect(elId, enumKey) {
 (async function() {
   GristHelpers.log('Initializing Editor…');
   fillDatalist('dl-admix', GristHelpers.ENUMS.admix_type);
-  fillEnumSelect('f-mat-type',      'material_type');
-  fillEnumSelect('f-expo-type',     'exposure_type');
-  fillEnumSelect('f-expo-nature',   'exposure_nature');
+  fillEnumSelect('f-mix-type',      'material_type');
   fillEnumSelect('f-mix-watertype', 'water_type');
   fillEnumSelect('f-cure-method',   'curing_method');
   fillDatalist('dl-sc-name', GristHelpers.ENUMS.scalar_name);

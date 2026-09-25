@@ -103,7 +103,7 @@
     // STATE
     // Each element of allData: {
     //   _id, D, duree_vie_ans,
-    //   material: {name, material_type, id_mix_design, id_exposure},
+    //   material: {name, id_mix_design, id_curing_condition, …},
     //   mix:      {wc_ratio, …},  // binders via MIX_DESIGN_BINDER
     //   exposure: {exposure_type, exposure_nature},
     //   source:   {authors, designation, year}
@@ -122,7 +122,7 @@
     // =========================================================================
     // LOAD DATA
     // Architecture v2.2:
-    //   SCALAR (name='D') → MEASUREMENT → MATERIAL → MIX_DESIGN + EXPOSURE
+    //   SCALAR (name='D') → MEASUREMENT → MATERIAL → MIX_DESIGN, and MEASUREMENT → PLACEMENT → EXPOSURE
     //   service life: SCALAR name='duree_vie_ans' on the same MEASUREMENT
     // =========================================================================
     async function loadAllData() {
@@ -130,20 +130,23 @@
       GristHelpers.setStatus('Loading…', '');
 
       try {
-        const [scalars, measurements, materials, mixes, exposures, sources] = await Promise.all([
+        const [scalars, measurements, materials, mixes, exposures, sources, placements, sites, labels] = await Promise.all([
           GristHelpers.fetchAllRecords('SCALAR'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MIX_DESIGN'),
           GristHelpers.fetchAllRecords('EXPOSURE'),
           GristHelpers.fetchAllRecords('SOURCE'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
+          GristHelpers.fetchAllRecords('SITE'),
+          GristHelpers.fetchAllRecords('LABEL'),
         ]);
 
         // Lookup maps
         const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
-        const materialMap = new Map(materials.map(m => [m.id, m.fields]));
         const mixMap      = new Map(mixes.map(m => [m.id, m.fields]));
-        const exposureMap = new Map(exposures.map(e => [e.id, e.fields]));
+        const ctxMaps     = GristHelpers.contextMaps(materials, placements, sites, exposures);
+        const labelFields = labels.map(l => l.fields);
         const sourceMap   = new Map(sources.map(s => [s.id, s.fields]));
 
         // Service life: SCALAR name='duree_vie_ans', grouped by id_measurement
@@ -163,15 +166,19 @@
 
         allData = dScalars.map(s => {
           const measure  = measureMap.get(s.fields.id_measurement)  || {};
-          const material = materialMap.get(measure.id_material)     || {};
+          // Exposure of the measurement (its placement; legacy MATERIAL columns if not migrated)
+          const ctx      = GristHelpers.measurementContext(measure, ctxMaps);
+          const material = ctx.material                              || {};
           const mix      = mixMap.get(material.id_mix_design)       || {};
-          const exposure = exposureMap.get(material.id_exposure)    || {};
+          const exposure = ctx.exposure                              || {};
           const source   = sourceMap.get(measure.id_source)        || {};
           return {
             _id:           s.id,
             D:             s.fields.value,
             duree_vie_ans: dureeMap.get(s.fields.id_measurement) || null,
             material,
+            // Campaign code of the measurement, else the material name
+            displayName:   GristHelpers.measurementCode(measure, labelFields) || material.name || '',
             mix,
             exposure,
             source,
@@ -193,7 +200,7 @@
     // FILTERS
     // =========================================================================
     function populateFilters(data) {
-      const matNames    = [...new Set(data.map(d => d.material.name).filter(Boolean))].sort();
+      const matNames    = [...new Set(data.map(d => d.displayName).filter(Boolean))].sort();
       const expoTypes   = [...new Set(data.map(d => d.exposure.exposure_type).filter(Boolean))].sort();
       const expoNatures = [...new Set(data.map(d => d.exposure.exposure_nature).filter(Boolean))].sort();
       const srcLabels   = [...new Set(data.map(d => sourceLabel(d.source)).filter(Boolean))].sort();
@@ -227,7 +234,7 @@
       const sourceFilter = document.getElementById('filter-source').value;
 
       filteredData = allData.filter(d => {
-        if (matFilter    && d.material.name              !== matFilter)  return false;
+        if (matFilter    && d.displayName              !== matFilter)  return false;
         if (expoType     && d.exposure.exposure_type     !== expoType)   return false;
         if (expoNature   && d.exposure.exposure_nature   !== expoNature) return false;
         if (sourceFilter && sourceLabel(d.source)        !== sourceFilter) return false;
@@ -288,7 +295,7 @@
     function renderDByMix(data) {
       const groups = {};
       data.forEach(d => {
-        const key = d.material.name || `mix_${d.material.id_mix_design}` || 'Unknown';
+        const key = d.displayName || `mix_${d.material.id_mix_design}` || 'Unknown';
         if (!groups[key]) groups[key] = [];
         if (d.D > 0) groups[key].push(d.D);
       });
@@ -320,14 +327,14 @@
         return;
       }
 
-      const matNames = [...new Set(valid.map(d => d.material.name || 'Unknown'))].sort();
+      const matNames = [...new Set(valid.map(d => d.displayName || 'Unknown'))].sort();
       const traces = matNames.map((name, i) => {
-        const pts = valid.filter(d => (d.material.name || 'Unknown') === name);
+        const pts = valid.filter(d => (d.displayName || 'Unknown') === name);
         return {
           x: pts.map(d => d.mix.wc_ratio), y: pts.map(d => d.D),
           mode: 'markers', type: 'scatter', name,
           marker: { color: PALETTE[i % PALETTE.length], size: 10, line: { color: 'rgba(255,255,255,0.3)', width: 1 } },
-          text: pts.map(d => `${d.material.name || '?'}<br>D: ${GristHelpers.formatDapp(d.D)}`)
+          text: pts.map(d => `${d.displayName || '?'}<br>D: ${GristHelpers.formatDapp(d.D)}`)
         };
       });
 
@@ -343,7 +350,7 @@
     function renderDureeVie(data) {
       const groups = {};
       data.forEach(d => {
-        const key = d.material.name || 'Unknown';
+        const key = d.displayName || 'Unknown';
         if (!groups[key]) groups[key] = [];
         if (d.duree_vie_ans != null && d.duree_vie_ans > 0) groups[key].push(d.duree_vie_ans);
       });
@@ -386,7 +393,7 @@
       document.getElementById('table-count').textContent = `${data.length} rows`;
       document.getElementById('data-table-body').innerHTML = data.map(d => `
         <tr>
-          <td>${d.material.name           || '—'}</td>
+          <td>${d.displayName           || '—'}</td>
           <td>${d.material.id_mix_design  ? `mix#${d.material.id_mix_design}` : '—'}</td>
           <td>${d.mix.wc_ratio != null    ? d.mix.wc_ratio.toFixed(2) : '—'}</td>
           <td>${GristHelpers.enumLabel(d.exposure.exposure_type)   || '—'}</td>

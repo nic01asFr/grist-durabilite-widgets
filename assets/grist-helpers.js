@@ -1,6 +1,10 @@
 // =========================================================================
 // GristHelpers — Shared utilities for durability widgets
-// Schema v2.5 — 15 tables, 13 enums (generic architecture)
+// Schema v3 — 18 tables (generic architecture)
+// v3:   MATERIAL = cast material (mix design + curing); PLACEMENT = its exposure
+//       (site + exposure condition + start date), 0..n per material; LABEL =
+//       campaign codes of a material/placement; SOURCE.source_type; migration
+//       from v2.5 in _migrateToV3() (run once, tracked in SCHEMA_INFO)
 // v2.5: vocabularies enriched from the RILEM metadata tool (binders, tests,
 //       admixtures, SCALAR parameters); MEB/DRX renamed SEM/XRD
 // Results: SCALAR (scalars 0..n) + CURVE+DATA_CURVE (curves 0..n)
@@ -10,7 +14,8 @@
 const GristHelpers = {
 
   // =========================================================================
-  // SCHEMA — Complete definition of 15 tables
+  // SCHEMA — Complete definition of the tables (creation order matters: a Ref
+  // column must point to a table defined above it)
   // =========================================================================
   SCHEMA: {
 
@@ -44,6 +49,7 @@ const GristHelpers = {
         { id: 'journal',     fields: { type: 'Text', label: 'Journal' } },
         { id: 'notes',       fields: { type: 'Text', label: 'Notes' } },
         { id: 'designation', fields: { type: 'Text', label: 'Designation' } },
+        { id: 'source_type', enum: 'source_type', fields: { type: 'Choice', label: 'Source type' } },
       ]
     },
 
@@ -91,6 +97,7 @@ const GristHelpers = {
     MIX_DESIGN: {
       columns: [
         { id: 'name',                                fields: { type: 'Text',    label: 'Name' } },
+        { id: 'material_type',                       enum: 'material_type', fields: { type: 'Choice', label: 'Material type' } },
         { id: 'water_type',                          enum: 'water_type', fields: { type: 'Choice',  label: 'Water type' } },
         { id: 'water_content_kg',                    fields: { type: 'Numeric', label: 'Water (kg/m³)' } },
         { id: 'global_warming_performance_kg_eq_m3', fields: { type: 'Numeric', label: 'GWP (kg CO₂-eq/m³)' } },
@@ -144,18 +151,45 @@ const GristHelpers = {
       ]
     },
 
-    // --- Cementitious material under study ---
+    // --- Cast material: a mix design, cured in a given way (what was made) ---
+    // name: descriptive, generated (mix name · curing). Campaign codes live in LABEL.
+    // Legacy v2.5 columns (read-only, superseded): id_site, id_exposure,
+    // exposure_start_date → PLACEMENT; material_type → MIX_DESIGN.material_type
     MATERIAL: {
       columns: [
-        { id: 'id_site',             fields: { type: 'Ref:SITE',             label: 'Site' } },
-        { id: 'id_exposure',         fields: { type: 'Ref:EXPOSURE',         label: 'Exposure' } },
         { id: 'id_mix_design',       fields: { type: 'Ref:MIX_DESIGN',       label: 'Mix design' } },
         { id: 'id_curing_condition', fields: { type: 'Ref:CURING_CONDITION', label: 'Curing' } },
         { id: 'manufacturing_date',  fields: { type: 'Date',                 label: 'Manufacturing date' } },
         { id: 'demolding_date',      fields: { type: 'Date',                 label: 'Demolding date' } },
-        { id: 'exposure_start_date', fields: { type: 'Date',                 label: 'Exposure start date' } },
         { id: 'name',                fields: { type: 'Text',                 label: 'Name' } },
-        { id: 'material_type',       enum: 'material_type', fields: { type: 'Choice',               label: 'Material type' } },
+        { id: 'id_site',             legacy: true, fields: { type: 'Ref:SITE',     label: 'Site (legacy)' } },
+        { id: 'id_exposure',         legacy: true, fields: { type: 'Ref:EXPOSURE', label: 'Exposure (legacy)' } },
+        { id: 'exposure_start_date', legacy: true, fields: { type: 'Date',         label: 'Exposure start date (legacy)' } },
+        { id: 'material_type',       legacy: true, enum: 'material_type', fields: { type: 'Choice', label: 'Material type (legacy)' } },
+      ]
+    },
+
+    // --- Exposure of a material: where and how it was exposed, from when (0..n per material) ---
+    PLACEMENT: {
+      columns: [
+        { id: 'id_material',         fields: { type: 'Ref:MATERIAL', label: 'Material' } },
+        { id: 'id_site',             fields: { type: 'Ref:SITE',     label: 'Site' } },
+        { id: 'id_exposure',         fields: { type: 'Ref:EXPOSURE', label: 'Exposure condition' } },
+        { id: 'exposure_start_date', fields: { type: 'Date',         label: 'Exposure start date' } },
+        { id: 'exposure_end_date',   fields: { type: 'Date',         label: 'Exposure end date' } },
+        { id: 'name',                fields: { type: 'Text',         label: 'Name' } },
+        { id: 'notes',               fields: { type: 'Text',         label: 'Notes' } },
+      ]
+    },
+
+    // --- Campaign codes: the name a material (or a material in a given exposure) has in a campaign ---
+    LABEL: {
+      columns: [
+        { id: 'label',        fields: { type: 'Text',          label: 'Code' } },
+        { id: 'id_source',    fields: { type: 'Ref:SOURCE',    label: 'Campaign / source' } },
+        { id: 'id_material',  fields: { type: 'Ref:MATERIAL',  label: 'Material' } },
+        { id: 'id_placement', fields: { type: 'Ref:PLACEMENT', label: 'Exposure (optional)' } },
+        { id: 'notes',        fields: { type: 'Text',          label: 'Notes' } },
       ]
     },
 
@@ -163,6 +197,8 @@ const GristHelpers = {
     MEASUREMENT: {
       columns: [
         { id: 'id_material',       fields: { type: 'Ref:MATERIAL', label: 'Material' } },
+        { id: 'id_placement',      fields: { type: 'Ref:PLACEMENT', label: 'Exposure (empty: laboratory test)' } },
+        { id: 'specimen_id',       fields: { type: 'Text',         label: 'Specimen ID' } },
         { id: 'id_source',         fields: { type: 'Ref:SOURCE',   label: 'Source' } },
         { id: 'id_test',           fields: { type: 'Ref:TEST',     label: 'Test' } },
         { id: 'sample_type',       enum: 'sample_type', fields: { type: 'Choice',       label: 'Sample type' } },
@@ -207,12 +243,21 @@ const GristHelpers = {
         { id: 'y',        fields: { type: 'Numeric',   label: 'Y' } },
       ]
     },
+
+    // --- Schema version of the document (drives one-shot migrations) ---
+    SCHEMA_INFO: {
+      columns: [
+        { id: 'key',   fields: { type: 'Text', label: 'Key' } },
+        { id: 'value', fields: { type: 'Text', label: 'Value' } },
+      ]
+    },
   },
 
   // =========================================================================
   // ENUMS — Allowed values for Choice columns
   // =========================================================================
   ENUMS: {
+    source_type:        ['publication', 'lab_campaign', 'report', 'thesis', 'other'],
     exposure_type:      ['laboratory', 'in-situ'],
     exposure_nature:    ['atmospheric', 'spray', 'splash', 'tidal', 'submerged'],
     material_type:      ['cement_paste', 'mortar', 'concrete'],
@@ -237,6 +282,7 @@ const GristHelpers = {
   // Values not listed here are humanized by enumLabel(): "wet_curing" → "Wet curing".
   // =========================================================================
   ENUM_LABELS: {
+    lab_campaign:             'Laboratory campaign (unpublished)',
     'in-situ':                'In situ',
     cl_profil:                'Chloride profile',
     diffusivity:              'Chloride diffusivity',
@@ -490,7 +536,7 @@ const GristHelpers = {
   // =========================================================================
   async ensureSchema() {
     const log = GristHelpers.log;
-    log('Checking Grist schema (15 tables)…');
+    log(`Checking Grist schema (${Object.keys(GristHelpers.SCHEMA).length} tables)…`);
 
     try {
       const [metaTables, metaCols] = await Promise.all([
@@ -540,6 +586,7 @@ const GristHelpers = {
       }
 
       log(`Schema verified ✓ (${created} tables created, ${updated} tables updated)`, 'ok');
+      await GristHelpers._runMigrations();
     } catch (err) {
       log('Schema verification error: ' + err.message, 'err');
     }
@@ -649,6 +696,164 @@ const GristHelpers = {
       id,
       fields: Object.fromEntries(colNames.map(col => [col, tableData[col][idx]]))
     }));
+  },
+
+  // =========================================================================
+  // MIGRATIONS — one-shot data migrations, tracked in SCHEMA_INFO (key 'version')
+  // =========================================================================
+  SCHEMA_VERSION: 3,
+
+  async _runMigrations() {
+    const log = GristHelpers.log;
+    const info = await GristHelpers.fetchAllRecords('SCHEMA_INFO');
+    const row = info.find(r => r.fields.key === 'version');
+    const version = parseInt(row?.fields.value) || 0;
+    if (version >= GristHelpers.SCHEMA_VERSION) return;
+    try {
+      if (version < 3) await GristHelpers._migrateToV3();
+      const fields = { key: 'version', value: String(GristHelpers.SCHEMA_VERSION) };
+      if (row) await GristHelpers.updateRecord('SCHEMA_INFO', row.id, fields);
+      else await GristHelpers.createRecord('SCHEMA_INFO', fields);
+      log(`Document migrated to schema v${GristHelpers.SCHEMA_VERSION} ✓`, 'ok');
+    } catch (err) {
+      // Version not recorded: the migration will be retried next time (each step is idempotent)
+      log('Migration error: ' + err.message, 'err');
+    }
+  },
+
+  // v2.5 → v3: MATERIAL (mix + curing + site + exposure) is split into
+  // MATERIAL (mix + curing) and PLACEMENT (site + exposure + start date).
+  // - each material with a site, an exposure or an exposure start date gets one placement,
+  //   and its measurements are attached to it;
+  // - the former material name becomes a campaign code (LABEL), attached to the source
+  //   most used by its measurements; the material gets a descriptive generated name;
+  // - mix designs get a generated name and the material type of their materials.
+  // Legacy MATERIAL columns are left untouched.
+  async _migrateToV3() {
+    const log = GristHelpers.log;
+    const T = GristHelpers.fetchAllRecords;
+    const [materials, measurements, mixes, mixBinders, binders, curings, sites, exposures, placements, labels] =
+      await Promise.all(['MATERIAL', 'MEASUREMENT', 'MIX_DESIGN', 'MIX_DESIGN_BINDER', 'BINDER',
+        'CURING_CONDITION', 'SITE', 'EXPOSURE', 'PLACEMENT', 'LABEL'].map(t => T(t)));
+    const byId = recs => new Map(recs.map(r => [r.id, r.fields]));
+    const binderById = byId(binders), curingById = byId(curings), siteById = byId(sites), expoById = byId(exposures);
+
+    // 1. Mix designs: generated name, material type inherited from their materials
+    const mixName = new Map();
+    const mixUpdates = { ids: [], name: [], material_type: [] };
+    for (const mix of mixes) {
+      const bs = mixBinders.filter(r => r.fields.id_mix_design === mix.id).map(r => ({
+        binder_type:   binderById.get(r.fields.id_binder)?.binder_type,
+        name:          binderById.get(r.fields.id_binder)?.name,
+        content_kg_m3: r.fields.content_kg_m3 || null,
+      }));
+      const name = mix.fields.name || GristHelpers.suggestMixName(bs, mix.fields.wl_ratio || null) || `Mix #${mix.id}`;
+      mixName.set(mix.id, name);
+      const types = [...new Set(materials.filter(m => m.fields.id_mix_design === mix.id)
+        .map(m => m.fields.material_type).filter(Boolean))];
+      const type = mix.fields.material_type || (types.length === 1 ? types[0] : '');
+      if (name !== mix.fields.name || type !== (mix.fields.material_type || '')) {
+        mixUpdates.ids.push(mix.id); mixUpdates.name.push(name); mixUpdates.material_type.push(type);
+      }
+    }
+
+    // 2. One placement per exposed material (skipped if the material already has one)
+    const toPlace = materials.filter(m =>
+      (m.fields.id_site || m.fields.id_exposure || m.fields.exposure_start_date)
+      && !placements.some(p => p.fields.id_material === m.id));
+    let newPlacementIds = [];
+    if (toPlace.length) {
+      const res = await grist.docApi.applyUserActions([['BulkAddRecord', 'PLACEMENT', toPlace.map(() => null), {
+        id_material:         toPlace.map(m => m.id),
+        id_site:             toPlace.map(m => m.fields.id_site || 0),
+        id_exposure:         toPlace.map(m => m.fields.id_exposure || 0),
+        exposure_start_date: toPlace.map(m => m.fields.exposure_start_date || null),
+        name:                toPlace.map(m => GristHelpers.placementName(
+          siteById.get(m.fields.id_site), expoById.get(m.fields.id_exposure), m.fields.exposure_start_date)),
+      }]]);
+      newPlacementIds = res.retValues[0];
+    }
+    const placementOf = new Map(toPlace.map((m, i) => [m.id, newPlacementIds[i]]));
+
+    // 3. Measurements of those materials → their placement
+    const measIds = [], measPlacement = [];
+    measurements.forEach(r => {
+      const pid = placementOf.get(r.fields.id_material);
+      if (pid && !r.fields.id_placement) { measIds.push(r.id); measPlacement.push(pid); }
+    });
+
+    // 4. Former names → campaign codes; descriptive material names
+    const newLabels = { label: [], id_source: [], id_material: [], id_placement: [] };
+    const matUpdates = { ids: [], name: [] };
+    for (const m of materials) {
+      const oldName = (m.fields.name || '').trim();
+      const hasLabel = labels.some(l => l.fields.id_material === m.id && l.fields.label === oldName);
+      if (oldName && !hasLabel) {
+        const counts = new Map();
+        measurements.filter(r => r.fields.id_material === m.id && r.fields.id_source)
+          .forEach(r => counts.set(r.fields.id_source, (counts.get(r.fields.id_source) || 0) + 1));
+        const source = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || 0;
+        newLabels.label.push(oldName);
+        newLabels.id_source.push(source);
+        newLabels.id_material.push(m.id);
+        newLabels.id_placement.push(placementOf.get(m.id) || 0);
+      }
+      const desc = GristHelpers.materialName(mixName.get(m.fields.id_mix_design), curingById.get(m.fields.id_curing_condition));
+      if (desc !== oldName) { matUpdates.ids.push(m.id); matUpdates.name.push(desc); }
+    }
+
+    const actions = [];
+    if (mixUpdates.ids.length) actions.push(['BulkUpdateRecord', 'MIX_DESIGN', mixUpdates.ids,
+      { name: mixUpdates.name, material_type: mixUpdates.material_type }]);
+    if (measIds.length) actions.push(['BulkUpdateRecord', 'MEASUREMENT', measIds, { id_placement: measPlacement }]);
+    if (newLabels.label.length) actions.push(['BulkAddRecord', 'LABEL', newLabels.label.map(() => null), newLabels]);
+    if (matUpdates.ids.length) actions.push(['BulkUpdateRecord', 'MATERIAL', matUpdates.ids, { name: matUpdates.name }]);
+    if (actions.length) await grist.docApi.applyUserActions(actions);
+
+    log(`Migration v3: ${toPlace.length} exposure(s) created, ${measIds.length} measurement(s) attached, ` +
+        `${newLabels.label.length} campaign code(s), ${matUpdates.ids.length} material name(s), ` +
+        `${mixUpdates.ids.length} mix design(s) updated`, 'ok');
+  },
+
+  // =========================================================================
+  // NAMES & CONTEXT — generated names, and where/how a measurement was exposed
+  // =========================================================================
+  // "FA25-0.45 · wet curing 28 d"
+  materialName(mixName, curing) {
+    const cure = curing
+      ? [GristHelpers.enumLabel(curing.curing_method).toLowerCase(),
+         curing.curing_duration_days ? `${curing.curing_duration_days} d` : '',
+         curing.temperature_c != null && curing.temperature_c !== '' ? `${curing.temperature_c} °C` : '',
+        ].filter(Boolean).join(' ')
+      : '';
+    return [mixName || 'Unnamed mix', cure || 'curing not specified'].join(' · ');
+  },
+
+  // "France — Marseille · Tidal · from 2019-03-29"
+  placementName(site, exposure, startSec) {
+    const where = site?.country_region
+      || (site?.latitude != null ? `${site.latitude.toFixed(2)}, ${site.longitude?.toFixed(2)}` : 'Site not specified');
+    const how = GristHelpers.enumLabel(exposure?.exposure_nature) || GristHelpers.enumLabel(exposure?.exposure_type);
+    const from = startSec ? `from ${new Date(startSec * 1000).toISOString().slice(0, 10)}` : '';
+    return [where, how, from].filter(Boolean).join(' · ');
+  },
+
+  // Where and how a measurement was exposed: its placement, or — for documents not yet
+  // migrated — the legacy site/exposure of its material. maps: { materials, placements,
+  // sites, exposures } as Map(id → fields). Returns { material, placement, site, exposure,
+  // siteId, exposureId, exposureStart } (null when unknown; placement null for laboratory tests).
+  measurementContext(meas, maps) {
+    const material  = maps.materials.get(meas.id_material) || null;
+    const placement = meas.id_placement ? maps.placements.get(meas.id_placement) || null : null;
+    const src = placement || (maps.placements.size ? null : material) || {};
+    return {
+      material, placement,
+      site:          maps.sites.get(src.id_site) || null,
+      exposure:      maps.exposures.get(src.id_exposure) || null,
+      siteId:        src.id_site || null,
+      exposureId:    src.id_exposure || null,
+      exposureStart: src.exposure_start_date || null,
+    };
   },
 
   // =========================================================================
@@ -771,32 +976,55 @@ const GristHelpers = {
   // Returns each scalar enriched with its measurement, material, test
   // and bibliographic source.
   // =========================================================================
-  joinScalarData(scalars, measurements, materials, tests, sources, mixes, exposures) {
+  // Campaign code shown for a measurement: the code of its exposure, else a code of its material;
+  // among several, the one of the measurement's source. labels: LABEL fields (array).
+  measurementCode(meas, labels) {
+    const ofMat = (labels || []).filter(l => l.id_material === meas.id_material && l.label);
+    const pick = list => list.find(l => l.id_source && l.id_source === meas.id_source) || list[0];
+    const hit = (meas.id_placement && pick(ofMat.filter(l => l.id_placement === meas.id_placement)))
+      || pick(ofMat.filter(l => !l.id_placement)) || pick(ofMat);
+    return hit ? hit.label : '';
+  },
+
+  // Maps used by measurementContext(), built once per join
+  contextMaps(materials, placements = [], sites = [], exposures = []) {
+    const toMap = recs => new Map((recs || []).map(r => [r.id, r.fields]));
+    return { materials: toMap(materials), placements: toMap(placements), sites: toMap(sites), exposures: toMap(exposures) };
+  },
+
+  // Each scalar with its measurement, material, placement (null: lab test), site, exposure, test, source, mix.
+  // placements/sites are optional: without them the legacy MATERIAL site/exposure is used.
+  // Adds code (campaign code, see measurementCode) and displayName (code, else material name).
+  joinScalarData(scalars, measurements, materials, tests, sources, mixes, exposures, sites = [], placements = [], labels = []) {
+    const labelFields = labels.map(l => l.fields);
     const measureMap  = new Map(measurements.map(m => [m.id, m.fields]));
-    const materialMap = new Map(materials.map(m => [m.id, m.fields]));
     const testMap     = new Map(tests.map(t => [t.id, t.fields]));
     const sourceMap   = new Map(sources.map(s => [s.id, s.fields]));
     const mixMap      = new Map((mixes || []).map(m => [m.id, m.fields]));
-    const exposureMap = new Map((exposures || []).map(e => [e.id, e.fields]));
+    const maps        = GristHelpers.contextMaps(materials, placements, sites, exposures);
 
     return scalars
       .filter(s => measureMap.has(s.fields.id_measurement))
       .map(s => {
         const measure  = measureMap.get(s.fields.id_measurement) || {};
-        const material = materialMap.get(measure.id_material)    || {};
+        const ctx      = GristHelpers.measurementContext(measure, maps);
+        const material = ctx.material || {};
         const test     = testMap.get(measure.id_test)            || {};
         const source   = sourceMap.get(measure.id_source)        || {};
         const mix      = mixMap.get(material.id_mix_design)      || {};
-        const exposure = exposureMap.get(material.id_exposure)   || {};
         return {
           ...s.fields,
           _id:         s.id,
           measurement: measure,
           material,
+          placement:   ctx.placement,
+          code:        GristHelpers.measurementCode(measure, labelFields),
+          displayName: GristHelpers.measurementCode(measure, labelFields) || material.name || '',
           test,
           source,
           mix,
-          exposure,
+          exposure:    ctx.exposure || {},
+          site:        ctx.site     || {},
         };
       });
   },
@@ -835,12 +1063,11 @@ const GristHelpers = {
   joinChlorideProfiles(dataPoints, curves, measurements, materials,
                        mixDesigns, mixBinders, binders,
                        exposures, sites, sources, scalars,
-                       curingConditions = []) {
+                       curingConditions = [], placements = [], labels = []) {
+    const labelFields = labels.map(l => l.fields);
     const measureMap  = new Map(measurements.map(m     => [m.id, m.fields]));
-    const materialMap = new Map(materials.map(m        => [m.id, m.fields]));
     const mixMap      = new Map(mixDesigns.map(m       => [m.id, m.fields]));
-    const exposureMap = new Map(exposures.map(e        => [e.id, e.fields]));
-    const siteMap     = new Map(sites.map(s            => [s.id, s.fields]));
+    const maps        = GristHelpers.contextMaps(materials, placements, sites, exposures);
     const sourceMap   = new Map(sources.map(s          => [s.id, s.fields]));
     const binderMap   = new Map(binders.map(b          => [b.id, b.fields]));
     const curingMap   = new Map(curingConditions.map(c => [c.id, c.fields]));
@@ -874,10 +1101,11 @@ const GristHelpers = {
       .map(c => {
         const cf     = c.fields;
         const meas   = measureMap.get(cf.id_measurement)       || {};
-        const mat    = materialMap.get(meas.id_material)        || {};
+        const ctx    = GristHelpers.measurementContext(meas, maps);
+        const mat    = ctx.material                             || {};
         const mix    = mixMap.get(mat.id_mix_design)            || {};
-        const expo   = exposureMap.get(mat.id_exposure)         || {};
-        const site   = siteMap.get(mat.id_site)                 || {};
+        const expo   = ctx.exposure                             || {};
+        const site   = ctx.site                                 || {};
         const src    = sourceMap.get(meas.id_source)            || {};
         const sc     = scalByMeas.get(cf.id_measurement)        || {};
         const bList  = bindersByMix.get(mat.id_mix_design)      || [];
@@ -891,6 +1119,10 @@ const GristHelpers = {
           points: pts,
           measurement: meas,
           material:    mat,
+          placement:   ctx.placement,
+          exposureStart: ctx.exposureStart,
+          code:        GristHelpers.measurementCode(meas, labelFields),
+          displayName: GristHelpers.measurementCode(meas, labelFields) || mat.name || '',
           mix,
           exposure:    expo,
           site,

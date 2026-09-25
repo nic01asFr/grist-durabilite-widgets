@@ -148,6 +148,7 @@ const COLUMN_GROUPS = [
     { id: 'src_journal',     label: 'Journal',        def: false },
   ]},
   { id: 'materiau', label: '🧱 Material', cols: [
+    { id: 'mat_code',  label: 'Campaign code', def: true  },
     { id: 'mat_name',  label: 'Name', def: true  },
     { id: 'mat_type',  label: 'Type', def: false },
   ]},
@@ -315,7 +316,7 @@ async function loadAllData() {
       dataPoints, curves, measurements, materials,
       mixDesigns, mixBinders, binders,
       exposures, sites, sources, scalars,
-      curingConditions, tests,
+      curingConditions, tests, placements, labels,
     ] = await Promise.all([
       GristHelpers.fetchAllRecords('DATA_CURVE'),
       GristHelpers.fetchAllRecords('CURVE'),
@@ -330,6 +331,8 @@ async function loadAllData() {
       GristHelpers.fetchAllRecords('SCALAR'),
       GristHelpers.fetchAllRecords('CURING_CONDITION'),
       GristHelpers.fetchAllRecords('TEST'),
+      GristHelpers.fetchAllRecords('PLACEMENT'),
+      GristHelpers.fetchAllRecords('LABEL'),
     ]);
 
     testMapGlobal = new Map(tests.map(t => [t.id, t.fields]));
@@ -349,7 +352,7 @@ async function loadAllData() {
       dataPoints, clCurves, measurements, materials,
       mixDesigns, mixBinders, binders,
       exposures, sites, sources, scalars,
-      curingConditions
+      curingConditions, placements, labels
     );
 
     GristHelpers.log(`${allProfiles.length} chloride profile(s) loaded ✓`, 'ok');
@@ -404,8 +407,9 @@ function buildFlatRows() {
       src_year:        src.year        != null ? src.year     : '',
       src_doi:         src.doi         || '',
       src_journal:     src.journal     || '',
+      mat_code:        p.code          || '',
       mat_name:        mat.name        || '',
-      mat_type:        mat.material_type || '',
+      mat_type:        mix.material_type || mat.material_type || '',
       site_region:     site.country_region || '',
       site_lat:        site.latitude   != null ? site.latitude  : '',
       site_lon:        site.longitude  != null ? site.longitude : '',

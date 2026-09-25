@@ -12,7 +12,7 @@
   <style>
     /* ---- Stepper (4-step wizard) ---- */
     .stepper {
-      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+      display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
       margin-bottom: 14px; position: sticky; top: 0; z-index: 10;
       background: var(--bg); padding: 4px 0;
     }
@@ -152,6 +152,14 @@
     }
 
     .family-select { flex: 0 1 240px; min-width: 0; }
+    .ro-summary { border: 1px solid var(--surface2); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; background: var(--bg); }
+    .ro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; font-size: 12px; }
+    .ro-k { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); margin-bottom: 2px; }
+    .codes-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .code-chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--surface2); color: var(--text); }
+    .code-add { display: inline-flex; gap: 4px; }
+    .code-add input { width: 120px; padding: 3px 6px; font-size: 12px; border: 1px solid var(--surface2); border-radius: 5px; background: var(--surface); color: var(--text); }
+    .code-add .btn { font-size: 11px; padding: 3px 8px; }
     .form-field .family-select { margin-bottom: 4px; }
     .label-link {
       float: right; text-transform: none; letter-spacing: 0; font-size: 11px;
@@ -251,15 +259,16 @@
   <nav class="stepper" id="stepper">
     <button class="step-btn active" data-step="1" onclick="goStep(1)"><span class="step-num">1</span><span class="step-text"><span class="step-title">Source</span><span class="step-sum" id="step-sum-1"></span></span></button>
     <button class="step-btn" data-step="2" onclick="goStep(2)"><span class="step-num">2</span><span class="step-text"><span class="step-title">Material</span><span class="step-sum" id="step-sum-2"></span></span></button>
-    <button class="step-btn" data-step="3" onclick="goStep(3)"><span class="step-num">3</span><span class="step-text"><span class="step-title">Measurement</span><span class="step-sum" id="step-sum-3"></span></span></button>
-    <button class="step-btn" data-step="4" onclick="goStep(4)"><span class="step-num">4</span><span class="step-text"><span class="step-title">Results</span><span class="step-sum" id="step-sum-4"></span></span></button>
+    <button class="step-btn" data-step="3" onclick="goStep(3)"><span class="step-num">3</span><span class="step-text"><span class="step-title">Exposure</span><span class="step-sum" id="step-sum-3"></span></span></button>
+    <button class="step-btn" data-step="4" onclick="goStep(4)"><span class="step-num">4</span><span class="step-text"><span class="step-title">Measurement</span><span class="step-sum" id="step-sum-4"></span></span></button>
+    <button class="step-btn" data-step="5" onclick="goStep(5)"><span class="step-num">5</span><span class="step-text"><span class="step-title">Results</span><span class="step-sum" id="step-sum-5"></span></span></button>
   </nav>
 
   <!-- ============================================================ -->
   <!-- STEP 1                                                       -->
   <!-- ============================================================ -->
   <section class="step active" id="step-1">
-    <p class="step-intro">Where do the data come from? Choose or create the <strong>publication</strong> (a DOI fills the form). For an unpublished laboratory campaign, skip this step.</p>
+    <p class="step-intro">Where do the data come from? Choose or create the <strong>publication</strong> (a DOI fills the form), or the <strong>laboratory campaign</strong> for unpublished data. Campaign codes of materials refer to it.</p>
     <div class="card">
       <div class="card-title">Bibliographic source</div>
       <div class="selector-row">
@@ -279,6 +288,10 @@
           <div class="field-hint" id="doi-hint">Paste a DOI to fill the fields below automatically (Crossref).</div>
         </div>
         <div class="form-grid">
+          <div class="form-field">
+            <label>Source type</label>
+            <select id="f-source-type" onchange="onSourceTypeChange()"><option value="">—</option></select>
+          </div>
           <div class="form-field"><label>Authors <span class="req">*</span></label><input type="text" id="f-source-authors" placeholder="Dupont, Martin et al."></div>
           <div class="form-field"><label>Title <span class="req">*</span></label><input type="text" id="f-source-title" placeholder="Article title"></div>
           <div class="form-field"><label>Journal</label><input type="text" id="f-source-journal" placeholder="Cement and Concrete Research"></div>
@@ -296,7 +309,8 @@
     <div class="step-nav">
       <span></span>
       <div class="step-nav-right">
-        <button class="btn btn-secondary" onclick="skipSource()">No publication — skip</button>
+        <button class="btn btn-secondary" onclick="newLabCampaign()" title="Record an unpublished laboratory campaign as the origin of the data">Unpublished lab campaign…</button>
+  <button class="btn btn-secondary" onclick="skipSource()">Skip</button>
         <button class="btn btn-primary" onclick="goTo('material')">Next: Material →</button>
       </div>
     </div>
@@ -306,7 +320,7 @@
   <!-- STEP 2                                                       -->
   <!-- ============================================================ -->
   <section class="step" id="step-2">
-    <p class="step-intro">Choose the tested <strong>material</strong>, or create it. Its mix design, exposure, curing and site are picked in the material form; create the missing ones in the building blocks below.</p>
+    <p class="step-intro">Choose the <strong>material</strong> — a mix design cured in a given way — or create it. Where and how it was exposed is described in the next step: the same material can have several exposures.</p>
     <div class="card">
       <div class="card-title">🔬 Material</div>
       <div class="selector-row">
@@ -317,6 +331,7 @@
         <button class="btn btn-secondary" id="btn-dup-material" onclick="duplicateMaterial()" disabled
           title="Create a new material pre-filled from the selected one">⧉ Duplicate</button>
       </div>
+      <div id="material-summary"></div>
       <div id="form-material" style="display:none;">
         <div class="dup-banner" id="dup-banner-material" style="display:none;"></div>
         <div class="form-grid">
@@ -326,30 +341,22 @@
             <select id="f-mat-mix" onchange="onRefSelect('mix', this)"><option value="">— Select —</option></select>
           </div>
           <div class="form-field">
-            <label>Exposure<a class="label-link" onclick="openBlock('exposure')">new…</a></label>
-            <select id="f-mat-exposure" onchange="onRefSelect('exposure', this)"><option value="">— None —</option></select>
-          </div>
-          <div class="form-field">
             <label>Curing<a class="label-link" onclick="openBlock('curing')">new…</a></label>
-            <select id="f-mat-curing" onchange="onRefSelect('curing', this)"><option value="">— None —</option></select>
-          </div>
-          <div class="form-field">
-            <label>Site<a class="label-link" onclick="openBlock('site')">new…</a></label>
-            <select id="f-mat-site" onchange="onRefSelect('site', this)"><option value="">— None —</option></select>
-          </div>
-        </div>
-        <div class="form-grid">
-          <div class="form-field"><label>Name <span class="req">*</span></label><input type="text" id="f-mat-name" placeholder="OPC-0.45-marseille"></div>
-          <div class="form-field">
-            <label>Material type <span class="req">*</span></label>
-            <select id="f-mat-type">
-              <option value="">Choose…</option>
-            </select>
+            <select id="f-mat-curing" onchange="onRefSelect('curing', this)"><option value="">— Not specified —</option></select>
           </div>
           <div class="form-field"><label>Manufacturing date</label><input type="date" id="f-mat-manuf"></div>
           <div class="form-field"><label>Demolding date</label><input type="date" id="f-mat-demold"></div>
-          <div class="form-field"><label>Exposure start date</label><input type="date" id="f-mat-expo-start"
-            title="Start of exposure on site (end of curing). Used as the start of the climate period."></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Name <span style="font-size:10px;color:var(--text-dim);text-transform:none;">generated from mix design and curing — edit freely</span></label>
+            <input type="text" id="f-mat-name" oninput="this.dataset.touched = this.value ? '1' : ''">
+          </div>
+          <div class="form-field">
+            <label>Campaign code <span style="font-size:10px;color:var(--text-dim);text-transform:none;">optional</span></label>
+            <input type="text" id="f-mat-code" placeholder="M3, B35-CV30…">
+            <div class="field-hint" id="f-mat-code-hint"></div>
+          </div>
         </div>
         <div class="form-actions">
           <button class="btn btn-secondary" onclick="toggleForm('material')">Cancel</button>
@@ -358,7 +365,7 @@
       </div>
     </div>
 
-    <div class="blocks-title">Building blocks</div>
+    <div class="blocks-title">Building blocks of a new material</div>
     <details class="block" id="block-mix">
       <summary><span class="block-title">⚗️ Mix design</span><span class="block-sum" id="sum-mix"></span></summary>
       <div class="block-body">
@@ -421,9 +428,13 @@
 
         <!-- Mix design fields -->
           <div class="form-grid">
-            <div class="form-field" style="grid-column:1/-1;">
+            <div class="form-field" style="grid-column:span 2;">
               <label>Name <span style="font-size:10px;color:var(--text-dim);text-transform:none;">suggested from the composition — edit freely</span></label>
               <input type="text" id="f-mix-name" placeholder="FA25-0.45" oninput="this.dataset.touched = this.value ? '1' : ''">
+            </div>
+            <div class="form-field">
+              <label>Material type <span class="req">*</span></label>
+              <select id="f-mix-type"><option value="">Choose…</option></select>
             </div>
             <div class="form-field"><label>w/c (ratio)</label><input type="number" id="f-mix-wc" step="0.01" min="0" max="1" placeholder="0.45"></div>
             <div class="form-field"><label>Water (kg/m³)</label><input type="number" id="f-mix-water-kg" step="1" min="0" placeholder="175" oninput="calcWlRatio()"></div>
@@ -445,39 +456,6 @@
           <div class="form-actions">
             <button class="btn btn-secondary" onclick="toggleForm('mix')">Cancel</button>
             <button class="btn btn-primary" onclick="saveMix()">Save mix design</button>
-          </div>
-        </div>
-      </div>
-    </details>
-    <details class="block" id="block-exposure">
-      <summary><span class="block-title">🌊 Exposure</span><span class="block-sum" id="sum-exposure"></span></summary>
-      <div class="block-body">
-        <div class="selector-row">
-          <select id="sel-exposure" onchange="onSel('exposure')">
-            <option value="">— Select an exposure —</option>
-          </select>
-          <button class="btn btn-secondary" onclick="toggleForm('exposure')">+ New</button>
-        </div>
-        <div id="form-exposure" style="display:none;">
-          <div class="form-grid">
-            <div class="form-field">
-              <label>Type <span class="req">*</span></label>
-              <select id="f-expo-type">
-                <option value="">Choose…</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label>Nature <span class="req">*</span></label>
-              <select id="f-expo-nature">
-                <option value="">Choose…</option>
-              </select>
-            </div>
-            <div class="form-field"><label>Wetting (%)</label><input type="number" id="f-expo-wetting" step="1" min="0" max="100" placeholder="50"></div>
-            <div class="form-field"><label>Drying (%)</label><input type="number" id="f-expo-drying" step="1" min="0" max="100" placeholder="50"></div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-secondary" onclick="toggleForm('exposure')">Cancel</button>
-            <button class="btn btn-primary" onclick="saveExposure()">Save exposure</button>
           </div>
         </div>
       </div>
@@ -513,6 +491,58 @@
         </div>
       </div>
     </details>
+    <div class="step-nav">
+      <button class="btn btn-secondary" onclick="goTo('source')">← Source</button>
+      <button class="btn btn-primary" onclick="goTo('placement')">Next: Exposure →</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- STEP 3 — EXPOSURE (PLACEMENT)                                  -->
+  <!-- ============================================================ -->
+  <section class="step" id="step-3">
+    <p class="step-intro">Where and how was the material <strong>exposed</strong>, and from when? Choose an exposure of the material or create one. Laboratory tests without exposure (e.g. compressive strength at 28 days) need none.</p>
+    <div class="card">
+      <div class="card-title">🌊 Exposure</div>
+      <div id="placement-empty" class="field-hint">Select or create a material first (step 2).</div>
+      <div id="placement-content">
+        <div class="selector-row">
+          <select id="sel-placement" onchange="onSel('placement')">
+            <option value="">— None: laboratory test without exposure —</option>
+          </select>
+          <button class="btn btn-secondary" onclick="openPlacementForm()">+ New</button>
+        </div>
+        <div id="placement-summary"></div>
+        <div id="form-placement" style="display:none;">
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Site<a class="label-link" onclick="openBlock('site')">new…</a></label>
+              <select id="f-pl-site" onchange="onRefSelect('site', this)"><option value="">— Not specified —</option></select>
+            </div>
+            <div class="form-field">
+              <label>Exposure condition <span class="req">*</span><a class="label-link" onclick="openBlock('exposure')">new…</a></label>
+              <select id="f-pl-exposure" onchange="onRefSelect('exposure', this)"><option value="">— Select —</option></select>
+            </div>
+            <div class="form-field">
+              <label>Exposure start date</label>
+              <input type="date" id="f-pl-start">
+              <div class="field-hint" id="f-pl-start-hint"></div>
+            </div>
+            <div class="form-field"><label>Exposure end date <span style="font-size:10px;color:var(--text-dim);text-transform:none;">if removed</span></label><input type="date" id="f-pl-end"></div>
+            <div class="form-field">
+              <label>Campaign code <span style="font-size:10px;color:var(--text-dim);text-transform:none;">optional</span></label>
+              <input type="text" id="f-pl-code" placeholder="M3-MAR-TID…">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" onclick="toggleForm('placement')">Cancel</button>
+            <button class="btn btn-primary" onclick="savePlacement()">Save exposure</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="blocks-title">Building blocks of a new exposure</div>
     <details class="block" id="block-site">
       <summary><span class="block-title">📍 Site</span><span class="block-sum" id="sum-site"></span></summary>
       <div class="block-body">
@@ -535,22 +565,59 @@
         </div>
       </div>
     </details>
+    <details class="block" id="block-exposure">
+      <summary><span class="block-title">🌊 Exposure condition</span><span class="block-sum" id="sum-exposure"></span></summary>
+      <div class="block-body">
+        <div class="selector-row">
+          <select id="sel-exposure" onchange="onSel('exposure')">
+            <option value="">— Select an exposure —</option>
+          </select>
+          <button class="btn btn-secondary" onclick="toggleForm('exposure')">+ New</button>
+        </div>
+        <div id="form-exposure" style="display:none;">
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Type <span class="req">*</span></label>
+              <select id="f-expo-type">
+                <option value="">Choose…</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Nature <span class="req">*</span></label>
+              <select id="f-expo-nature">
+                <option value="">Choose…</option>
+              </select>
+            </div>
+            <div class="form-field"><label>Wetting (%)</label><input type="number" id="f-expo-wetting" step="1" min="0" max="100" placeholder="50"></div>
+            <div class="form-field"><label>Drying (%)</label><input type="number" id="f-expo-drying" step="1" min="0" max="100" placeholder="50"></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" onclick="toggleForm('exposure')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveExposure()">Save exposure</button>
+          </div>
+        </div>
+      </div>
+    </details>
     <div class="step-nav">
-      <button class="btn btn-secondary" onclick="goTo('source')">← Source</button>
+      <button class="btn btn-secondary" onclick="goTo('material')">← Material</button>
       <button class="btn btn-primary" onclick="goTo('measurement')">Next: Measurement →</button>
     </div>
   </section>
 
   <!-- ============================================================ -->
-  <!-- STEP 3                                                       -->
+  <!-- STEP 4                                                       -->
   <!-- ============================================================ -->
-  <section class="step" id="step-3">
+  <section class="step" id="step-4">
     <p class="step-intro">Describe the <strong>measurement</strong>: which test, on which specimen, when. Successive measurements of a series (e.g. several ages) are created with ⧉ Duplicate.</p>
     <div class="card">
       <div class="card-title">📏 Measurement</div>
       <div class="form-field ctx-field">
         <label>Material <span class="req">*</span><a class="label-link" onclick="goTo('material')">new…</a></label>
         <select id="f-meas-material" onchange="onRefSelect('material', this)"><option value="">— Select a material —</option></select>
+      </div>
+      <div class="form-field ctx-field">
+        <label>Exposure<a class="label-link" onclick="goTo('placement')">new…</a></label>
+        <select id="f-meas-placement" onchange="onRefSelect('placement', this)"><option value="">— None: laboratory test —</option></select>
       </div>
       <div class="selector-row">
         <select id="sel-measurement" onchange="onSel('measurement')">
@@ -566,6 +633,10 @@
           <div class="form-field">
             <label>Source<a class="label-link" onclick="goTo('source')">new…</a></label>
             <select id="f-meas-source" onchange="onRefSelect('source', this)"><option value="">— None (unpublished) —</option></select>
+          </div>
+          <div class="form-field">
+            <label>Specimen ID</label>
+            <input type="text" id="f-meas-specimen" placeholder="M3-T-90d-2…">
           </div>
           <!-- Test linked to the campaign -->
           <div class="form-field">
@@ -628,15 +699,15 @@
       </div>
     </div>
     <div class="step-nav">
-      <button class="btn btn-secondary" onclick="goTo('material')">← Material</button>
+      <button class="btn btn-secondary" onclick="goTo('placement')">← Exposure</button>
       <button class="btn btn-primary" onclick="goTo('results')">Next: Results →</button>
     </div>
   </section>
 
   <!-- ============================================================ -->
-  <!-- STEP 4                                                       -->
+  <!-- STEP 5                                                       -->
   <!-- ============================================================ -->
-  <section class="step" id="step-4">
+  <section class="step" id="step-5">
     <p class="step-intro">Enter the <strong>results</strong> of the measurement: scalar values and curves (profiles can be pasted or opened from a spreadsheet).</p>
     <div class="card">
       <div class="card-title">📊 Results</div>
@@ -769,11 +840,12 @@
     let allExposures = [], allCurings = [], allSites = [];
     let allMaterials = [], allMeasurements = [], allTests = [];
     let allMixBinders = [], allMixAggregates = [];
+    let allPlacements = [], allLabels = [];
 
     const sel = {
       source: null,
       mix: null, exposure: null, curing: null,
-      site: null, material: null, measurement: null, test: null,
+      site: null, material: null, placement: null, measurement: null, test: null,
     };
     let selectedAggregates = [];  // [{id_aggregate, content_kg_m3, _name, _size}]
     let selectedBinders    = [];  // [{id_binder, content_kg_m3, _name, _type}]
@@ -791,11 +863,11 @@
     // WIZARD NAVIGATION — 4 steps: Source → Material → Measurement → Results
     // =========================================================================
     // Any former section name maps to a step, and to a building block of step 2.
-    const STEP_OF  = { source: 1, material: 2, mix: 2, binder: 2, aggregate: 2, exposition: 2,
-                       exposure: 2, curing: 2, site: 2, measurement: 3, results: 4 };
-    const BLOCK_OF = { mix: 'mix', binder: 'mix', aggregate: 'mix', exposition: 'exposure',
-                       exposure: 'exposure', curing: 'curing', site: 'site' };
-    const STEP_NAMES = ['source', 'material', 'measurement', 'results'];
+    const STEP_OF  = { source: 1, material: 2, mix: 2, binder: 2, aggregate: 2, curing: 2,
+                       placement: 3, exposition: 3, exposure: 3, site: 3, measurement: 4, results: 5 };
+    const BLOCK_OF = { mix: 'mix', binder: 'mix', aggregate: 'mix', curing: 'curing',
+                       exposition: 'exposure', exposure: 'exposure', site: 'site' };
+    const STEP_NAMES = ['source', 'material', 'placement', 'measurement', 'results'];
     let activeStep = 1;
     let sourceSkipped = false;  // step 1 left empty on purpose (unpublished lab campaign)
 
@@ -804,7 +876,7 @@
       document.querySelectorAll('.step').forEach(el =>
         el.classList.toggle('active', el.id === 'step-' + activeStep));
       if (activeStep === 2) updateMixContextBar();
-      if (activeStep === 4) updateResultsPanel();
+      if (activeStep === 5) updateResultsPanel();
       populateDropdowns();
       updateStepper();
       if (BLOCK_OF[target]) openBlock(BLOCK_OF[target]);
@@ -814,7 +886,8 @@
     function goStep(n) { goTo(STEP_NAMES[n - 1]); }
 
     function openBlock(name) {
-      if (activeStep !== 2) goTo('material');
+      const step = STEP_OF[name];
+      if (activeStep !== step) goTo(STEP_NAMES[step - 1]);
       const block = document.getElementById('block-' + name);
       block.open = true;
       block.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -838,7 +911,23 @@
       document.getElementById('form-material').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // Step 4 shortcut: new measurement of the same series (next age), pre-filled from the current one.
+    // After a site or exposure condition is saved: back to the exposure form, where it is now selected.
+    function backToPlacementForm(block) {
+      document.getElementById('block-' + block).open = false;
+      goTo('placement');
+      openPlacementForm();
+    }
+
+    function newLabCampaign() {
+      goTo('source');
+      const form = document.getElementById('form-source');
+      form.style.display = '';
+      setVal('f-source-type', 'lab_campaign');
+      onSourceTypeChange();
+      document.getElementById('f-source-title').focus();
+    }
+
+    // Step 5 shortcut: new measurement of the same series (next age), pre-filled from the current one.
     function nextInSeries() {
       if (!sel.measurement) { notify('Select a measurement first', 'warn'); return; }
       goTo('measurement');
@@ -848,12 +937,14 @@
     function updateStepper() {
       const src  = allSources.find(s => s.id === sel.source);
       const mat  = allMaterials.find(m => m.id === sel.material);
+      const pl   = allPlacements.find(p => p.id === sel.placement);
       const meas = allMeasurements.find(m => m.id === sel.measurement);
       const test = meas && allTests.find(t => t.id === meas.fields.id_test);
       const steps = [
         { done: !!src || sourceSkipped,
           sum: src ? sourceShortLabel(src) : sourceSkipped ? 'None (unpublished)' : 'Optional' },
         { done: !!mat, sum: mat ? (mat.fields.name || `#${mat.id}`) : 'To do' },
+        { done: !!pl, sum: pl ? placementLabel(pl) : mat ? 'None: laboratory test' : '—' },
         { done: !!meas,
           sum: meas ? [testLabel(test), gristDateToInput(meas.fields.result_date)].filter(Boolean).join(' · ') : 'To do' },
         { done: false, sum: meas ? 'Scalars and curves' : '—' },
@@ -865,7 +956,7 @@
         document.getElementById(`step-sum-${i + 1}`).textContent = st.sum;
       });
 
-      // Building block headers show what the material form currently points to.
+      // Building block headers show what the new material / exposure forms currently point to.
       const blockSums = {
         mix:      [allMixes.find(m => m.id === sel.mix),          mixLabel],
         exposure: [allExposures.find(e => e.id === sel.exposure), exposureLabel],
@@ -877,6 +968,10 @@
         el.textContent = rec ? labelFn(rec) : 'none selected';
         el.classList.toggle('set', !!rec);
       });
+      renderMaterialSummary();
+      renderPlacementPanel();
+      refreshMaterialNameSuggestion();
+      updateCodeHints();
     }
 
     function toggleForm(section) {
@@ -964,6 +1059,174 @@
     });
 
     // =========================================================================
+    // MATERIAL & EXPOSURE PANELS — read-only summaries, campaign codes
+    // =========================================================================
+    const dateOrDash = sec => gristDateToInput(sec) || '—';
+
+    // plId = 0: every code of the material (those of an exposure are marked); else the codes of that exposure
+    function codesHTML(matId, plId) {
+      const codes = plId ? codesOf(matId, plId) : codesOf(matId);
+      const where = l => {
+        if (plId || !l.fields.id_placement) return '';
+        const pl = allPlacements.find(p => p.id === l.fields.id_placement);
+        const nature = allExposures.find(e => e.id === pl?.fields.id_exposure)?.fields.exposure_nature;
+        return ` · ${GristHelpers.enumLabel(nature) || 'exposure'}`;
+      };
+      const chips = codes.map(l => `<span class="code-chip">${escapeHtml(codeText(l) + where(l))}</span>`).join('') ||
+        '<span class="field-hint">none</span>';
+      const key = plId ? `pl-${plId}` : `mat-${matId}`;
+      return `<div class="codes-row">${chips}
+        <span class="code-add"><input type="text" id="code-add-${key}" placeholder="New code">
+        <button class="btn btn-secondary" onclick="addCode(${matId}, ${plId || 0}, 'code-add-${key}')">+ Add</button></span></div>`;
+    }
+
+    // Read-only view of the selected material: it is not modified from here.
+    function renderMaterialSummary() {
+      const box = document.getElementById('material-summary');
+      if (!box) return;
+      const m = allMaterials.find(x => x.id === sel.material);
+      if (!m) { box.innerHTML = ''; return; }
+      const f = m.fields;
+      const mix = allMixes.find(x => x.id === f.id_mix_design);
+      const cur = allCurings.find(x => x.id === f.id_curing_condition);
+      const pls = allPlacements.filter(p => p.fields.id_material === m.id);
+      box.innerHTML = `
+        <div class="ro-summary">
+          <div class="ro-grid">
+            <div><span class="ro-k">Mix design</span>${mix ? escapeHtml(mixLabel(mix)) : '—'}
+              ${mix ? `<span class="field-hint"> · ${escapeHtml(mixInfo.get(mix.id)?.family.label || '')} · ${escapeHtml(GristHelpers.enumLabel(mix.fields.material_type))}</span>` : ''}</div>
+            <div><span class="ro-k">Curing</span>${cur ? escapeHtml(curingLabel(cur)) : 'not specified'}</div>
+            <div><span class="ro-k">Manufacturing / demolding</span>${dateOrDash(f.manufacturing_date)} / ${dateOrDash(f.demolding_date)}</div>
+            <div><span class="ro-k">Exposures</span>${pls.length ? pls.map(p => escapeHtml(placementLabel(p))).join('<br>') : 'none (laboratory only)'}</div>
+          </div>
+          <div class="ro-k" style="margin-top:8px;">Campaign codes</div>
+          ${codesHTML(m.id, 0)}
+          <p class="field-hint" style="margin:6px 0 0;">A material is not edited here: its mix design and curing define it.
+            To change them, create a new material (⧉ Duplicate); fix typos in the Editor widget.</p>
+        </div>`;
+    }
+
+    function renderPlacementPanel() {
+      const empty = document.getElementById('placement-empty');
+      const content = document.getElementById('placement-content');
+      if (!empty || !content) return;
+      const hasMat = !!allMaterials.find(x => x.id === sel.material);
+      empty.style.display = hasMat ? 'none' : '';
+      content.style.display = hasMat ? '' : 'none';
+      const box = document.getElementById('placement-summary');
+      const p = allPlacements.find(x => x.id === sel.placement);
+      if (!p) { box.innerHTML = ''; return; }
+      const f = p.fields;
+      const site = allSites.find(x => x.id === f.id_site);
+      const expo = allExposures.find(x => x.id === f.id_exposure);
+      const nMeas = allMeasurements.filter(r => r.fields.id_placement === p.id).length;
+      box.innerHTML = `
+        <div class="ro-summary">
+          <div class="ro-grid">
+            <div><span class="ro-k">Site</span>${site ? escapeHtml(siteLabel(site)) : 'not specified'}</div>
+            <div><span class="ro-k">Exposure condition</span>${expo ? escapeHtml(exposureLabel(expo)) : '—'}</div>
+            <div><span class="ro-k">Start / end</span>${dateOrDash(f.exposure_start_date)} / ${f.exposure_end_date ? dateOrDash(f.exposure_end_date) : 'ongoing'}</div>
+            <div><span class="ro-k">Measurements</span>${nMeas}</div>
+          </div>
+          <div class="ro-k" style="margin-top:8px;">Campaign codes of this exposure</div>
+          ${codesHTML(sel.material, p.id)}
+        </div>`;
+    }
+
+    async function addCode(matId, plId, inputId) {
+      const label = document.getElementById(inputId)?.value.trim();
+      if (!label) { notify('Type a code first', 'warn'); return; }
+      if (codesOf(matId).some(l => l.fields.label.toLowerCase() === label.toLowerCase() && (l.fields.id_placement || 0) === plId)) {
+        notify(`Code "${label}" already exists`, 'warn'); return;
+      }
+      try {
+        await GristHelpers.createRecord('LABEL', { label, id_source: sel.source || 0, id_material: matId, id_placement: plId || 0 });
+        notify(`Code "${label}" added ✓`, 'ok');
+        await refreshAll();
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
+    }
+
+    // Where a new code will be recorded
+    function updateCodeHints() {
+      const src = allSources.find(s => s.id === sel.source);
+      const el = document.getElementById('f-mat-code-hint');
+      if (el) el.textContent = src ? `Recorded for ${sourceShortLabel(src)} (step 1).`
+                                   : 'No source selected in step 1: the code will not be linked to a campaign.';
+    }
+
+    // Material name = mix design name · curing, until the user types their own.
+    function refreshMaterialNameSuggestion() {
+      const el = document.getElementById('f-mat-name');
+      if (!el || el.dataset.touched) return;
+      const mix = allMixes.find(m => m.id === sel.mix);
+      if (!mix) { el.value = ''; return; }
+      el.value = GristHelpers.materialName(mix.fields.name || `Mix #${mix.id}`,
+        allCurings.find(c => c.id === sel.curing)?.fields);
+    }
+
+    function openPlacementForm() {
+      const mat = allMaterials.find(m => m.id === sel.material);
+      if (!mat) { notify('Select or create a material first (step 2)', 'warn'); return; }
+      document.getElementById('form-placement').style.display = '';
+      // Default start: demolding + curing duration
+      const startEl = document.getElementById('f-pl-start');
+      const hint = document.getElementById('f-pl-start-hint');
+      if (!startEl.value) {
+        const days = allCurings.find(c => c.id === mat.fields.id_curing_condition)?.fields.curing_duration_days || 0;
+        if (mat.fields.demolding_date) {
+          startEl.value = addDays(gristDateToInput(mat.fields.demolding_date), days);
+          hint.textContent = `Suggested: demolding${days ? ` + ${days} d curing` : ''}`;
+        } else hint.textContent = '';
+      }
+      document.getElementById('form-placement').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    async function savePlacement() {
+      const mat = allMaterials.find(m => m.id === sel.material);
+      if (!mat) { notify('Select or create a material first (step 2)', 'warn'); return; }
+      const manuf = gristDateToInput(mat.fields.manufacturing_date);
+      const demold = gristDateToInput(mat.fields.demolding_date);
+      if (!validateForm('form-placement', [
+        required('f-pl-exposure', 'Select an exposure condition'),
+        { id: 'f-pl-start', msg: `Before the manufacturing date (${manuf})`, fails: () => manuf && val('f-pl-start') && val('f-pl-start') < manuf },
+        dateOrder('f-pl-start', 'f-pl-end', 'End must be after start'),
+        { id: 'f-pl-start', level: 'warn', msg: `Before the demolding date (${demold})`, fails: () => demold && val('f-pl-start') && val('f-pl-start') < demold },
+        { id: 'f-pl-exposure', level: 'warn', msg: 'This material already has an exposure with the same site, condition and start date',
+          fails: () => allPlacements.some(p => p.fields.id_material === mat.id && (p.fields.id_site || null) === sel.site
+            && (p.fields.id_exposure || null) === sel.exposure && gristDateToInput(p.fields.exposure_start_date) === val('f-pl-start')) },
+      ])) return;
+      try {
+        const start = inputToGristDate(val('f-pl-start')), end = inputToGristDate(val('f-pl-end'));
+        const result = await GristHelpers.createRecord('PLACEMENT', {
+          id_material: mat.id, id_site: sel.site || 0, id_exposure: sel.exposure || 0,
+          exposure_start_date: start, exposure_end_date: end,
+          name: GristHelpers.placementName(allSites.find(x => x.id === sel.site)?.fields,
+            allExposures.find(e => e.id === sel.exposure)?.fields, start),
+        });
+        const code = val('f-pl-code');
+        if (code) await GristHelpers.createRecord('LABEL', { label: code, id_source: sel.source || 0, id_material: mat.id, id_placement: result.id });
+        notify(`Exposure created (id=${result.id}) ✓`, 'ok');
+        sel.placement = result.id;
+        ['f-pl-start', 'f-pl-end', 'f-pl-code'].forEach(id => setVal(id, ''));
+        toggleForm('placement');
+        await refreshAll();
+        goTo('measurement');
+      } catch (err) { notify('Error: ' + err.message, 'err'); }
+    }
+
+    function onSourceTypeChange() {
+      const lab = val('f-source-type') === 'lab_campaign';
+      const relabel = (id, text) => {
+        const label = document.getElementById(id)?.closest('.form-field')?.querySelector('label');
+        if (label) label.firstChild.textContent = text + ' ';
+      };
+      relabel('f-source-authors', lab ? 'Laboratory / team' : 'Authors');
+      relabel('f-source-title',   lab ? 'Campaign name'     : 'Title');
+      document.getElementById('f-source-authors').placeholder = lab ? 'CEREMA Méditerranée — Durability lab' : 'Dupont, Martin et al.';
+      document.getElementById('f-source-title').placeholder   = lab ? 'Marine exposure campaign 2019–2024' : 'Article title';
+    }
+
+    // =========================================================================
     // DUPLICATION — open the creation form pre-filled from the selected record
     // =========================================================================
     function updateDuplicateButtons() {
@@ -1031,6 +1294,7 @@
           });
 
         const f = mix.fields;
+        setVal('f-mix-type',          f.material_type);
         setVal('f-mix-wc',            numOrEmpty(f.wc_ratio));
         setVal('f-mix-water-kg',      numOrEmpty(f.water_content_kg));
         setVal('f-mix-water-type',    f.water_type);
@@ -1058,30 +1322,26 @@
       const mat = allMaterials.find(m => m.id === sel.material);
       if (!mat) return;
       const f = mat.fields;
-      // The new material is attached to the same context (mix, exposure, curing, site).
-      applyMaterialContext(mat.id);
+      sel.mix    = f.id_mix_design       || null;
+      sel.curing = f.id_curing_condition || null;
       populateDropdowns();
-
-      setVal('f-mat-name',   `${f.name || 'Material'} (copy)`);
-      setVal('f-mat-type',   f.material_type);
       setVal('f-mat-manuf',  gristDateToInput(f.manufacturing_date));
       setVal('f-mat-demold', gristDateToInput(f.demolding_date));
-      setVal('f-mat-expo-start', gristDateToInput(f.exposure_start_date));
+      setVal('f-mat-code',   '');
+      document.getElementById('f-mat-name').dataset.touched = '';
       updateStepper();
       openDuplicateForm('material',
-        `⧉ Copy of <strong>${escapeHtml(f.name || '#' + mat.id)}</strong>, with the same mix design, exposure, ` +
-        `curing and site (change them below if needed). Rename it, then save: ` +
-        `a <strong>new</strong> material will be created.`);
-      document.getElementById('f-mat-name').select();
+        `⧉ Copy of <strong>${escapeHtml(f.name || '#' + mat.id)}</strong>: same mix design, curing and dates. ` +
+        `Change what differs (e.g. the curing), then save: a <strong>new</strong> material will be created. ` +
+        `For the same material in another exposure, add an exposure in step 3 instead.`);
     }
 
     function duplicateMeasurement() {
       const meas = allMeasurements.find(m => m.id === sel.measurement);
       if (!meas) return;
       const f = meas.fields;
-      // The new measurement belongs to the same material and source.
-      sel.material = f.id_material || sel.material;
-      applyMaterialContext(sel.material);
+      // The new measurement belongs to the same material, exposure and source.
+      applyMeasurementContext(meas.id);
       sel.source   = f.id_source   || sel.source;
       sel.test     = f.id_test     || null;
       populateDropdowns();
@@ -1091,13 +1351,14 @@
       setVal('f-meas-dims',        f.sample_dimensions);
       setVal('f-meas-mass',        numOrEmpty(f.sample_mass_g));
       setVal('f-meas-operator',    f.operator);
+      setVal('f-meas-specimen',    f.specimen_id);
       setVal('f-meas-prep-date',   gristDateToInput(f.preparation_date));
       setVal('f-meas-result-date', gristDateToInput(f.result_date));
       updateStepper();
       const test = allTests.find(t => t.id === f.id_test);
       openDuplicateForm('measurement',
         `⧉ Copy of measurement <strong>#${meas.id}</strong> (${escapeHtml(testLabel(test))}), ` +
-        `same material and source. Typically change the result date (next age), then save: ` +
+        `same material, exposure and source. Typically change the result date (next age), then save: ` +
         `a <strong>new</strong> measurement will be created, without results.`);
       document.getElementById('f-meas-result-date').focus();
     }
@@ -1112,7 +1373,7 @@
         [allSources, allBinders, allAggregates, allMixes,
          allExposures, allCurings, allSites,
          allMaterials, allMeasurements, allTests,
-         allMixBinders, allMixAggregates] = await Promise.all([
+         allMixBinders, allMixAggregates, allPlacements, allLabels] = await Promise.all([
           GristHelpers.fetchAllRecords('SOURCE'),
           GristHelpers.fetchAllRecords('BINDER'),
           GristHelpers.fetchAllRecords('AGGREGATE'),
@@ -1125,6 +1386,8 @@
           GristHelpers.fetchAllRecords('TEST'),
           GristHelpers.fetchAllRecords('MIX_DESIGN_BINDER'),
           GristHelpers.fetchAllRecords('MIX_DESIGN_AGGREGATE'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
+          GristHelpers.fetchAllRecords('LABEL'),
         ]);
         GristHelpers.log(
           `${allSources.length} sources, ${allBinders.length} binders, ` +
@@ -1165,7 +1428,9 @@
           composition: GristHelpers.mixCompositionLabel(binders),
           scmShare:    comp.scmShare ?? 0,
           total:       comp.total,
-          users:       allMaterials.filter(x => x.fields.id_mix_design === m.id).map(x => x.fields.name || `#${x.id}`),
+          // Materials using the mix, by their first campaign code (more telling than generated names)
+          users:       allMaterials.filter(x => x.fields.id_mix_design === m.id)
+                         .map(x => codesOf(x.id)[0]?.fields.label || x.fields.name || `#${x.id}`),
         }];
       }));
     }
@@ -1273,16 +1538,36 @@
         || `Source #${s.id}`;
     }
     function sourceOptionLabel(s) {
-      return sourceShortLabel(s) + (s.fields.title ? ' — ' + s.fields.title.substring(0, 35) : '');
+      const kind = s.fields.source_type && s.fields.source_type !== 'publication'
+        ? `[${GristHelpers.enumLabel(s.fields.source_type)}] ` : '';
+      return kind + sourceShortLabel(s) + (s.fields.title ? ' — ' + s.fields.title.substring(0, 35) : '');
+    }
+    // Campaign codes of a material (optionally only those of one exposure)
+    function codesOf(matId, plId = undefined) {
+      return allLabels.filter(l => l.fields.id_material === matId
+        && (plId === undefined || l.fields.id_placement === plId));
+    }
+    function codeText(l) {
+      const src = allSources.find(s => s.id === l.fields.id_source);
+      return `${l.fields.label}${src ? ` (${sourceShortLabel(src)})` : ''}`;
     }
     function materialLabel(m) {
-      return `${m.fields.name || 'Material #' + m.id} (${GristHelpers.enumLabel(m.fields.material_type) || '?'})`;
+      const codes = codesOf(m.id).map(l => l.fields.label);
+      return `${m.fields.name || 'Material #' + m.id}${codes.length ? ` — ${codes.slice(0, 3).join(', ')}${codes.length > 3 ? '…' : ''}` : ''}`;
+    }
+    function placementLabel(p) {
+      const f = p.fields;
+      return f.name || GristHelpers.placementName(
+        allSites.find(x => x.id === f.id_site)?.fields, allExposures.find(e => e.id === f.id_exposure)?.fields, f.exposure_start_date);
     }
     function measurementLabel(m) {
       const L = GristHelpers.enumLabel;
       const test = allTests.find(t => t.id === m.fields.id_test);
       const when = m.fields.result_date ? gristDateToInput(m.fields.result_date) : '';
-      return `#${m.id} — ${testLabel(test)} — ${[L(m.fields.sample_dimensions) || L(m.fields.sample_type), when].filter(Boolean).join(' · ') || '?'}`;
+      const pl = allPlacements.find(p => p.id === m.fields.id_placement);
+      const where = pl ? GristHelpers.enumLabel(allExposures.find(e => e.id === pl.fields.id_exposure)?.fields.exposure_nature) || 'exposed' : 'lab';
+      return `#${m.id}${m.fields.specimen_id ? ' ' + m.fields.specimen_id : ''} — ${testLabel(test)} — ` +
+        `${[where, L(m.fields.sample_dimensions) || L(m.fields.sample_type), when].filter(Boolean).join(' · ')}`;
     }
     function testLabel(t) {
       if (!t) return '?';
@@ -1307,9 +1592,12 @@
       fillDrop('sel-curing',   allCurings,   curingLabel);
       fillDrop('sel-site',     allSites,     siteLabel);
       fillMixSelect('f-mat-mix');
-      fillDrop('f-mat-exposure', allExposures, exposureLabel);
+      fillDrop('f-pl-exposure',  allExposures, exposureLabel);
       fillDrop('f-mat-curing',   allCurings,   curingLabel);
-      fillDrop('f-mat-site',     allSites,     siteLabel);
+      fillDrop('f-pl-site',      allSites,     siteLabel);
+      const matPlacements = allPlacements.filter(p => p.fields.id_material === sel.material);
+      fillDrop('sel-placement',    matPlacements, placementLabel);
+      fillDrop('f-meas-placement', matPlacements, placementLabel);
       fillDrop('sel-material',    allMaterials, materialLabel);
       fillDrop('f-meas-material', allMaterials, materialLabel);
 
@@ -1328,8 +1616,9 @@
         'sel-measurement': 'measurement',
         'f-meas-material': 'material', 'f-meas-source': 'source',
         'f-res-measurement': 'measurement',
-        'f-mat-mix': 'mix', 'f-mat-exposure': 'exposure',
-        'f-mat-curing': 'curing', 'f-mat-site': 'site',
+        'f-mat-mix': 'mix', 'f-mat-curing': 'curing',
+        'f-pl-site': 'site', 'f-pl-exposure': 'exposure',
+        'sel-placement': 'placement', 'f-meas-placement': 'placement',
       };
       Object.entries(map).forEach(([elId, key]) => {
         const el = document.getElementById(elId);
@@ -1379,19 +1668,43 @@
     function applyMaterialContext(matId) {
       const f = allMaterials.find(m => m.id === matId)?.fields;
       if (!f) return;
-      sel.mix      = f.id_mix_design       || null;
-      sel.exposure = f.id_exposure         || null;
-      sel.curing   = f.id_curing_condition || null;
-      sel.site     = f.id_site             || null;
+      sel.mix    = f.id_mix_design       || null;
+      sel.curing = f.id_curing_condition || null;
+      // A single exposure is selected directly; with several, the user chooses in step 3.
+      const pls = allPlacements.filter(p => p.fields.id_material === matId);
+      sel.placement = pls.length === 1 ? pls[0].id : null;
+      applyPlacementContext(sel.placement);
+    }
+
+    // An exposure carries its site and exposure condition.
+    function applyPlacementContext(plId) {
+      const f = allPlacements.find(p => p.id === plId)?.fields;
+      if (!f) return;
+      sel.site     = f.id_site     || null;
+      sel.exposure = f.id_exposure || null;
+    }
+
+    // A measurement carries its material and exposure.
+    function applyMeasurementContext(measId) {
+      const f = allMeasurements.find(m => m.id === measId)?.fields;
+      if (!f) return;
+      if (f.id_material && f.id_material !== sel.material) {
+        sel.material = f.id_material;
+        applyMaterialContext(sel.material);
+      }
+      sel.placement = f.id_placement || null;
+      applyPlacementContext(sel.placement);
     }
 
     function onSel(key) {
       const elId = `sel-${key.replace('_', '-')}`;
       const v = parseInt(document.getElementById(elId)?.value) || null;
       sel[key] = v;
-      if (key === 'material') { sel.measurement = null; applyMaterialContext(v); populateDropdowns(); }
-      if (key === 'source')   sourceSkipped = false;
-      updateDuplicateButtons();
+      if (key === 'material')    { sel.measurement = null; applyMaterialContext(v); }
+      if (key === 'placement')   applyPlacementContext(v);
+      if (key === 'measurement') applyMeasurementContext(v);
+      if (key === 'source')      sourceSkipped = false;
+      populateDropdowns();
       updateStepper();
     }
 
@@ -1401,11 +1714,13 @@
     // Reference selects inside forms (material, source, measurement…) mirror the global selection.
     function onRefSelect(key, el) {
       sel[key] = parseInt(el.value) || null;
-      if (key === 'material') { sel.measurement = null; applyMaterialContext(sel.material); }
-      if (key === 'source')   sourceSkipped = false;
+      if (key === 'material')    { sel.measurement = null; applyMaterialContext(sel.material); }
+      if (key === 'placement')   applyPlacementContext(sel.placement);
+      if (key === 'measurement') applyMeasurementContext(sel.measurement);
+      if (key === 'source')      sourceSkipped = false;
       populateDropdowns();
       updateStepper();
-      if (key === 'measurement' && activeStep === 4) updateResultsPanel();
+      if (key === 'measurement' && activeStep === 5) updateResultsPanel();
     }
 
     function resetBinderForm() {
@@ -1671,6 +1986,7 @@
           url:         document.getElementById('f-source-url').value.trim() || '',
           designation: document.getElementById('f-source-designation').value.trim() || '',
           notes:       document.getElementById('f-source-notes').value.trim() || '',
+          source_type: val('f-source-type') || (normalizeDoi(val('f-source-doi')) ? 'publication' : ''),
         });
         notify(`Source created (id=${result.id}) ✓`, 'ok');
         sel.source = result.id;
@@ -1693,6 +2009,7 @@
         && Math.abs(num(id) - water / denom) > 0.02;
       if (!validateForm('form-mix', [
         { id: 'sel-binder-add', msg: 'Add at least one binder component', fails: () => selectedBinders.length === 0 },
+        required('f-mix-type', 'Paste, mortar or concrete?'),
         { id: 'sel-binder-add', level: 'warn', msg: 'Some binders have no quantity: w/b and w/c cannot be checked',
           fails: () => selectedBinders.some(b => b.content_kg_m3 == null) },
         range('f-mix-wc', 0, 3), range('f-mix-wl', 0, 3),
@@ -1715,6 +2032,7 @@
 
         const mixFields = {
           name:                                val('f-mix-name'),
+          material_type:                       val('f-mix-type'),
           water_content_kg:                    floatOrNull('f-mix-water-kg')      ?? 0,
           water_type:                          document.getElementById('f-mix-water-type').value || '',
           wc_ratio:                            floatOrNull('f-mix-wc')            ?? 0,
@@ -1782,7 +2100,7 @@
         sel.exposure = result.id;
         toggleForm('exposure');
         await refreshAll();
-        backToMaterialForm('exposure');
+        backToPlacementForm('exposure');
       } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
@@ -1838,7 +2156,7 @@
         sel.site = result.id;
         toggleForm('site');
         await refreshAll();
-        backToMaterialForm('site');
+        backToPlacementForm('site');
       } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
@@ -1846,36 +2164,37 @@
     // SAVE: MATERIAL
     // =========================================================================
     async function saveMaterial() {
-      const name = document.getElementById('f-mat-name').value.trim();
-      const type = document.getElementById('f-mat-type').value;
+      const name = val('f-mat-name');
+      const twin = allMaterials.find(m => m.fields.id_mix_design === sel.mix
+        && (m.fields.id_curing_condition || null) === sel.curing
+        && gristDateToInput(m.fields.manufacturing_date) === val('f-mat-manuf'));
       if (!validateForm('form-material', [
-        required('f-mat-mix', 'Select a mix design'), required('f-mat-name'), required('f-mat-type'),
+        required('f-mat-mix', 'Select a mix design'), required('f-mat-name'),
         dateOrder('f-mat-manuf', 'f-mat-demold', 'Demolding must be after manufacturing'),
-        dateOrder('f-mat-manuf', 'f-mat-expo-start', 'Exposure cannot start before manufacturing'),
-        { id: 'f-mat-expo-start', level: 'warn', msg: 'Exposure starts before demolding',
-          fails: () => val('f-mat-demold') && val('f-mat-expo-start') && val('f-mat-expo-start') < val('f-mat-demold') },
-        { id: 'f-mat-name', level: 'warn', msg: 'A material with this name already exists',
-          fails: () => allMaterials.some(m => (m.fields.name || '').trim().toLowerCase() === name.toLowerCase()) },
+        { id: 'f-mat-mix', level: 'warn',
+          msg: `Same mix design, curing and manufacturing date as "${twin?.fields.name || ''}" (#${twin?.id}): ` +
+               `for another exposure of it, select it and add an exposure in step 3`,
+          fails: () => !!twin },
       ])) return;
       try {
-        const manuf  = document.getElementById('f-mat-manuf').value;
-        const demold = document.getElementById('f-mat-demold').value;
-        const expoStart = document.getElementById('f-mat-expo-start').value;
         const result = await GristHelpers.createRecord('MATERIAL', {
-          name, material_type: type,
-          id_mix_design:       sel.mix      || 0,
-          id_exposure:         sel.exposure || 0,
-          id_curing_condition: sel.curing   || 0,
-          id_site:             sel.site     || 0,
-          manufacturing_date:  manuf  ? Math.floor(new Date(manuf).getTime()  / 1000) : null,
-          demolding_date:      demold ? Math.floor(new Date(demold).getTime() / 1000) : null,
-          exposure_start_date: expoStart ? Math.floor(new Date(expoStart).getTime() / 1000) : null,
+          name,
+          id_mix_design:       sel.mix    || 0,
+          id_curing_condition: sel.curing || 0,
+          manufacturing_date:  inputToGristDate(val('f-mat-manuf')),
+          demolding_date:      inputToGristDate(val('f-mat-demold')),
         });
+        const code = val('f-mat-code');
+        if (code) await GristHelpers.createRecord('LABEL', { label: code, id_source: sel.source || 0, id_material: result.id });
         notify(`Material "${name}" created (id=${result.id}) ✓`, 'ok');
         sel.material = result.id;
+        sel.placement = null;
+        document.getElementById('f-mat-name').dataset.touched = '';
+        setVal('f-mat-code', '');
         toggleForm('material');
         await refreshAll();
-        goTo('measurement');
+        goTo('placement');
+        openPlacementForm();
       } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
@@ -1917,6 +2236,8 @@
         dateOrder('f-meas-prep-date', 'f-meas-result-date', 'Result date must be after preparation date'),
         { id: 'f-meas-prep-date', level: 'warn', msg: `Before the material manufacturing date (${manuf})`,
           fails: () => manuf && val('f-meas-prep-date') && val('f-meas-prep-date') < manuf },
+        { id: 'f-meas-placement', level: 'warn', msg: 'No exposure: this will be recorded as a laboratory test',
+          fails: () => !sel.placement && allPlacements.some(p => p.fields.id_material === sel.material) },
       ])) return;
       const testId = parseInt(document.getElementById('f-meas-test').value);
       try {
@@ -1924,6 +2245,8 @@
         const resultDate = document.getElementById('f-meas-result-date').value;
         const fields = {
           id_material:       sel.material,
+          id_placement:      sel.placement || 0,
+          specimen_id:       val('f-meas-specimen'),
           id_source:         sel.source || 0,
           id_test:           testId,
           sample_type:       document.getElementById('f-meas-sample-type').value || '',
@@ -2029,12 +2352,12 @@
     const inputToGristDate = v => (v ? Math.floor(new Date(v).getTime() / 1000) : null);
 
     // Default period: exposure start (or demolding + curing, or manufacturing) → result date.
-    function defaultClimatePeriod(mat, meas) {
+    function defaultClimatePeriod(mat, placement, meas) {
       const f = mat.fields;
       const curing = allCurings.find(c => c.id === f.id_curing_condition);
       let start = '', origin = 'to enter';
-      if (f.exposure_start_date) {
-        start = gristDateToInput(f.exposure_start_date); origin = 'material exposure start date';
+      if (placement?.fields.exposure_start_date) {
+        start = gristDateToInput(placement.fields.exposure_start_date); origin = 'exposure start date';
       } else if (f.demolding_date) {
         const days = curing?.fields.curing_duration_days || 0;
         start = addDays(gristDateToInput(f.demolding_date), days);
@@ -2044,6 +2367,8 @@
       }
       const yesterday = addDays(new Date().toISOString().slice(0, 10), -1);
       let end = gristDateToInput(meas.fields.result_date), endOrigin = 'measurement result date';
+      const removed = gristDateToInput(placement?.fields.exposure_end_date);
+      if (removed && (!end || removed < end)) { end = removed; endOrigin = 'exposure end date'; }
       if (!end) { end = yesterday; endOrigin = 'no result date: yesterday'; }
       else if (end > yesterday) { end = yesterday; endOrigin = 'result date in the future: yesterday'; }
       return { start, origin, end, endOrigin };
@@ -2056,19 +2381,25 @@
       if (!meas) { card.style.display = 'none'; return; }
       card.style.display = '';
       const mat  = allMaterials.find(m => m.id === meas.fields.id_material);
-      const expo = allExposures.find(e => e.id === mat?.fields.id_exposure);
-      const site = allSites.find(x => x.id === mat?.fields.id_site);
+      const pl   = allPlacements.find(p => p.id === meas.fields.id_placement);
+      const expo = allExposures.find(e => e.id === pl?.fields.id_exposure);
+      const site = allSites.find(x => x.id === pl?.fields.id_site);
 
+      if (!pl) {
+        body.innerHTML = `<p class="field-hint">Laboratory test without exposure: the site climate does not apply.
+          To attach this measurement to an exposure, create it again from step 4.</p>`;
+        return;
+      }
       if (expo?.fields.exposure_type === 'laboratory') {
         body.innerHTML = `<p class="field-hint">Laboratory exposure: conditions are controlled, the site climate does not apply.</p>`;
         return;
       }
       if (!site || site.fields.latitude == null || site.fields.longitude == null) {
-        body.innerHTML = `<p class="field-hint">The material has no geolocated site. Add the latitude and longitude of its site
-          in step 2 (<a class="label-link" style="float:none" onclick="openBlock('site')">Site block</a>).</p>`;
+        body.innerHTML = `<p class="field-hint">This exposure has no geolocated site. Add the latitude and longitude of the site
+          (<a class="label-link" style="float:none" onclick="openBlock('site')">Site block, step 3</a>).</p>`;
         return;
       }
-      const p = defaultClimatePeriod(mat, meas);
+      const p = defaultClimatePeriod(mat, pl, meas);
       const marine = MARINE_NATURES.has(expo?.fields.exposure_nature);
       body.innerHTML = `
         <p class="field-hint" style="margin:0 0 10px;">
@@ -2095,10 +2426,10 @@
             </select>
           </div>
         </div>
-        ${!mat.fields.exposure_start_date ? `
+        ${!pl.fields.exposure_start_date ? `
         <label class="field-hint" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
           <input type="checkbox" id="f-clim-store-start" checked style="width:auto;">
-          Also store this start date as the material's exposure start date
+          Also store this start date as the exposure start date
         </label>` : ''}
         <div class="form-actions" style="justify-content:flex-start;">
           <button class="btn btn-secondary" id="btn-clim-fetch" onclick="fetchClimatePreview()">🌦 Fetch climate</button>
@@ -2110,7 +2441,8 @@
     async function fetchClimatePreview() {
       const meas  = allMeasurements.find(m => m.id === sel.measurement);
       const mat   = allMaterials.find(m => m.id === meas?.fields.id_material);
-      const site  = allSites.find(x => x.id === mat?.fields.id_site);
+      const pl    = allPlacements.find(p => p.id === meas?.fields.id_placement);
+      const site  = allSites.find(x => x.id === pl?.fields.id_site);
       if (!validateForm('climate-body', [
         required('f-clim-start'), required('f-clim-end'),
         dateOrder('f-clim-start', 'f-clim-end', 'End must be after start'),
@@ -2129,7 +2461,7 @@
         ]);
         const existing = scalars.filter(r => r.fields.id_measurement === meas.id
           && GristHelpers.CLIMATE_SCALARS.includes(r.fields.name));
-        climatePreview = { measId: meas.id, matId: mat.id, start, end, marine, result, existingIds: existing.map(r => r.id) };
+        climatePreview = { measId: meas.id, placementId: pl.id, start, end, marine, result, existingIds: existing.map(r => r.id) };
 
         const covKey = { mean_temperature: 'temperature', mean_rh: 'rh', time_of_wetness: 'precipitation',
                          annual_precipitation: 'precipitation', mean_sea_temperature: 'sea' };
@@ -2342,7 +2674,7 @@
         await GristHelpers.bulkCreateRecords('SCALAR', records);
         const storeStart = document.getElementById('f-clim-store-start');
         if (storeStart?.checked) {
-          await GristHelpers.updateRecord('MATERIAL', cp.matId, { exposure_start_date: inputToGristDate(cp.start) });
+          await GristHelpers.updateRecord('PLACEMENT', cp.placementId, { exposure_start_date: inputToGristDate(cp.start) });
         }
         notify(`${records.length} climate value(s) saved for measurement #${cp.measId} ✓`, 'ok');
         await refreshAll();
@@ -2543,9 +2875,11 @@
         const meas = allMeasurements.find(m => m.id === sel.measurement);
         const test = allTests.find(t => t.id === meas?.fields.id_test);
         const mat  = allMaterials.find(m => m.id === meas?.fields.id_material);
+        const pl = allPlacements.find(p => p.id === meas?.fields.id_placement);
         document.getElementById('results-context-bar').innerHTML =
           tagHTML('Measurement', `#${sel.measurement}`) +
           tagHTML('Material',    mat?.fields.name) +
+          tagHTML('Exposure',    pl ? placementLabel(pl) : 'none (lab test)') +
           tagHTML('Test',        test ? testLabel(test) : null);
         renderResultsForm(test?.fields.name);
       }
@@ -3060,7 +3394,8 @@
       fillEnumSelect('f-expo-type',        'exposure_type');
       fillEnumSelect('f-expo-nature',      'exposure_nature');
       fillEnumSelect('f-cur-method',       'curing_method');
-      fillEnumSelect('f-mat-type',         'material_type');
+      fillEnumSelect('f-mix-type',         'material_type');
+      fillEnumSelect('f-source-type',      'source_type');
       fillEnumSelect('f-meas-sample-type', 'sample_type');
       fillEnumSelect('f-meas-dims',        'sample_dimensions');
       fillEnumSelect('f-test-type',        'test_type');

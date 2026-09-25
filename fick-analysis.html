@@ -493,7 +493,7 @@
       try {
         const [dataPoints, curves, measurements, materials,
                mixDesigns, mixBinders, binders,
-               exposures, sites, sources, scalars, tests, curings] = await Promise.all([
+               exposures, sites, sources, scalars, tests, curings, placements, labels] = await Promise.all([
           GristHelpers.fetchAllRecords('DATA_CURVE'),
           GristHelpers.fetchAllRecords('CURVE'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
@@ -507,6 +507,8 @@
           GristHelpers.fetchAllRecords('SCALAR'),
           GristHelpers.fetchAllRecords('TEST'),
           GristHelpers.fetchAllRecords('CURING_CONDITION'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
+          GristHelpers.fetchAllRecords('LABEL'),
         ]);
 
         rawData = { dataPoints, curves, measurements, materials,
@@ -526,7 +528,7 @@
         const all = GristHelpers.joinChlorideProfiles(
           dataPoints, curves, measurements, materials,
           mixDesigns, mixBinders, binders,
-          exposures, sites, sources, scalars, curings
+          exposures, sites, sources, scalars, curings, placements, labels
         );
 
         allProfiles = all.filter(p => clTestIds.has(p.measurement.id_test));
@@ -646,7 +648,7 @@
       const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' d' : '?';
       const cem  = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
       const cltype = getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
-      return `<b>${p.material.name || 'Material'}</b> — ${cltype}<br>` +
+      return `<b>${p.displayName || 'Material'}</b> — ${cltype}<br>` +
              `Source: ${src}<br>Exposure: ${expo}<br>` +
              `Duration: ${dur} · Latitude: ${lat} · Curing: ${cure}<br>` +
              `Binders: ${cem}<br>SCM: ${getBinderSignature(p)}<br>` +
@@ -794,8 +796,8 @@
 
       return {
         source:       src,
-        mat_name:     p.material.name        || '—',
-        mat_type:     GristHelpers.enumLabel(p.material.material_type) || '—',
+        mat_name:     p.displayName          || '—',
+        mat_type:     GristHelpers.enumLabel(p.mix.material_type || p.material.material_type) || '—',
         site:         p.site.country_region  || '—',
         latitude:     p.site.latitude        ?? null,
         expo_type:    GristHelpers.enumLabel(p.exposure.exposure_type)   || '—',
@@ -941,7 +943,7 @@
       const opts = allProfiles.map(p => {
         const measId = getMeasurementIdFromProfile(p);
         if (!measId) return null;
-        const mat    = p.material.name || '?';
+        const mat    = p.displayName || '?';
         const nature = GristHelpers.enumLabel(p.exposure.exposure_nature) || '?';
         const dur    = p.scalars.exposure_duration != null
                        ? p.scalars.exposure_duration.toFixed(0) + ' yr' : '?';
@@ -985,7 +987,7 @@
           Math.round(profile.scalars.exposure_duration * 365.25);
       }
 
-      const matName = profile.material.name || `id=${measurementId}`;
+      const matName = profile.displayName || `id=${measurementId}`;
       GristHelpers.log(`Measurement selected: id=${measurementId}`);
       GristHelpers.log(`Material: ${matName}`, 'ok');
       GristHelpers.log(
@@ -1049,18 +1051,21 @@
       currentMaterial = null; currentMix = null; currentExposure = null;
       if (!measurement.id_material) return;
       try {
-        const [materials, mixes, exposures] = await Promise.all([
+        const [materials, mixes, exposures, placements, sites] = await Promise.all([
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MIX_DESIGN'),
           GristHelpers.fetchAllRecords('EXPOSURE'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
+          GristHelpers.fetchAllRecords('SITE'),
         ]);
-        const mat = materials.find(m => m.id === measurement.id_material);
-        currentMaterial = mat ? mat.fields : null;
+        // Exposure of the measurement (its placement; legacy MATERIAL columns if not migrated)
+        const ctx = GristHelpers.measurementContext(measurement,
+          GristHelpers.contextMaps(materials, placements, sites, exposures));
+        currentMaterial = ctx.material;
         if (currentMaterial) {
           const mix  = mixes.find(m => m.id === currentMaterial.id_mix_design);
           currentMix = mix ? mix.fields : null;
-          const expo = exposures.find(e => e.id === currentMaterial.id_exposure);
-          currentExposure = expo ? expo.fields : null;
+          currentExposure = ctx.exposure;
           GristHelpers.log(`Material: ${currentMaterial.name || 'id=' + measurement.id_material}`, 'ok');
         }
       } catch (err) {
@@ -1128,7 +1133,7 @@
       const expo = currentExposure  || {};
       const fields = [
         { label: 'Material',       value: mat.name          || '—' },
-        { label: 'Material type',  value: GristHelpers.enumLabel(mat.material_type)   || '—' },
+        { label: 'Material type',  value: GristHelpers.enumLabel(mix.material_type || mat.material_type) || '—' },
         { label: 'w/c',            value: mix.wc_ratio != null ? mix.wc_ratio.toFixed(2) : '—' },
         { label: 'Exposure type',  value: GristHelpers.enumLabel(expo.exposure_type)   || '—' },
         { label: 'Exposure nature',value: GristHelpers.enumLabel(expo.exposure_nature) || '—' },

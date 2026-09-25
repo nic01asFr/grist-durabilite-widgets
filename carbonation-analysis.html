@@ -204,18 +204,21 @@
       currentExposure = null;
       if (!measurement.id_material) return;
       try {
-        const [materials, mixes, exposures] = await Promise.all([
+        const [materials, mixes, exposures, placements, sites] = await Promise.all([
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MIX_DESIGN'),
           GristHelpers.fetchAllRecords('EXPOSURE'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
+          GristHelpers.fetchAllRecords('SITE'),
         ]);
-        const mat = materials.find(m => m.id === measurement.id_material);
-        currentMaterial = mat ? mat.fields : null;
+        // Exposure of the measurement (its placement; legacy MATERIAL columns if not migrated)
+        const ctx = GristHelpers.measurementContext(measurement,
+          GristHelpers.contextMaps(materials, placements, sites, exposures));
+        currentMaterial = ctx.material;
         if (currentMaterial) {
           const mix  = mixes.find(m => m.id === currentMaterial.id_mix_design);
           currentMix = mix ? mix.fields : null;
-          const expo = exposures.find(e => e.id === currentMaterial.id_exposure);
-          currentExposure = expo ? expo.fields : null;
+          currentExposure = ctx.exposure;
           GristHelpers.log(`Material: ${currentMaterial.name || 'id=' + measurement.id_material}`, 'ok');
         }
       } catch (err) {
@@ -276,8 +279,10 @@
           return;
         }
 
+        // Same material AND same exposure: one material exposed in two conditions gives two series
         const series = measurements.filter(m =>
           m.fields.id_material === selected.fields.id_material &&
+          (m.fields.id_placement || 0) === (selected.fields.id_placement || 0) &&
           testOf(m).name === 'carbonation' &&
           (testOf(m).test_type || '') === (selTest.test_type || '')
         );
@@ -324,7 +329,7 @@
       const expo = currentExposure  || {};
       const fields = [
         { label: 'Material',       value: mat.name          || '—' },
-        { label: 'Material type',  value: GristHelpers.enumLabel(mat.material_type)   || '—' },
+        { label: 'Material type',  value: GristHelpers.enumLabel(mix.material_type || mat.material_type) || '—' },
         { label: 'w/c',            value: mix.wc_ratio != null ? mix.wc_ratio.toFixed(2) : '—' },
         { label: 'Exposure type',  value: GristHelpers.enumLabel(expo.exposure_type)   || '—' },
         { label: 'Exposure nature',value: GristHelpers.enumLabel(expo.exposure_nature) || '—' },

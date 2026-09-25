@@ -256,7 +256,7 @@
       try {
         const [dataPoints, curves, measurements, materials,
                mixDesigns, mixBinders, binders,
-               exposures, sites, sources, scalars, tests, curings] = await Promise.all([
+               exposures, sites, sources, scalars, tests, curings, placements, labels] = await Promise.all([
           GristHelpers.fetchAllRecords('DATA_CURVE'),
           GristHelpers.fetchAllRecords('CURVE'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
@@ -270,6 +270,8 @@
           GristHelpers.fetchAllRecords('SCALAR'),
           GristHelpers.fetchAllRecords('TEST'),
           GristHelpers.fetchAllRecords('CURING_CONDITION'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
+          GristHelpers.fetchAllRecords('LABEL'),
         ]);
 
         GristHelpers.log(
@@ -285,7 +287,7 @@
         const allProfiles = GristHelpers.joinChlorideProfiles(
           dataPoints, curves, measurements, materials,
           mixDesigns, mixBinders, binders,
-          exposures, sites, sources, scalars, curings
+          exposures, sites, sources, scalars, curings, placements, labels
         );
 
         profiles = allProfiles.filter(p => clTestIds.has(p.measurement.id_test));
@@ -364,7 +366,7 @@
       const cure = p.curing.curing_duration_days != null ? p.curing.curing_duration_days + ' d' : '?';
       const cem  = p.binders.map(b => `${b.name || '?'} (${b.content_kg_m3 ?? '?'} kg/m³)`).join(', ');
       const cltype = getTestType(p) === 'free_cl' ? 'Free Cl' : 'Total Cl';
-      return `<b>${p.material.name || 'Material'}</b> — ${cltype}<br>` +
+      return `<b>${p.displayName || 'Material'}</b> — ${cltype}<br>` +
              `Source: ${src}<br>` +
              `Exposure: ${expo}<br>` +
              `Duration: ${dur} · Latitude: ${lat} · Curing: ${cure}<br>` +

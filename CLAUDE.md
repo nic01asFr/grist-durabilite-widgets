@@ -30,16 +30,17 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 ### Shared code (`assets/`)
 - `shared-styles.css` — CSS custom properties (`:root` variables), base reset, shared components (`.card`, `.header`, `.status`, `.info-grid`, `.btn`, `.log`, `.tabs`, `.filter-bar`, `.mode-selector`)
 - `grist-helpers.js` — `GristHelpers` namespace:
-  - Schema: `SCHEMA` (15 table definitions), `ENUMS` (allowed values of Choice columns), `ENUM_LABELS` + `enumLabel(value)` (display labels for enum values; stored values unchanged), `SCALAR_PARAMETERS` (dictionary of `SCALAR.name` values with default unit + RILEM label), `VALUE_RENAMES` (stored values renamed across versions), `ensureSchema()`
+  - Schema: `SCHEMA` (18 table definitions, creation order matters for Ref columns), `ENUMS` (allowed values of Choice columns), `ENUM_LABELS` + `enumLabel(value)` (display labels for enum values; stored values unchanged), `SCALAR_PARAMETERS` (dictionary of `SCALAR.name` values with default unit + RILEM label), `VALUE_RENAMES` (stored values renamed across versions), `ensureSchema()`, one-shot data migrations `_runMigrations()` (version stored in SCHEMA_INFO, `SCHEMA_VERSION`)
+  - Context: `measurementContext(meas, maps)` + `contextMaps()` — site/exposure of a measurement through its PLACEMENT (falls back on legacy MATERIAL columns in non-migrated documents); `measurementCode(meas, labels)` — campaign code to display; `materialName()`, `placementName()` — generated names
   - Binders: `CEMENT_LABELS`, `SCM_LABELS`, `isCement(type)`, `binderSignature(binders)` (e.g. "Portland + FA + SF")
   - Binder families (two-level mix choice): `BINDER_FAMILIES`, `binderFamily(binders)` (classified by the nature of additions ≥ 5 % of the binder, not by EN 197 class; blended cements by the CEM class read in their name), `mixComposition()`, `mixCompositionLabel()` (e.g. "FA 25 %"), `suggestMixName(binders, wb)`
-  - Data access: `fetchAllRecords(table)`, `createRecord(table, fields)`, `updateRecord()`, `bulkCreateRecords()`, `bulkRemoveRecords()`, `joinScalarData()`, `joinCurvePoints()`, `joinChlorideProfiles()`
+  - Data access: `fetchAllRecords(table)`, `createRecord(table, fields)`, `updateRecord()`, `bulkCreateRecords()`, `bulkRemoveRecords()`, `joinScalarData()`, `joinCurvePoints()`, `joinChlorideProfiles()` (both joins take optional `placements` and `labels`, and return `placement`, `site`, `code`, `displayName`)
   - UI: `log()`, `setStatus()`, `plotlyDarkLayout()`, `plotlyDarkAxis()`, `formatDapp()`, `formatKcarb()`, `formatDureeVie()`
 
 ### Grist integration pattern (all widgets follow this):
 1. Load `grist-plugin-api.js` from CDN + `assets/grist-helpers.js`
 2. Call `grist.ready({ requiredAccess: 'full' })` to register
-3. Call `await GristHelpers.ensureSchema()` — auto-creates missing tables and columns, applies `VALUE_RENAMES` to existing records, and syncs Choice columns with `ENUMS` (Text → Choice conversion, missing choices added, user-added choices kept)
+3. Call `await GristHelpers.ensureSchema()` — auto-creates missing tables and columns, applies `VALUE_RENAMES` to existing records, runs pending data migrations, and syncs Choice columns with `ENUMS` (Text → Choice conversion, missing choices added, user-added choices kept)
 4. For linked widgets: listen via `grist.onRecord(callback)`
 5. For global widgets: read all data via `GristHelpers.fetchAllRecords(tableName)`
 6. Write results via `GristHelpers.createRecord(tableName, fields)`
@@ -53,30 +54,33 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 - **Crossref REST API** — DOI → bibliographic metadata (data-entry only, `api.crossref.org`, no key)
 - **Open-Meteo** — historical weather (ERA5, `archive-api.open-meteo.com`) and marine (`marine-api.open-meteo.com`, sea temperature only for recent years), no key, free for non-commercial use; wrapped by `GristHelpers.fetchClimate()`
 
-### Grist table schema (15 tables, v2.5)
+### Grist table schema (18 tables, v3)
 
-Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement stores 0..n SCALAR results and 0..n CURVEs (points in DATA_CURVE). `[enum]` = Choice column whose values come from `GristHelpers.ENUMS`.
+Generic architecture: a MATERIAL (a mix design cured in a given way — what was made) has 0..n PLACEMENTs (where and how it was exposed, from when); it is tested in MEASUREMENTs, attached to a placement or to none (laboratory test); each measurement stores 0..n SCALAR results and 0..n CURVEs (points in DATA_CURVE). Campaign codes (the names a material has in a lab campaign or a paper) are LABEL rows, never the material name. Always read site/exposure through `measurementContext()`, never from MATERIAL. `[enum]` = Choice column whose values come from `GristHelpers.ENUMS`.
 
 **Context:**
-- **SOURCE**: `title`, `authors`, `doi`, `url`, `year`, `journal`, `notes`, `designation`
+- **SOURCE**: `title`, `authors`, `doi`, `url`, `year`, `journal`, `notes`, `designation`, `source_type` [source_type] (publication, lab_campaign…)
 - **SITE**: `latitude`, `longitude`, `country_region`
 - **EXPOSURE**: `exposure_type` [exposure_type], `exposure_nature` [exposure_nature], `wetting_duration_pct`, `drying_duration_pct`
 
 **Constituents and mix design:**
 - **BINDER**: `name`, `binder_type` [binder_type], `density_kg_m3`, `specific_surface`, `loss_on_ignition`, Bogue phases `C3S`, `C2S`, `C3A`, `C4AF`, `Gp`, oxides `SiO2`, `Al2O3`, `Fe2O3`, `CaO`, `MgO`, `SO3`, `K2O`, `Na2O`, `notes`
 - **AGGREGATE**: `name`, `aggregate_type` [aggregate_type], `size_min_mm`, `size_max_mm`, `density_kg_m3`, `water_absorption_pct`, `notes`
-- **MIX_DESIGN**: `name` (optional, suggested from the composition e.g. `FA25-0.45`), `water_type` [water_type], `water_content_kg`, `global_warming_performance_kg_eq_m3`, `wc_ratio`, `wl_ratio`, `admix_type` [admix_type], `adjuvant_content`, `entrained_air`
+- **MIX_DESIGN**: `name` (optional, suggested from the composition e.g. `FA25-0.45`), `material_type` [material_type], `water_type` [water_type], `water_content_kg`, `global_warming_performance_kg_eq_m3`, `wc_ratio`, `wl_ratio`, `admix_type` [admix_type], `adjuvant_content`, `entrained_air`
 - **MIX_DESIGN_BINDER**: `id_mix_design` (Ref→MIX_DESIGN), `id_binder` (Ref→BINDER), `content_kg_m3`
 - **MIX_DESIGN_AGGREGATE**: `id_mix_design` (Ref→MIX_DESIGN), `id_aggregate` (Ref→AGGREGATE), `content_kg_m3`
 - **CURING_CONDITION**: `temperature_c`, `humidity_pct`, `wind_protection`, `solar_protection`, `curing_method` [curing_method], `curing_duration_days`, `standard_name`
 
 **Material, tests and results:**
-- **MATERIAL**: `id_site` (Ref→SITE), `id_exposure` (Ref→EXPOSURE), `id_mix_design` (Ref→MIX_DESIGN), `id_curing_condition` (Ref→CURING_CONDITION), `manufacturing_date`, `demolding_date`, `exposure_start_date` (start of site exposure, used as the climate period start), `name`, `material_type` [material_type]
+- **MATERIAL**: `id_mix_design` (Ref→MIX_DESIGN), `id_curing_condition` (Ref→CURING_CONDITION), `manufacturing_date`, `demolding_date`, `name` (generated: mix name · curing). Legacy v2.5 columns kept read-only: `id_site`, `id_exposure`, `exposure_start_date`, `material_type`
+- **PLACEMENT**: `id_material` (Ref→MATERIAL), `id_site` (Ref→SITE), `id_exposure` (Ref→EXPOSURE), `exposure_start_date` (climate period start), `exposure_end_date`, `name` (generated: site · condition · from date), `notes`
+- **LABEL**: `label` (campaign code), `id_source` (Ref→SOURCE: campaign where the code is used), `id_material` (Ref→MATERIAL), `id_placement` (Ref→PLACEMENT, when the code designates the material in one exposure), `notes`
 - **TEST**: `name` [test_name], `standard_name`, `experiment_duration`, `test_type` [test_type]
-- **MEASUREMENT**: `id_material` (Ref→MATERIAL), `id_source` (Ref→SOURCE), `id_test` (Ref→TEST), `sample_type` [sample_type], `sample_dimensions` [sample_dimensions], `preparation_date`, `result_date`, `sample_mass_g`, `operator`
+- **MEASUREMENT**: `id_material` (Ref→MATERIAL), `id_placement` (Ref→PLACEMENT, empty = laboratory test), `specimen_id`, `id_source` (Ref→SOURCE), `id_test` (Ref→TEST), `sample_type` [sample_type], `sample_dimensions` [sample_dimensions], `preparation_date`, `result_date`, `sample_mass_g`, `operator`
 - **SCALAR**: `id_measurement` (Ref→MEASUREMENT), `name` [scalar_name], `value`, `unit`, `is_derived`, `notes`
 - **CURVE**: `id_measurement` (Ref→MEASUREMENT), `x_name`, `y_name`, `x_unit`, `y_unit`, `notes`
 - **DATA_CURVE**: `id_curve` (Ref→CURVE), `x`, `y`
+- **SCHEMA_INFO**: `key`, `value` — `version` drives one-shot migrations (v2.5 → v3: one PLACEMENT per exposed material, former material names → LABEL, generated names)
 
 ### Vocabularies
 
@@ -90,13 +94,13 @@ Generic architecture: a MATERIAL is tested in MEASUREMENTs; each measurement sto
 
 | Widget | File | Grist link | Tables | Libs |
 |--------|------|------------|--------|------|
-| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 4-step wizard (Source → Material → Measurement → Results); mix design, exposure, curing and site are collapsible building blocks of step 2; binders/aggregates are created in dialogs; step 4 fetches the site climate over the exposure period and saves it as derived SCALARs (`CLIMATE_SCALARS`) | SheetJS (on demand) |
-| Editor | `editor.html` | Select By MATERIAL | R: MATERIAL and related tables, MEASUREMENT, SCALAR, CURVE / W: via `applyUserActions` | — |
+| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 5-step wizard (Source → Material → Exposure → Measurement → Results); mix design and curing are building blocks of step 2, site and exposure condition of step 3; a selected material/exposure is shown read-only; binders/aggregates are created in dialogs; step 5 fetches the site climate over the exposure period and saves it as derived SCALARs (`CLIMATE_SCALARS`) | SheetJS (on demand) |
+| Editor | `editor.html` | Select By MATERIAL | R: MATERIAL and related tables, PLACEMENT, LABEL, MEASUREMENT, SCALAR, CURVE / W: via `applyUserActions` — exposures and campaign codes of the material are editable; records shared with other materials/exposures (mix design, curing, site, exposure condition) carry a warning | — |
 | Fick Analysis | `fick-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN(_BINDER), BINDER… / W: SCALAR, TEST | Pyodide, Plotly |
-| Carbonation Analysis | `carbonation-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, TEST, SCALAR, CURVE, DATA_CURVE, MATERIAL, MIX_DESIGN, EXPOSURE / W: SCALAR — depth vs time series = one point per carbonation measurement of the selected material (same TEST name + test_type): depth from `mean_depth` (else mean of section curves), time from `exposure_duration` (else result − preparation date, else `t=<n> days` in curve notes) | Pyodide, Plotly |
+| Carbonation Analysis | `carbonation-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, TEST, SCALAR, CURVE, DATA_CURVE, MATERIAL, MIX_DESIGN, EXPOSURE / W: SCALAR — depth vs time series = one point per carbonation measurement of the selected material in the same exposure (same PLACEMENT, TEST name + test_type): depth from `mean_depth` (else mean of section curves), time from `exposure_duration` (else result − preparation date, else `t=<n> days` in curve notes) | Pyodide, Plotly |
 | Chloride Profiles | `profil-chlorure.html` | None (reads all) | R: MEASUREMENT, CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN(_BINDER), BINDER, SITE, SOURCE, TEST… | Plotly |
 | Dashboard | `dashboard.html` | None (reads all) | R: SCALAR (`D`, `duree_vie_ans`), MEASUREMENT, MATERIAL, MIX_DESIGN, EXPOSURE, SOURCE | Plotly |
-| Site Map | `site-map.html` | None (reads all) | R: SITE, MATERIAL, MEASUREMENT, SCALAR | Leaflet |
+| Site Map | `site-map.html` | None (reads all) | R: SITE, PLACEMENT, MATERIAL, MEASUREMENT, SCALAR — materials are on a site through their exposures | Leaflet |
 | Export | `export.html` | None (reads all) | R: all tables → CSV | — |
 
 ## Adding a New Widget

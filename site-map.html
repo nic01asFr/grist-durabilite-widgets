@@ -141,11 +141,12 @@
       GristHelpers.setStatus('Loading…', '');
 
       try {
-        const [sites, materials, measurements, scalars] = await Promise.all([
+        const [sites, materials, measurements, scalars, placements] = await Promise.all([
           GristHelpers.fetchAllRecords('SITE'),
           GristHelpers.fetchAllRecords('MATERIAL'),
           GristHelpers.fetchAllRecords('MEASUREMENT'),
           GristHelpers.fetchAllRecords('SCALAR'),
+          GristHelpers.fetchAllRecords('PLACEMENT'),
         ]);
 
         GristHelpers.log(`${sites.length} sites, ${materials.length} materials, ${measurements.length} measurements, ${scalars.length} scalars`, 'ok');
@@ -163,23 +164,17 @@
           .filter(r => r.fields.name === 'duree_vie_ans' && r.fields.value != null && r.fields.value > 0)
           .forEach(r => dureeByMeasurement.set(r.fields.id_measurement, r.fields.value));
 
-        // Group materials by site_id
-        const materialsBySite = new Map();
-        materials.forEach(mat => {
-          const sid = mat.fields.id_site;
-          if (!sid) return;
-          if (!materialsBySite.has(sid)) materialsBySite.set(sid, []);
-          materialsBySite.get(sid).push(mat);
-        });
+        // A material is on a site through its exposures (PLACEMENT); a measurement through its own
+        // exposure. Documents not yet migrated fall back on the legacy MATERIAL.id_site.
+        const push = (map, key, v) => { if (!key) return; if (!map.has(key)) map.set(key, new Set()); map.get(key).add(v); };
+        const materialsBySite = new Map();   // site id → Set(material id)
+        if (placements.length) placements.forEach(p => push(materialsBySite, p.fields.id_site, p.fields.id_material));
+        else materials.forEach(m => push(materialsBySite, m.fields.id_site, m.id));
 
-        // Measurements index by material_id
-        const measureByMaterial = new Map();
-        measurements.forEach(m => {
-          const mid = m.fields.id_material;
-          if (!mid) return;
-          if (!measureByMaterial.has(mid)) measureByMaterial.set(mid, []);
-          measureByMaterial.get(mid).push(m.id);
-        });
+        const ctxMaps = GristHelpers.contextMaps(materials, placements, sites, []);
+        const measureBySite = new Map();     // site id → Set(measurement id)
+        measurements.forEach(m => push(measureBySite, GristHelpers.measurementContext(m.fields, ctxMaps).siteId, m.id));
+        const materialById = new Map(materials.map(m => [m.id, m]));
 
         // Build siteData
         const siteData = {};
@@ -188,11 +183,11 @@
           const f = s.fields;
           if (f.latitude == null || f.longitude == null) { skipped++; return; }
 
-          const siteMaterials = materialsBySite.get(s.id) || [];
+          const siteMaterials = [...(materialsBySite.get(s.id) || [])].map(id => materialById.get(id)).filter(Boolean);
           const matNames = [...new Set(siteMaterials.map(m => m.fields.name).filter(Boolean))];
 
-          // Collect all measurement IDs for this site's materials
-          const measureIds = siteMaterials.flatMap(mat => measureByMaterial.get(mat.id) || []);
+          // Measurements made on this site (through their exposure)
+          const measureIds = [...(measureBySite.get(s.id) || [])];
 
           // Collect Dapp values
           const dappValues  = measureIds.map(mid => dappByMeasurement.get(mid)).filter(v => v != null);
