@@ -1059,10 +1059,7 @@
       if (!mat) return;
       const f = mat.fields;
       // The new material is attached to the same context (mix, exposure, curing, site).
-      sel.mix      = f.id_mix_design       || null;
-      sel.exposure = f.id_exposure         || null;
-      sel.curing   = f.id_curing_condition || null;
-      sel.site     = f.id_site             || null;
+      applyMaterialContext(mat.id);
       populateDropdowns();
 
       setVal('f-mat-name',   `${f.name || 'Material'} (copy)`);
@@ -1084,6 +1081,7 @@
       const f = meas.fields;
       // The new measurement belongs to the same material and source.
       sel.material = f.id_material || sel.material;
+      applyMaterialContext(sel.material);
       sel.source   = f.id_source   || sel.source;
       sel.test     = f.id_test     || null;
       populateDropdowns();
@@ -1377,11 +1375,21 @@
     // =========================================================================
     // SELECTION HANDLERS
     // =========================================================================
+    // A material carries its mix design, exposure, curing and site: selecting it selects them too.
+    function applyMaterialContext(matId) {
+      const f = allMaterials.find(m => m.id === matId)?.fields;
+      if (!f) return;
+      sel.mix      = f.id_mix_design       || null;
+      sel.exposure = f.id_exposure         || null;
+      sel.curing   = f.id_curing_condition || null;
+      sel.site     = f.id_site             || null;
+    }
+
     function onSel(key) {
       const elId = `sel-${key.replace('_', '-')}`;
       const v = parseInt(document.getElementById(elId)?.value) || null;
       sel[key] = v;
-      if (key === 'material') { sel.measurement = null; populateDropdowns(); }
+      if (key === 'material') { sel.measurement = null; applyMaterialContext(v); populateDropdowns(); }
       if (key === 'source')   sourceSkipped = false;
       updateDuplicateButtons();
       updateStepper();
@@ -1393,7 +1401,7 @@
     // Reference selects inside forms (material, source, measurement…) mirror the global selection.
     function onRefSelect(key, el) {
       sel[key] = parseInt(el.value) || null;
-      if (key === 'material') sel.measurement = null;
+      if (key === 'material') { sel.measurement = null; applyMaterialContext(sel.material); }
       if (key === 'source')   sourceSkipped = false;
       populateDropdowns();
       updateStepper();
