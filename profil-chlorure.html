@@ -331,8 +331,9 @@
       return cem.name || null;
     }
 
+    // Chloride fraction of the profile: 'total_cl' | 'free_cl' | '' (curve name, legacy test type)
     function getTestType(p) {
-      return (testMap.get(p.measurement.id_test) || {}).test_type || '';
+      return GristHelpers.chlorideFraction(p, testMap.get(p.measurement.id_test));
     }
 
     // Returns a Set of checked values for checkboxes with a given name

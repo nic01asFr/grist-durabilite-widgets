@@ -54,7 +54,7 @@ Each widget is a self-contained `.html` file that runs entirely client-side in t
 - **Crossref REST API** — DOI → bibliographic metadata (data-entry only, `api.crossref.org`, no key)
 - **Open-Meteo** — historical weather (ERA5, `archive-api.open-meteo.com`) and marine (`marine-api.open-meteo.com`, sea temperature only for recent years), no key, free for non-commercial use; wrapped by `GristHelpers.fetchClimate()`
 
-### Grist table schema (18 tables, v3)
+### Grist table schema (18 tables, v4)
 
 Generic architecture: a MATERIAL (a mix design cured in a given way — what was made) has 0..n PLACEMENTs (where and how it was exposed, from when); it is tested in MEASUREMENTs, attached to a placement or to none (laboratory test); each measurement stores 0..n SCALAR results and 0..n CURVEs (points in DATA_CURVE). Campaign codes (the names a material has in a lab campaign or a paper) are LABEL rows, never the material name. Always read site/exposure through `measurementContext()`, never from MATERIAL. `[enum]` = Choice column whose values come from `GristHelpers.ENUMS`.
 
@@ -75,12 +75,12 @@ Generic architecture: a MATERIAL (a mix design cured in a given way — what was
 - **MATERIAL**: `id_mix_design` (Ref→MIX_DESIGN), `id_curing_condition` (Ref→CURING_CONDITION), `manufacturing_date`, `demolding_date`, `name` (generated: mix name · curing). Legacy v2.5 columns kept read-only: `id_site`, `id_exposure`, `exposure_start_date`, `material_type`
 - **PLACEMENT**: `id_material` (Ref→MATERIAL), `id_site` (Ref→SITE), `id_exposure` (Ref→EXPOSURE), `exposure_start_date` (climate period start), `exposure_end_date`, `name` (generated: site · condition · from date), `notes`
 - **LABEL**: `label` (campaign code), `id_source` (Ref→SOURCE: campaign where the code is used), `id_material` (Ref→MATERIAL), `id_placement` (Ref→PLACEMENT, when the code designates the material in one exposure), `notes`
-- **TEST**: `name` [test_name], `standard_name`, `experiment_duration`, `test_type` [test_type]
+- **TEST**: `name` [test_name] (grouped by `TEST_FAMILIES`; `diffusivity` is written by fick-analysis, not offered for entry), `standard_name`, `experiment_duration` (protocol duration), `test_type` [test_type] = test **mode** (natural / accelerated / in_situ_sampling)
 - **MEASUREMENT**: `id_material` (Ref→MATERIAL), `id_placement` (Ref→PLACEMENT, empty = laboratory test), `specimen_id`, `id_source` (Ref→SOURCE), `id_test` (Ref→TEST), `sample_type` [sample_type], `sample_dimensions` [sample_dimensions], `preparation_date`, `result_date`, `sample_mass_g`, `operator`
 - **SCALAR**: `id_measurement` (Ref→MEASUREMENT), `name` [scalar_name], `value`, `unit`, `is_derived`, `notes`
-- **CURVE**: `id_measurement` (Ref→MEASUREMENT), `x_name`, `y_name`, `x_unit`, `y_unit`, `notes`
+- **CURVE**: `id_measurement` (Ref→MEASUREMENT), `x_name`, `y_name`, `x_unit`, `y_unit`, `notes` — chloride profiles: `y_name` = `Cl_total` / `Cl_free` carries the chloride fraction; read it with `GristHelpers.chlorideFraction(curve, test)` (falls back on the pre-v4 `TEST.test_type` total_cl/free_cl)
 - **DATA_CURVE**: `id_curve` (Ref→CURVE), `x`, `y`
-- **SCHEMA_INFO**: `key`, `value` — `version` drives one-shot migrations (v2.5 → v3: one PLACEMENT per exposed material, former material names → LABEL, generated names)
+- **SCHEMA_INFO**: `key`, `value` — `version` drives one-shot migrations (v2.5 → v3: one PLACEMENT per exposed material, former material names → LABEL, generated names; v3 → v4: chloride fraction moved from TEST.test_type to CURVE.y_name). `ensureSchema()` runs structure → migrations → `VALUE_RENAMES` + choices, so migrations can still read values that renames clear
 
 ### Vocabularies
 
@@ -94,7 +94,7 @@ Generic architecture: a MATERIAL (a mix design cured in a given way — what was
 
 | Widget | File | Grist link | Tables | Libs |
 |--------|------|------------|--------|------|
-| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 5-step wizard (Source → Material → Exposure → Measurement → Results); mix design and curing are building blocks of step 2, site and exposure condition of step 3; a selected material/exposure is shown read-only; binders/aggregates are created in dialogs; step 5 fetches the site climate over the exposure period and saves it as derived SCALARs (`CLIMATE_SCALARS`) | SheetJS (on demand) |
+| Data Entry | `data-entry.html` | None | R/W: all context, constituent and result tables — 4-step wizard (Source → Material → Exposure → Test & results); mix design and curing are building blocks of step 2, site and exposure condition of step 3; a selected material/exposure is shown read-only; binders/aggregates are created in dialogs; step 4 (test, specimen and dates, then the result forms of that test — the generic form suggests `TEST_DEFAULT_SCALAR`) fetches the site climate over the exposure period and saves it as derived SCALARs (`CLIMATE_SCALARS`) | SheetJS (on demand) |
 | Editor | `editor.html` | Select By MATERIAL | R: MATERIAL and related tables, PLACEMENT, LABEL, MEASUREMENT, SCALAR, CURVE / W: via `applyUserActions` — exposures and campaign codes of the material are editable; records shared with other materials/exposures (mix design, curing, site, exposure condition) carry a warning | — |
 | Fick Analysis | `fick-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, CURVE, DATA_CURVE, SCALAR, MATERIAL, MIX_DESIGN(_BINDER), BINDER… / W: SCALAR, TEST | Pyodide, Plotly |
 | Carbonation Analysis | `carbonation-analysis.html` | Select By MEASUREMENT | R: MEASUREMENT, TEST, SCALAR, CURVE, DATA_CURVE, MATERIAL, MIX_DESIGN, EXPOSURE / W: SCALAR — depth vs time series = one point per carbonation measurement of the selected material in the same exposure (same PLACEMENT, TEST name + test_type): depth from `mean_depth` (else mean of section curves), time from `exposure_duration` (else result − preparation date, else `t=<n> days` in curve notes) | Pyodide, Plotly |

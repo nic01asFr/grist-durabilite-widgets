@@ -1191,7 +1191,7 @@ async function loadMeasurementsTable() {
 // Build the table header (fixed + dynamic columns)
 // -------------------------------------------------------------------------
 function buildMeasTableHeader() {
-  const fixedCols = ['Test', 'Cl⁻ type', 'Time (days)', 'Prep. date', 'Result date'];
+  const fixedCols = ['Test', 'Mode', 'Time (days)', 'Prep. date', 'Result date'];
   const allCols   = [...fixedCols, ...measScalarNames, 'Curves'];
   const tr = document.querySelector('#meas-thead tr');
   tr.innerHTML = allCols.map((name, i) =>

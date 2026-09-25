@@ -12,7 +12,7 @@
   <style>
     /* ---- Stepper (4-step wizard) ---- */
     .stepper {
-      display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
       margin-bottom: 14px; position: sticky; top: 0; z-index: 10;
       background: var(--bg); padding: 4px 0;
     }
@@ -260,8 +260,7 @@
     <button class="step-btn active" data-step="1" onclick="goStep(1)"><span class="step-num">1</span><span class="step-text"><span class="step-title">Source</span><span class="step-sum" id="step-sum-1"></span></span></button>
     <button class="step-btn" data-step="2" onclick="goStep(2)"><span class="step-num">2</span><span class="step-text"><span class="step-title">Material</span><span class="step-sum" id="step-sum-2"></span></span></button>
     <button class="step-btn" data-step="3" onclick="goStep(3)"><span class="step-num">3</span><span class="step-text"><span class="step-title">Exposure</span><span class="step-sum" id="step-sum-3"></span></span></button>
-    <button class="step-btn" data-step="4" onclick="goStep(4)"><span class="step-num">4</span><span class="step-text"><span class="step-title">Measurement</span><span class="step-sum" id="step-sum-4"></span></span></button>
-    <button class="step-btn" data-step="5" onclick="goStep(5)"><span class="step-num">5</span><span class="step-text"><span class="step-title">Results</span><span class="step-sum" id="step-sum-5"></span></span></button>
+    <button class="step-btn" data-step="4" onclick="goStep(4)"><span class="step-num">4</span><span class="step-text"><span class="step-title">Test & results</span><span class="step-sum" id="step-sum-4"></span></span></button>
   </nav>
 
   <!-- ============================================================ -->
@@ -608,9 +607,9 @@
   <!-- STEP 4                                                       -->
   <!-- ============================================================ -->
   <section class="step" id="step-4">
-    <p class="step-intro">Describe the <strong>measurement</strong>: which test, on which specimen, when. Successive measurements of a series (e.g. several ages) are created with ⧉ Duplicate.</p>
+    <p class="step-intro">Which <strong>test</strong>, on which specimen, when — then its <strong>results</strong>. Each measurement is one test on one specimen at one date; successive ages of a series are created with ⧉ Duplicate or <em>Next measurement of this series</em>.</p>
     <div class="card">
-      <div class="card-title">📏 Measurement</div>
+      <div class="card-title">📏 Test</div>
       <div class="form-field ctx-field">
         <label>Material <span class="req">*</span><a class="label-link" onclick="goTo('material')">new…</a></label>
         <select id="f-meas-material" onchange="onRefSelect('material', this)"><option value="">— Select a material —</option></select>
@@ -630,6 +629,12 @@
       <div id="form-measurement" style="display:none;">
         <div class="dup-banner" id="dup-banner-measurement" style="display:none;"></div>
         <div class="form-grid">
+          <div class="form-field" style="grid-column:span 2;">
+            <label>Test <span class="req">*</span><a class="label-link" onclick="toggleCollapsible('new-test')">new test…</a></label>
+            <select id="f-meas-test">
+              <option value="">— Select or create —</option>
+            </select>
+          </div>
           <div class="form-field">
             <label>Source<a class="label-link" onclick="goTo('source')">new…</a></label>
             <select id="f-meas-source" onchange="onRefSelect('source', this)"><option value="">— None (unpublished) —</option></select>
@@ -637,13 +642,6 @@
           <div class="form-field">
             <label>Specimen ID</label>
             <input type="text" id="f-meas-specimen" placeholder="M3-T-90d-2…">
-          </div>
-          <!-- Test linked to the campaign -->
-          <div class="form-field">
-            <label>Test <span class="req">*</span></label>
-            <select id="f-meas-test">
-              <option value="">— Select or create —</option>
-            </select>
           </div>
           <div class="form-field">
             <label>Sample type</label>
@@ -658,9 +656,16 @@
             </select>
           </div>
           <div class="form-field"><label>Mass (g)</label><input type="number" id="f-meas-mass" step="0.1" min="0" placeholder="500"></div>
-          <div class="form-field"><label>Preparation date</label><input type="date" id="f-meas-prep-date"></div>
-          <div class="form-field"><label>Result date</label><input type="date" id="f-meas-result-date"></div>
           <div class="form-field"><label>Operator</label><input type="text" id="f-meas-operator" placeholder="Name, lab…"></div>
+          <div class="form-field">
+            <label>Test start <span style="font-size:10px;color:var(--text-dim);text-transform:none;">specimen preparation / sampling</span></label>
+            <input type="date" id="f-meas-prep-date" oninput="updateAgeHint()">
+          </div>
+          <div class="form-field">
+            <label>Result date <span style="font-size:10px;color:var(--text-dim);text-transform:none;">end of test</span></label>
+            <input type="date" id="f-meas-result-date" oninput="updateAgeHint()">
+            <div class="field-hint" id="f-meas-age-hint"></div>
+          </div>
         </div>
 
         <!-- Inline quick-create test -->
@@ -672,19 +677,19 @@
           <div class="collapsible-body" id="body-new-test">
             <div class="form-grid">
               <div class="form-field">
-                <label>Property <span class="req">*</span></label>
+                <label>Measured property <span class="req">*</span></label>
                 <select id="f-test-name">
                   <option value="">Choose…</option>
                 </select>
               </div>
               <div class="form-field">
-                <label>Test type <span class="req">*</span></label>
+                <label>Mode</label>
                 <select id="f-test-type">
                   <option value="">Choose…</option>
                 </select>
               </div>
-              <div class="form-field"><label>Standard</label><input type="text" id="f-test-std" placeholder="NT BUILD 443"></div>
-              <div class="form-field"><label>Test duration (days)</label><input type="number" id="f-test-dur" step="1" min="0" placeholder="90"></div>
+              <div class="form-field"><label>Standard</label><input type="text" id="f-test-std" placeholder="NT BUILD 492, EN 12390-12…"></div>
+              <div class="form-field"><label>Protocol duration (days)</label><input type="number" id="f-test-dur" step="1" min="0" placeholder="e.g. 35 for NT BUILD 443"></div>
             </div>
             <div class="form-actions">
               <button class="btn btn-primary" onclick="saveTestAndSelect()">Create test and select</button>
@@ -698,26 +703,11 @@
         </div>
       </div>
     </div>
-    <div class="step-nav">
-      <button class="btn btn-secondary" onclick="goTo('placement')">← Exposure</button>
-      <button class="btn btn-primary" onclick="goTo('results')">Next: Results →</button>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- STEP 5                                                       -->
-  <!-- ============================================================ -->
-  <section class="step" id="step-5">
-    <p class="step-intro">Enter the <strong>results</strong> of the measurement: scalar values and curves (profiles can be pasted or opened from a spreadsheet).</p>
-    <div class="card">
+    <div class="card" id="results-card">
       <div class="card-title">📊 Results</div>
-      <div class="form-field ctx-field">
-        <label>Measurement<a class="label-link" onclick="goTo('measurement')">new…</a></label>
-        <select id="f-res-measurement" onchange="onRefSelect('measurement', this)"><option value="">— Select a measurement —</option></select>
-      </div>
       <div id="results-empty" class="empty-state" style="padding:24px;">
-        <h3>Select a measurement first</h3>
-        <p>Choose a measurement above, or create one in step 3.</p>
+        <h3>No measurement selected</h3>
+        <p>Select a measurement above, or create one (+ New): its result forms appear here.</p>
       </div>
       <div id="results-content" style="display:none;">
         <div class="context-bar" id="results-context-bar" style="margin-bottom:12px;"></div>
@@ -729,8 +719,8 @@
       <div id="climate-body"></div>
     </div>
     <div class="step-nav">
-      <button class="btn btn-secondary" onclick="goTo('measurement')">← Measurement</button>
-      <button class="btn btn-secondary" onclick="nextInSeries()" title="New measurement of the same material, test and specimen — typically the next age">⧉ Next measurement of this series</button>
+      <button class="btn btn-secondary" onclick="goTo('placement')">← Exposure</button>
+      <button class="btn btn-secondary" onclick="nextInSeries()" title="New measurement of the same material, exposure, test and specimen — typically the next age">⧉ Next measurement of this series</button>
     </div>
   </section>
 
@@ -864,10 +854,10 @@
     // =========================================================================
     // Any former section name maps to a step, and to a building block of step 2.
     const STEP_OF  = { source: 1, material: 2, mix: 2, binder: 2, aggregate: 2, curing: 2,
-                       placement: 3, exposition: 3, exposure: 3, site: 3, measurement: 4, results: 5 };
+                       placement: 3, exposition: 3, exposure: 3, site: 3, measurement: 4, results: 4 };
     const BLOCK_OF = { mix: 'mix', binder: 'mix', aggregate: 'mix', curing: 'curing',
                        exposition: 'exposure', exposure: 'exposure', site: 'site' };
-    const STEP_NAMES = ['source', 'material', 'placement', 'measurement', 'results'];
+    const STEP_NAMES = ['source', 'material', 'placement', 'measurement'];
     let activeStep = 1;
     let sourceSkipped = false;  // step 1 left empty on purpose (unpublished lab campaign)
 
@@ -876,10 +866,11 @@
       document.querySelectorAll('.step').forEach(el =>
         el.classList.toggle('active', el.id === 'step-' + activeStep));
       if (activeStep === 2) updateMixContextBar();
-      if (activeStep === 5) updateResultsPanel();
+      if (activeStep === 4) updateResultsPanel();
       populateDropdowns();
       updateStepper();
       if (BLOCK_OF[target]) openBlock(BLOCK_OF[target]);
+      else if (target === 'results') document.getElementById('results-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
       else window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -947,7 +938,6 @@
         { done: !!pl, sum: pl ? placementLabel(pl) : mat ? 'None: laboratory test' : '—' },
         { done: !!meas,
           sum: meas ? [testLabel(test), gristDateToInput(meas.fields.result_date)].filter(Boolean).join(' · ') : 'To do' },
-        { done: false, sum: meas ? 'Scalars and curves' : '—' },
       ];
       steps.forEach((st, i) => {
         const btn = document.querySelector(`.step-btn[data-step="${i + 1}"]`);
@@ -1406,6 +1396,52 @@
     // =========================================================================
     // DROPDOWNS
     // =========================================================================
+    // ---- Tests, grouped by family (GristHelpers.TEST_FAMILIES) ----
+    const familyOfTest = name => GristHelpers.TEST_FAMILIES.findIndex(f => f.tests.includes(name));
+
+    // Existing TEST records (method + mode + standard) for the measurement form
+    function fillTestSelect() {
+      const el = document.getElementById('f-meas-test');
+      if (!el) return;
+      const prev = el.value;
+      const usable = allTests.filter(t => t.fields.name !== 'diffusivity');
+      let html = '<option value="">— Select or create —</option>';
+      GristHelpers.TEST_FAMILIES.forEach((fam, i) => {
+        const list = usable.filter(t => familyOfTest(t.fields.name) === i)
+          .sort((a, b) => fam.tests.indexOf(a.fields.name) - fam.tests.indexOf(b.fields.name));
+        if (list.length) html += `<optgroup label="${escapeHtml(fam.label)}">` + list.map(t =>
+          `<option value="${t.id}">${escapeHtml(`${testLabel(t)} — ${t.fields.standard_name || 'no standard'}`)}</option>`).join('') + '</optgroup>';
+      });
+      const other = usable.filter(t => familyOfTest(t.fields.name) < 0);
+      if (other.length) html += '<optgroup label="Other">' + other.map(t =>
+        `<option value="${t.id}">${escapeHtml(testLabel(t))}</option>`).join('') + '</optgroup>';
+      el.innerHTML = html;
+      el.value = sel.test || prev || '';
+    }
+
+    // Measured properties for a new TEST record
+    function fillTestNameSelect() {
+      const el = document.getElementById('f-test-name');
+      if (!el) return;
+      el.innerHTML = '<option value="">Choose…</option>' + GristHelpers.TEST_FAMILIES.map(fam =>
+        `<optgroup label="${escapeHtml(fam.label)}">` + fam.tests.map(n =>
+          `<option value="${n}">${escapeHtml(GristHelpers.enumLabel(n))}</option>`).join('') + '</optgroup>').join('');
+    }
+
+    // Age of the specimen at the result date, and time spent in its exposure
+    function updateAgeHint() {
+      const el = document.getElementById('f-meas-age-hint');
+      if (!el) return;
+      const end = val('f-meas-result-date');
+      const mat = allMaterials.find(m => m.id === sel.material);
+      const pl  = allPlacements.find(p => p.id === sel.placement);
+      const days = (from) => from ? Math.round((new Date(end) - new Date(from)) / 86400000) : null;
+      const age  = end ? days(gristDateToInput(mat?.fields.manufacturing_date)) : null;
+      const expo = end ? days(gristDateToInput(pl?.fields.exposure_start_date)) : null;
+      el.textContent = [age != null ? `Age: ${age} d` : '', expo != null ? `exposure: ${expo} d (${(expo / 365.25).toFixed(1)} yr)` : '']
+        .filter(Boolean).join(' · ');
+    }
+
     // ---- Record labels shared by selectors ----
     // ---- Mix designs: family (level 1) and label (level 2) ----
     let mixInfo = new Map();                                  // mixId → { family, composition, scmShare, total, users }
@@ -1605,8 +1641,7 @@
         ? allMeasurements.filter(m => m.fields.id_material === sel.material)
         : allMeasurements;
       fillDrop('sel-measurement',   matMeasures, measurementLabel);
-      fillDrop('f-res-measurement', matMeasures, measurementLabel);
-      fillDrop('f-meas-test', allTests, t => `${testLabel(t)} — ${t.fields.standard_name || 'no standard'}`);
+      fillTestSelect();
 
       // Restore selections
       const map = {
@@ -1615,7 +1650,7 @@
         'sel-curing': 'curing', 'sel-site': 'site', 'sel-material': 'material',
         'sel-measurement': 'measurement',
         'f-meas-material': 'material', 'f-meas-source': 'source',
-        'f-res-measurement': 'measurement',
+
         'f-mat-mix': 'mix', 'f-mat-curing': 'curing',
         'f-pl-site': 'site', 'f-pl-exposure': 'exposure',
         'sel-placement': 'placement', 'f-meas-placement': 'placement',
@@ -1706,6 +1741,7 @@
       if (key === 'source')      sourceSkipped = false;
       populateDropdowns();
       updateStepper();
+      if (activeStep === 4) updateResultsPanel();
     }
 
     // =========================================================================
@@ -1720,7 +1756,7 @@
       if (key === 'source')      sourceSkipped = false;
       populateDropdowns();
       updateStepper();
-      if (key === 'measurement' && activeStep === 5) updateResultsPanel();
+      if (key === 'measurement' && activeStep === 4) updateResultsPanel();
     }
 
     function resetBinderForm() {
@@ -2205,7 +2241,7 @@
       const name = document.getElementById('f-test-name').value;
       const type = document.getElementById('f-test-type').value;
       if (!validateForm('body-new-test', [
-        required('f-test-name'), required('f-test-type'), range('f-test-dur', 0, 36500),
+        required('f-test-name'), range('f-test-dur', 0, 36500),
       ])) return;
       try {
         const result = await GristHelpers.createRecord('TEST', {
@@ -2262,7 +2298,7 @@
         sel.measurement = result.id;
         toggleForm('measurement');
         await refreshAll();
-        goTo('results');
+        goTo('results');   // same step: scrolls to the result forms
       } catch (err) { notify('Error: ' + err.message, 'err'); }
     }
 
@@ -2862,7 +2898,7 @@
     // =========================================================================
     // RESULTS PANEL — dynamic rendering based on test type
     // =========================================================================
-    const CHLORIDE_TESTS    = new Set(['cl_profil', 'diffusivity']);
+    const CHLORIDE_TESTS    = new Set(['cl_profil', 'diffusivity']);   // profile + Fick parameters
     const CARBONATION_TESTS = new Set(['carbonation']);
     const FILE_TESTS        = new Set(['SEM', 'XRD', 'EDS', 'NMR']);
 
@@ -2892,7 +2928,12 @@
       if (CHLORIDE_TESTS.has(testName))    container.innerHTML = buildChlorideForm();
       else if (CARBONATION_TESTS.has(testName)) container.innerHTML = buildCarbonationForm();
       else if (FILE_TESTS.has(testName))   container.innerHTML = buildFileRefForm(testName);
-      else                                 container.innerHTML = buildGenericForm();
+      else {
+        container.innerHTML = buildGenericForm();
+        // Suggest the main result of the test (e.g. D_nssm for a RCM migration test)
+        const main = GristHelpers.TEST_DEFAULT_SCALAR[testName];
+        if (main) { setVal('f-sc-name', main); fillScalarUnit(); }
+      }
     }
 
     // ---- Chloride form ----
@@ -2931,6 +2972,13 @@
             <div class="form-field">
               <label>Exposure time (days)</label>
               <input type="number" id="f-cl-cv-time" step="1" min="0" placeholder="90">
+            </div>
+            <div class="form-field">
+              <label>Chloride fraction</label>
+              <select id="f-cl-cv-fraction">
+                <option value="Cl_total">Total (acid-soluble)</option>
+                <option value="Cl_free">Free (water-soluble)</option>
+              </select>
             </div>
             <div class="form-field">
               <label>Cl unit</label>
@@ -3159,7 +3207,8 @@
       try {
         const curveRec = await GristHelpers.createRecord('CURVE', {
           id_measurement: sel.measurement,
-          x_name: 'depth', x_unit: 'mm', y_name: 'Cl', y_unit: yunit, notes: noteStr,
+          // The curve name carries the chloride fraction (see GristHelpers.chlorideFraction)
+          x_name: 'depth', x_unit: 'mm', y_name: val('f-cl-cv-fraction') || 'Cl_total', y_unit: yunit, notes: noteStr,
         });
         const points = [];
         rows.forEach(row => {
@@ -3387,7 +3436,7 @@
       grist.ready({ requiredAccess: 'full', columns: [] });
       GristHelpers.log('Connected to Grist ✓', 'ok');
       fillEnumSelect('f-b-type',    'binder_type');
-      fillEnumSelect('f-test-name', 'test_name');
+      fillTestNameSelect();
       fillEnumSelect('f-mix-admix', 'admix_type');
       fillEnumSelect('f-agg-type',         'aggregate_type');
       fillEnumSelect('f-mix-water-type',   'water_type');

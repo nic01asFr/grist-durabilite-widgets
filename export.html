@@ -389,9 +389,8 @@ function buildFlatRows() {
     const total_binder_kg = totalBinder > 0 ? totalBinder.toFixed(1) : '';
 
     const testFields = testMapGlobal.get(p.measurement.id_test) || {};
-    let cl_type = '';
-    if      (testFields.test_type === 'free_cl')  cl_type = 'free';
-    else if (testFields.test_type === 'total_cl') cl_type = 'total';
+    const fraction = GristHelpers.chlorideFraction(p, testFields);
+    const cl_type = fraction === 'free_cl' ? 'free' : fraction === 'total_cl' ? 'total' : '';
 
     const mix  = p.mix    || {};
     const site = p.site   || {};

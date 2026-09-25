@@ -146,8 +146,10 @@ const GristHelpers = {
       columns: [
         { id: 'name',                enum: 'test_name', fields: { type: 'Choice',  label: 'Measured property' } },
         { id: 'standard_name',       fields: { type: 'Text',    label: 'Standard' } },
-        { id: 'experiment_duration', fields: { type: 'Numeric', label: 'Test duration (days)' } },
-        { id: 'test_type',           enum: 'test_type', fields: { type: 'Choice',  label: 'Test type' } },
+        { id: 'experiment_duration', fields: { type: 'Numeric', label: 'Protocol duration (days)' } },
+        // Test mode (natural / accelerated / in situ sampling). Until v3 it also held the chloride
+        // fraction (total_cl / free_cl), now carried by the curve name (Cl_total / Cl_free).
+        { id: 'test_type',           enum: 'test_type', fields: { type: 'Choice',  label: 'Test mode' } },
       ]
     },
 
@@ -267,8 +269,17 @@ const GristHelpers = {
     sample_dimensions:  ['cylinder_100x200','cylinder_110x220','cylinder_150x300','cylinder_160x320','cube_100','cube_150','cube_200','prism_40x40x160','prism_70x70x280','prism_100x100x400','powder','other'],
     // Additions from RILEM "Experiments" vocabulary: MIP, EDS, NMR, water_permeability,
     // corrosion_*, rcpt, freeze_thaw, sulfate_resistance, ASR
-    test_name:          ['calorimetry', 'carbonation', 'cl_profil', 'diffusivity', 'Rc', 'gas_permeability', 'water_permeability', 'sorptivity', 'porosity', 'total_porosity', 'resistivity', 'rcpt', 'corrosion_potential', 'corrosion_rate', 'freeze_thaw', 'sulfate_resistance', 'ASR', 'org_density', 'SEM', 'XRD', 'EDS', 'MIP', 'NMR'],
-    test_type:          ['natural', 'accelerated', 'total_cl', 'free_cl'],
+    // Grouped for display by TEST_FAMILIES. 'diffusivity' is written by fick-analysis (D fitted
+    // on a profile): a computed result, not offered for entry.
+    test_name:          ['cl_profil', 'cl_migration_rcm', 'rcpt', 'cl_binding',
+                         'carbonation', 'tga',
+                         'water_porosity', 'sorptivity', 'gas_permeability', 'water_permeability', 'oxygen_diffusion', 'resistivity',
+                         'corrosion_potential', 'corrosion_rate', 'cover_depth',
+                         'Rc', 'tensile_strength', 'flexural_strength', 'elastic_modulus', 'density',
+                         'freeze_thaw', 'salt_scaling', 'sulfate_resistance', 'seawater_attack', 'leaching', 'ASR',
+                         'calorimetry', 'SEM', 'EDS', 'XRD', 'MIP', 'NMR',
+                         'diffusivity'],
+    test_type:          ['natural', 'accelerated', 'in_situ_sampling'],
     // Additions from RILEM "Materials" vocabulary: CAC, CSA, alkali-activated, calcined clay, RHA, glass powder
     binder_type:        ['portland_cement', 'blended_cement', 'calcium_aluminate_cement', 'csa_cement', 'alkali_activated', 'fly_ash', 'slag', 'silica_fume', 'limestone_filler', 'natural_pozzolan', 'metakaolin', 'calcined_clay', 'zeolite', 'rice_husk_ash', 'glass_powder', 'other'],
     aggregate_type:     ['sand', 'gravel', 'crushed_stone', 'lightweight', 'recycled'],
@@ -283,9 +294,21 @@ const GristHelpers = {
   // =========================================================================
   ENUM_LABELS: {
     lab_campaign:             'Laboratory campaign (unpublished)',
+    cl_migration_rcm:         'Chloride migration (RCM, NT BUILD 492)',
+    cl_binding:               'Chloride binding isotherm',
+    tga:                      'TGA (thermogravimetry)',
+    water_porosity:           'Water-accessible porosity',
+    oxygen_diffusion:         'Oxygen diffusion',
+    tensile_strength:         'Tensile strength',
+    flexural_strength:        'Flexural strength',
+    elastic_modulus:          'Elastic modulus',
+    density:                  'Density (hardened)',
+    salt_scaling:             'Salt scaling (freeze–thaw with de-icing salts)',
+    seawater_attack:          'Seawater attack (Mg²⁺ / SO₄²⁻)',
+    in_situ_sampling:         'In situ sampling (structure)',
     'in-situ':                'In situ',
     cl_profil:                'Chloride profile',
-    diffusivity:              'Chloride diffusivity',
+    diffusivity:              'Chloride diffusivity (computed)',
     Rc:                       'Compressive strength (Rc)',
     rcpt:                     'RCPT (rapid chloride permeability)',
     ASR:                      'Alkali–silica reaction (ASR)',
@@ -322,6 +345,39 @@ const GristHelpers = {
   },
 
   // =========================================================================
+  // TEST_FAMILIES — display groups of ENUMS.test_name (entry forms)
+  // TEST_DEFAULT_SCALAR — main result of a test, suggested in the generic result form
+  // =========================================================================
+  TEST_FAMILIES: [
+    { label: 'Chlorides',               tests: ['cl_profil', 'cl_migration_rcm', 'rcpt', 'cl_binding'] },
+    { label: 'Carbonation',             tests: ['carbonation', 'tga'] },
+    { label: 'Transport and porosity',  tests: ['water_porosity', 'sorptivity', 'gas_permeability', 'water_permeability', 'oxygen_diffusion', 'resistivity'] },
+    { label: 'Corrosion',               tests: ['corrosion_potential', 'corrosion_rate', 'cover_depth'] },
+    { label: 'Mechanical and physical', tests: ['Rc', 'tensile_strength', 'flexural_strength', 'elastic_modulus', 'density'] },
+    { label: 'Other degradations',      tests: ['freeze_thaw', 'salt_scaling', 'sulfate_resistance', 'seawater_attack', 'leaching', 'ASR'] },
+    { label: 'Microstructure',          tests: ['calorimetry', 'SEM', 'EDS', 'XRD', 'MIP', 'NMR'] },
+  ],
+  TEST_DEFAULT_SCALAR: {
+    cl_migration_rcm: 'D_nssm', rcpt: 'rcpt_charge', cl_binding: 'chloride_binding_capacity',
+    tga: 'portlandite_content', water_porosity: 'porosity', sorptivity: 'sorptivity',
+    gas_permeability: 'gas_permeability', water_permeability: 'water_permeability',
+    oxygen_diffusion: 'oxygen_diffusion_coeff', resistivity: 'electrical_resistivity',
+    corrosion_potential: 'corrosion_potential', corrosion_rate: 'corrosion_rate', cover_depth: 'cover_depth',
+    Rc: 'Rc', tensile_strength: 'tensile_strength', flexural_strength: 'flexural_strength',
+    elastic_modulus: 'elastic_modulus', density: 'density', salt_scaling: 'scaling_mass_loss', MIP: 'porosity',
+  },
+
+  // Chloride fraction of a profile: 'total_cl' | 'free_cl' | '' (unknown).
+  // Read from the curve name (Cl_total / Cl_free); documents before v4 kept it in TEST.test_type.
+  chlorideFraction(curve, test) {
+    const y = String(curve?.y_name || '').toLowerCase();
+    if (y === 'cl_free')  return 'free_cl';
+    if (y === 'cl_total') return 'total_cl';
+    const t = test?.test_type;
+    return t === 'free_cl' || t === 'total_cl' ? t : '';
+  },
+
+  // =========================================================================
   // SCALAR_PARAMETERS — Dictionary of SCALAR.name values
   // unit: default unit; rilem: matching RILEM "Data_Categories" label (null if none)
   // Names already written by widgets (D, Dapp, Cs, duree_vie_ans…) must stay unchanged.
@@ -336,9 +392,12 @@ const GristHelpers = {
     chloride_binding_capacity:  { unit: 'mol/kg',   rilem: 'Chloride binding capacity' },
     free_chloride:              { unit: 'mol/L',    rilem: 'Free chloride ion concentration' },
     rcpt_charge:                { unit: 'C',        rilem: 'Chloride penetration' },
+    D_nssm:                     { unit: 'm²/s',     rilem: 'Chloride migration coefficient' },  // RCM (NT BUILD 492)
     // Carbonation
     mean_depth:                 { unit: 'mm',       rilem: 'Carbonation depth' },
     carbonation_rate_coeff:     { unit: 'mm/yr^0.5', rilem: 'Carbonation rate coefficient' },
+    portlandite_content:        { unit: '%',        rilem: null },   // TGA, % of binder or sample (see notes)
+    calcite_content:            { unit: '%',        rilem: null },
     // Corrosion / service life
     duree_vie_ans:              { unit: 'yr',       rilem: 'Time to corrosion initiation' },
     profondeur_crit:            { unit: 'mm',       rilem: null },
@@ -357,6 +416,11 @@ const GristHelpers = {
     degree_of_saturation:       { unit: '%',        rilem: 'Degree of saturation' },
     // Mechanical
     Rc:                         { unit: 'MPa',      rilem: 'Compressive strength' },
+    tensile_strength:           { unit: 'MPa',      rilem: 'Tensile strength' },
+    flexural_strength:          { unit: 'MPa',      rilem: 'Flexural strength' },
+    elastic_modulus:            { unit: 'GPa',      rilem: 'Elastic modulus' },
+    density:                    { unit: 'kg/m³',    rilem: 'Density' },
+    scaling_mass_loss:          { unit: 'kg/m²',    rilem: null },   // salt scaling
     // Fit quality / metadata
     R2:                         { unit: '',         rilem: null },
     RMSE:                       { unit: '',         rilem: null },
@@ -381,7 +445,11 @@ const GristHelpers = {
   // Applied to existing records by ensureSchema(); old values are dropped from choices.
   // =========================================================================
   VALUE_RENAMES: {
-    TEST:   { name: { MEB: 'SEM', DRX: 'XRD' } },
+    TEST:   {
+      name:      { MEB: 'SEM', DRX: 'XRD', porosity: 'water_porosity', total_porosity: 'water_porosity', org_density: 'density' },
+      // v4: chloride fraction moved to the curve name (see _migrateToV4); the mode is unknown
+      test_type: { total_cl: '', free_cl: '' },
+    },
     SCALAR: { name: { meb_file: 'sem_file', drx_file: 'xrd_file' } },
   },
 
@@ -563,6 +631,7 @@ const GristHelpers = {
 
       let created = 0, updated = 0;
 
+      // 1. Structure: missing tables and columns
       for (const [tableName, tableDef] of Object.entries(GristHelpers.SCHEMA)) {
         if (!existingTables.has(tableName)) {
           log(`Creating table ${tableName}…`);
@@ -580,13 +649,21 @@ const GristHelpers = {
             log(`${tableName}: +${missingCols.length} column(s) ✓`, 'ok');
             updated++;
           }
-          await GristHelpers._renameValues(tableName, existingCols);
-          if (await GristHelpers._syncChoices(tableName, tableDef, existingCols)) updated++;
         }
       }
 
-      log(`Schema verified ✓ (${created} tables created, ${updated} tables updated)`, 'ok');
+      // 2. Data migrations — before value renames, which may clear values they still need
       await GristHelpers._runMigrations();
+
+      // 3. Stored values renamed across versions, Choice columns in line with ENUMS
+      for (const [tableName, tableDef] of Object.entries(GristHelpers.SCHEMA)) {
+        if (!existingTables.has(tableName)) continue;  // just created with the right options
+        const existingCols = existingColumns[tableName] || {};
+        await GristHelpers._renameValues(tableName, existingCols);
+        if (await GristHelpers._syncChoices(tableName, tableDef, existingCols)) updated++;
+      }
+
+      log(`Schema verified ✓ (${created} tables created, ${updated} tables updated)`, 'ok');
     } catch (err) {
       log('Schema verification error: ' + err.message, 'err');
     }
@@ -701,7 +778,7 @@ const GristHelpers = {
   // =========================================================================
   // MIGRATIONS — one-shot data migrations, tracked in SCHEMA_INFO (key 'version')
   // =========================================================================
-  SCHEMA_VERSION: 3,
+  SCHEMA_VERSION: 4,
 
   async _runMigrations() {
     const log = GristHelpers.log;
@@ -711,6 +788,7 @@ const GristHelpers = {
     if (version >= GristHelpers.SCHEMA_VERSION) return;
     try {
       if (version < 3) await GristHelpers._migrateToV3();
+      if (version < 4) await GristHelpers._migrateToV4();
       const fields = { key: 'version', value: String(GristHelpers.SCHEMA_VERSION) };
       if (row) await GristHelpers.updateRecord('SCHEMA_INFO', row.id, fields);
       else await GristHelpers.createRecord('SCHEMA_INFO', fields);
@@ -813,6 +891,25 @@ const GristHelpers = {
     log(`Migration v3: ${toPlace.length} exposure(s) created, ${measIds.length} measurement(s) attached, ` +
         `${newLabels.label.length} campaign code(s), ${matUpdates.ids.length} material name(s), ` +
         `${mixUpdates.ids.length} mix design(s) updated`, 'ok');
+  },
+
+  // v3 → v4: the chloride fraction (total/free) leaves TEST.test_type for the curve name:
+  // chloride curves of such tests named 'Cl' (or unnamed) become 'Cl_total' / 'Cl_free'.
+  // TEST.test_type total_cl/free_cl are then cleared by VALUE_RENAMES (mode unknown).
+  async _migrateToV4() {
+    const [tests, measurements, curves] = await Promise.all(
+      ['TEST', 'MEASUREMENT', 'CURVE'].map(t => GristHelpers.fetchAllRecords(t)));
+    const fraction = new Map(tests.filter(t => ['total_cl', 'free_cl'].includes(t.fields.test_type))
+      .map(t => [t.id, t.fields.test_type]));
+    const testOfMeas = new Map(measurements.map(m => [m.id, m.fields.id_test]));
+    const ids = [], names = [];
+    curves.forEach(c => {
+      const fr = fraction.get(testOfMeas.get(c.fields.id_measurement));
+      const y = String(c.fields.y_name || '').trim().toLowerCase();
+      if (fr && (y === 'cl' || y === '')) { ids.push(c.id); names.push(fr === 'free_cl' ? 'Cl_free' : 'Cl_total'); }
+    });
+    if (ids.length) await grist.docApi.applyUserActions([['BulkUpdateRecord', 'CURVE', ids, { y_name: names }]]);
+    GristHelpers.log(`Migration v4: ${ids.length} chloride curve(s) renamed Cl_total / Cl_free`, 'ok');
   },
 
   // =========================================================================

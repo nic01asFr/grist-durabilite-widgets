@@ -561,8 +561,9 @@
       return cem.name || null;
     }
 
+    // Chloride fraction of the profile: 'total_cl' | 'free_cl' | '' (curve name, legacy test type)
     function getTestType(p) {
-      return (testMapGlobal.get(p.measurement.id_test) || {}).test_type || '';
+      return GristHelpers.chlorideFraction(p, testMapGlobal.get(p.measurement.id_test));
     }
 
     function getChecked(name) {
